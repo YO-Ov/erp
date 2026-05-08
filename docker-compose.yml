@@ -1,0 +1,27 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: hwlee-erp-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: erp_db
+      MYSQL_USER: erp
+      MYSQL_PASSWORD: erp
+      TZ: Asia/Seoul
+    ports:
+      - "3307:3306"
+    volumes:
+      - hwlee-erp-mysql-data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+09:00
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uerp", "-perp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  hwlee-erp-mysql-data:

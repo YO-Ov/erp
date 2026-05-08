@@ -1,0 +1,29 @@
+### macOS ###
+.DS_Store
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+### VS Code ###
+.vscode/
+
+### Claude Code ###
+.claude/
+
+### Gradle ###
+.gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### Logs ###
+*.log
+
+### Env ###
+.env
+.env.local
+.env.*.local

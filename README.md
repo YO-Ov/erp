@@ -20,38 +20,20 @@ my-app/erp/                   ← 모노레포 루트
 
 ## 실행 방법
 
-### 1) 인프라 시작
+매일 따라할 시작/종료 흐름과 트러블슈팅은 [`실행-가이드.md`](실행-가이드.md) 참고.
+
+요약:
 ```bash
-docker compose up -d
+docker compose up -d           # ① 인프라
+cd hwlee-erp && ./gradlew bootRun   # ② 앱
+curl http://localhost:8080/api/health | jq   # ③ 동작 확인
+# Swagger UI: http://localhost:8080/swagger-ui.html
 ```
 
-### 2) ERP 애플리케이션 실행
+종료:
 ```bash
-cd hwlee-erp
-./gradlew bootRun
-```
-
-### 3) Swagger UI 접속
-http://localhost:8080/swagger-ui.html
-
-### 4) 헬스체크 확인
-```bash
-curl http://localhost:8080/api/health | jq
-```
-
-기대 응답:
-```json
-{
-  "status": "UP",
-  "db": "OK",
-  "timestamp": "2026-05-06T20:34:00+09:00"
-}
-```
-
-### 5) 통합 테스트 실행
-```bash
-cd hwlee-erp
-./gradlew test
+# 앱 터미널에서 Ctrl+C
+docker compose stop
 ```
 
 ## 학습 진행 현황

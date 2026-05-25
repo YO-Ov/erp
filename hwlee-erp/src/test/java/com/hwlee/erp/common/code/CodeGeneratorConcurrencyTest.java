@@ -27,7 +27,7 @@ import org.springframework.context.annotation.Import;
  *
  * <p>업무 규칙: 동시에 N 개 발급 요청이 들어와도 코드는 절대 중복되지 않는다.
  *
- * <p>전제: (prefix, year) 시퀀스 행은 미리 만들어져 있다고 가정한다.
+ * <p>전제: (prefix, periodKey) 시퀀스 행은 미리 만들어져 있다고 가정한다.
  * 운영에서 행 초기화는 부팅 시 한 번만 발생하는 이벤트이고,
  * 그 충돌 처리는 별도 단위 테스트 ({@code CodeGeneratorInitRaceTest}) 에서 다룬다.
  */
@@ -48,11 +48,11 @@ class CodeGeneratorConcurrencyTest {
 
     @BeforeEach
     void seedSequenceRow() {
-        int year = LocalDate.now(clock).getYear();
+        String periodKey = String.valueOf(LocalDate.now(clock).getYear());
         repository.findAll().stream()
-                .filter(s -> s.getPrefix().equals(PREFIX) && s.getYear() == year)
+                .filter(s -> s.getPrefix().equals(PREFIX) && s.getPeriodKey().equals(periodKey))
                 .findFirst()
-                .ifPresentOrElse(s -> {}, () -> repository.save(CodeSequence.initial(PREFIX, year)));
+                .ifPresentOrElse(s -> {}, () -> repository.save(CodeSequence.initial(PREFIX, periodKey)));
     }
 
     @Test

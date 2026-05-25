@@ -2,6 +2,7 @@ package com.hwlee.erp.common.code;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -13,10 +14,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-import jakarta.persistence.EntityListeners;
 
 /**
- * (prefix, year) 별 다음 발급 번호를 관리하는 시퀀스 테이블.
+ * (prefix, period_key) 별 다음 발급 번호를 관리하는 시퀀스 테이블.
+ *
+ * <p>{@code period_key} 는 발급 단위 — 마스터는 연("2026"), 트랜잭션은 일("20260524").
  *
  * <p>코드 자동 생성 시 비관적 락(SELECT ... FOR UPDATE)으로 행을 점유한 뒤
  * next_number 를 1 증가시켜 번호 중복을 방지한다.
@@ -30,7 +32,9 @@ import jakarta.persistence.EntityListeners;
 @EntityListeners(AuditingEntityListener.class)
 @Table(
         name = "code_sequence",
-        uniqueConstraints = @UniqueConstraint(name = "uk_code_sequence_prefix_year", columnNames = {"prefix", "year"})
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_code_sequence_prefix_period",
+                columnNames = {"prefix", "period_key"})
 )
 public class CodeSequence {
 
@@ -42,8 +46,11 @@ public class CodeSequence {
     @Column(name = "prefix", nullable = false, length = 16)
     private String prefix;
 
-    @Column(name = "year", nullable = false)
-    private int year;
+    /**
+     * 발급 단위 키. 마스터(연 단위)는 {@code "YYYY"}, 트랜잭션(일 단위)는 {@code "YYYYMMDD"}.
+     */
+    @Column(name = "period_key", nullable = false, length = 8)
+    private String periodKey;
 
     @Column(name = "next_number", nullable = false)
     private int nextNumber;
@@ -52,10 +59,10 @@ public class CodeSequence {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public static CodeSequence initial(String prefix, int year) {
+    public static CodeSequence initial(String prefix, String periodKey) {
         CodeSequence seq = new CodeSequence();
         seq.prefix = prefix;
-        seq.year = year;
+        seq.periodKey = periodKey;
         seq.nextNumber = 1;
         return seq;
     }

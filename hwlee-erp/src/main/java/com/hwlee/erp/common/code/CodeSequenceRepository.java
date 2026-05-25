@@ -10,10 +10,11 @@ import org.springframework.data.repository.query.Param;
 public interface CodeSequenceRepository extends JpaRepository<CodeSequence, Long> {
 
     /**
-     * 비관적 쓰기 락(SELECT ... FOR UPDATE)으로 (prefix, year) 행을 점유한다.
-     * 동일 (prefix, year) 를 요청한 다른 트랜잭션은 이 트랜잭션이 끝날 때까지 대기한다.
+     * 비관적 쓰기 락(SELECT ... FOR UPDATE)으로 (prefix, periodKey) 행을 점유한다.
+     * 동일 (prefix, periodKey) 를 요청한 다른 트랜잭션은 이 트랜잭션이 끝날 때까지 대기한다.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select s from CodeSequence s where s.prefix = :prefix and s.year = :year")
-    Optional<CodeSequence> findForUpdate(@Param("prefix") String prefix, @Param("year") int year);
+    @Query("select s from CodeSequence s where s.prefix = :prefix and s.periodKey = :periodKey")
+    Optional<CodeSequence> findForUpdate(@Param("prefix") String prefix,
+                                         @Param("periodKey") String periodKey);
 }

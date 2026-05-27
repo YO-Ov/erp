@@ -1,6 +1,6 @@
 package com.hwlee.erp.sd.invoice;
 
-import com.hwlee.erp.sd.TransactionNumberGenerator;
+import com.hwlee.erp.common.code.TransactionNumberGenerator;
 import com.hwlee.erp.sd.invoice.dto.InvoiceCreateRequest;
 import com.hwlee.erp.sd.invoice.dto.InvoiceLineRequest;
 import com.hwlee.erp.sd.invoice.dto.InvoiceResponse;

@@ -3,6 +3,7 @@ package com.hwlee.erp.sd;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hwlee.erp.TestcontainersConfiguration;
+import com.hwlee.erp.common.code.TransactionNumberGenerator;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;

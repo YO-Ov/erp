@@ -1,6 +1,6 @@
 package com.hwlee.erp.sd.delivery;
 
-import com.hwlee.erp.sd.TransactionNumberGenerator;
+import com.hwlee.erp.common.code.TransactionNumberGenerator;
 import com.hwlee.erp.sd.delivery.dto.DeliveryCreateRequest;
 import com.hwlee.erp.sd.delivery.dto.DeliveryLineRequest;
 import com.hwlee.erp.sd.delivery.dto.DeliveryResponse;

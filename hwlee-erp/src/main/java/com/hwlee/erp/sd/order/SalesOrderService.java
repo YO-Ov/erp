@@ -6,7 +6,7 @@ import com.hwlee.erp.master.employee.Employee;
 import com.hwlee.erp.master.employee.EmployeeRepository;
 import com.hwlee.erp.master.item.Item;
 import com.hwlee.erp.master.item.ItemRepository;
-import com.hwlee.erp.sd.TransactionNumberGenerator;
+import com.hwlee.erp.common.code.TransactionNumberGenerator;
 import com.hwlee.erp.sd.order.creditcheck.CreditLimitChecker;
 import com.hwlee.erp.sd.order.dto.SalesOrderCreateRequest;
 import com.hwlee.erp.sd.order.dto.SalesOrderLineRequest;

@@ -4,7 +4,7 @@ import com.hwlee.erp.master.customer.Customer;
 import com.hwlee.erp.master.customer.CustomerRepository;
 import com.hwlee.erp.master.item.Item;
 import com.hwlee.erp.master.item.ItemRepository;
-import com.hwlee.erp.sd.TransactionNumberGenerator;
+import com.hwlee.erp.common.code.TransactionNumberGenerator;
 import com.hwlee.erp.sd.quotation.dto.QuotationCreateRequest;
 import com.hwlee.erp.sd.quotation.dto.QuotationLineRequest;
 import com.hwlee.erp.sd.quotation.dto.QuotationResponse;

@@ -1,11 +1,14 @@
 package com.hwlee.erp.common.error;
 
+import com.hwlee.erp.mm.stock.InsufficientStockException;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.OptimisticLockException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.validation.FieldError;
@@ -63,6 +66,28 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleIllegalState(IllegalStateException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         problem.setTitle("Conflict");
+        return problem;
+    }
+
+    @ExceptionHandler(InsufficientStockException.class)
+    public ProblemDetail handleInsufficientStock(InsufficientStockException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Insufficient Stock");
+        problem.setProperty("code", "INSUFFICIENT_STOCK");
+        problem.setProperty("itemId", ex.getItemId());
+        problem.setProperty("warehouseId", ex.getWarehouseId());
+        problem.setProperty("available", ex.getAvailable());
+        problem.setProperty("requested", ex.getRequested());
+        return problem;
+    }
+
+    @ExceptionHandler({OptimisticLockException.class, OptimisticLockingFailureException.class})
+    public ProblemDetail handleOptimisticLock(Exception ex) {
+        log.warn("Optimistic lock conflict", ex);
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "동시 수정 충돌 — 다른 트랜잭션이 먼저 갱신했습니다. 재시도해 주세요.");
+        problem.setTitle("Optimistic Lock Conflict");
+        problem.setProperty("code", "OPTIMISTIC_LOCK_CONFLICT");
         return problem;
     }
 }

@@ -1,13 +1,12 @@
-package com.hwlee.erp.sd;
+package com.hwlee.erp.common.code;
 
-import com.hwlee.erp.common.code.CodeGenerator;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * SD 모듈의 트랜잭션 번호 발급 래퍼.
+ * 트랜잭션 번호 발급 래퍼 (모듈 공통).
  *
  * <p>형식: {@code <PREFIX>-<YYYYMMDD>-<NNN>} — 예: {@code SO-20260524-001}.
  * 같은 날짜 동안 prefix 별 일련번호가 1부터 증가하며, 자정이 지나면 새 periodKey 로 리셋된다.
@@ -23,6 +22,8 @@ public class TransactionNumberGenerator {
     static final String PREFIX_SALES_ORDER = "SO";
     static final String PREFIX_DELIVERY = "DLV";
     static final String PREFIX_INVOICE = "INV";
+    static final String PREFIX_GOODS_RECEIPT = "GR";
+    static final String PREFIX_GOODS_ISSUE = "GI";
 
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
@@ -42,6 +43,14 @@ public class TransactionNumberGenerator {
 
     public String nextInvoiceNumber(LocalDate invoiceDate) {
         return codeGenerator.nextTransactionCode(PREFIX_INVOICE, periodKey(invoiceDate));
+    }
+
+    public String nextGoodsReceiptNumber(LocalDate receiptDate) {
+        return codeGenerator.nextTransactionCode(PREFIX_GOODS_RECEIPT, periodKey(receiptDate));
+    }
+
+    public String nextGoodsIssueNumber(LocalDate issueDate) {
+        return codeGenerator.nextTransactionCode(PREFIX_GOODS_ISSUE, periodKey(issueDate));
     }
 
     private static String periodKey(LocalDate date) {

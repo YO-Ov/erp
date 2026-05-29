@@ -9,6 +9,7 @@ import com.hwlee.erp.mm.goodsreceipt.dto.GoodsReceiptCreateRequest;
 import com.hwlee.erp.mm.goodsreceipt.dto.GoodsReceiptLineRequest;
 import com.hwlee.erp.mm.goodsreceipt.dto.GoodsReceiptResponse;
 import com.hwlee.erp.mm.goodsreceipt.dto.GoodsReceiptUpdateRequest;
+import com.hwlee.erp.mm.goodsreceipt.event.GoodsReceiptPostedEvent;
 import com.hwlee.erp.mm.stock.MovementReason;
 import com.hwlee.erp.mm.stock.Stock;
 import com.hwlee.erp.mm.stock.StockMovement;
@@ -22,6 +23,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -47,6 +49,7 @@ public class GoodsReceiptService {
     private final StockRepository stockRepository;
     private final StockMovementRepository stockMovementRepository;
     private final TransactionNumberGenerator numberGenerator;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
     @Transactional
@@ -108,6 +111,16 @@ public class GoodsReceiptService {
                     item, warehouse, line.getQuantity(), line.getUnitCost(),
                     MovementReason.GOODS_RECEIPT, "GR", gr.getId(), now));
         }
+
+        // ⭐ Phase 5 — 입고 확정 사건 발행. FI 의 PurchaseAccountingListener 가
+        // 같은 트랜잭션(BEFORE_COMMIT) 안에서 매입 자동 분개(차)재고자산 / 대)매입채무) 생성.
+        events.publishEvent(new GoodsReceiptPostedEvent(
+                gr.getId(), gr.getNumber(), gr.getReceiptDate(),
+                gr.getLines().stream()
+                        .map(l -> new GoodsReceiptPostedEvent.Line(
+                                l.getItem().getId(), l.getQuantity(), l.getUnitCost()))
+                        .toList()));
+
         return mapper.toResponse(gr);
     }
 

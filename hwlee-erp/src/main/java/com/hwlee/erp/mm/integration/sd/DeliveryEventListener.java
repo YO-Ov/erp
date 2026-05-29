@@ -5,6 +5,7 @@ import com.hwlee.erp.sd.delivery.event.DeliveryCancelledEvent;
 import com.hwlee.erp.sd.delivery.event.DeliveryShippedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -32,6 +33,12 @@ class DeliveryEventListener {
 
     private final GoodsIssueService goodsIssueService;
 
+    /**
+     * {@code @Order(10)} 으로 회계 리스너({@code @Order(20)}, Phase 5) 보다 먼저 실행되도록 못박는다.
+     * 회계의 매출원가 분개는 StockMovement 의 {@code unit_cost} 가 박혀 있어야 계산 가능 —
+     * 즉 GoodsIssue.post 가 끝난 뒤에 회계가 동작해야 한다. 순서가 정합성을 좌우.
+     */
+    @Order(10)
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     void onShipped(DeliveryShippedEvent event) {
         log.info("출하 확정 사건 수신: deliveryId={}, warehouseId={}, lines={}",

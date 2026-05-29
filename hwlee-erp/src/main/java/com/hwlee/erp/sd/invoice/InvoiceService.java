@@ -4,11 +4,13 @@ import com.hwlee.erp.common.code.TransactionNumberGenerator;
 import com.hwlee.erp.sd.invoice.dto.InvoiceCreateRequest;
 import com.hwlee.erp.sd.invoice.dto.InvoiceLineRequest;
 import com.hwlee.erp.sd.invoice.dto.InvoiceResponse;
+import com.hwlee.erp.sd.invoice.event.InvoiceIssuedEvent;
 import com.hwlee.erp.sd.order.SalesOrder;
 import com.hwlee.erp.sd.order.SalesOrderLine;
 import com.hwlee.erp.sd.order.SalesOrderRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -24,6 +26,7 @@ public class InvoiceService {
     private final InvoiceMapper mapper;
     private final SalesOrderRepository salesOrderRepository;
     private final TransactionNumberGenerator numberGenerator;
+    private final ApplicationEventPublisher events;
 
     @Transactional
     public InvoiceResponse create(InvoiceCreateRequest req) {
@@ -44,7 +47,16 @@ public class InvoiceService {
             order.recordInvoicing(iline.getSalesOrderLine(), iline.getQuantity());
         }
 
-        return mapper.toResponse(repository.save(invoice));
+        Invoice saved = repository.save(invoice);
+
+        // ⭐ Phase 5 — 인보이스 발행 사건 발행. FI 의 SalesAccountingListener 가
+        // 같은 트랜잭션(BEFORE_COMMIT) 안에서 매출 자동 분개(차)매출채권 / 대)매출+부가세) 생성.
+        // 분개 실패(차/대 불일치 등)면 인보이스 발행 자체가 롤백된다.
+        events.publishEvent(new InvoiceIssuedEvent(
+                saved.getId(), saved.getNumber(), saved.getInvoiceDate(),
+                saved.getSubtotal(), saved.getTaxAmount(), saved.getTotalAmount()));
+
+        return mapper.toResponse(saved);
     }
 
     public InvoiceResponse findById(Long id) {

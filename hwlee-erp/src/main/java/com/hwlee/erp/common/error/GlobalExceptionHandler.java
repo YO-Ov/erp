@@ -1,5 +1,6 @@
 package com.hwlee.erp.common.error;
 
+import com.hwlee.erp.fi.journal.UnbalancedJournalException;
 import com.hwlee.erp.mm.stock.InsufficientStockException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.OptimisticLockException;
@@ -78,6 +79,17 @@ public class GlobalExceptionHandler {
         problem.setProperty("warehouseId", ex.getWarehouseId());
         problem.setProperty("available", ex.getAvailable());
         problem.setProperty("requested", ex.getRequested());
+        return problem;
+    }
+
+    @ExceptionHandler(UnbalancedJournalException.class)
+    public ProblemDetail handleUnbalancedJournal(UnbalancedJournalException ex) {
+        // 복식부기의 차/대 불일치 — 422 (UNPROCESSABLE_ENTITY). 입력 형식은 맞지만 도메인 규칙 위반.
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+        problem.setTitle("Unbalanced Journal Entry");
+        problem.setProperty("code", "UNBALANCED_JOURNAL");
+        problem.setProperty("totalDebit", ex.getTotalDebit());
+        problem.setProperty("totalCredit", ex.getTotalCredit());
         return problem;
     }
 

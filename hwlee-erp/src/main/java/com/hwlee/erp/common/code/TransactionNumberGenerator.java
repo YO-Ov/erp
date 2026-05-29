@@ -24,6 +24,8 @@ public class TransactionNumberGenerator {
     static final String PREFIX_INVOICE = "INV";
     static final String PREFIX_GOODS_RECEIPT = "GR";
     static final String PREFIX_GOODS_ISSUE = "GI";
+    static final String PREFIX_JOURNAL_ENTRY = "JE";
+    static final String PREFIX_PAYMENT = "PAY";
 
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
@@ -51,6 +53,14 @@ public class TransactionNumberGenerator {
 
     public String nextGoodsIssueNumber(LocalDate issueDate) {
         return codeGenerator.nextTransactionCode(PREFIX_GOODS_ISSUE, periodKey(issueDate));
+    }
+
+    public String nextJournalEntryNumber(LocalDate entryDate) {
+        return codeGenerator.nextTransactionCode(PREFIX_JOURNAL_ENTRY, periodKey(entryDate));
+    }
+
+    public String nextPaymentNumber(LocalDate paymentDate) {
+        return codeGenerator.nextTransactionCode(PREFIX_PAYMENT, periodKey(paymentDate));
     }
 
     private static String periodKey(LocalDate date) {

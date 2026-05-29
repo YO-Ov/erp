@@ -11,6 +11,13 @@ import com.hwlee.erp.master.item.ItemCategory;
 import com.hwlee.erp.master.item.ItemService;
 import com.hwlee.erp.master.item.ItemUnit;
 import com.hwlee.erp.master.item.dto.ItemCreateRequest;
+import com.hwlee.erp.master.vendor.VendorService;
+import com.hwlee.erp.master.vendor.dto.VendorCreateRequest;
+import com.hwlee.erp.mm.goodsreceipt.GoodsReceiptService;
+import com.hwlee.erp.mm.goodsreceipt.dto.GoodsReceiptCreateRequest;
+import com.hwlee.erp.mm.goodsreceipt.dto.GoodsReceiptLineRequest;
+import com.hwlee.erp.mm.warehouse.WarehouseService;
+import com.hwlee.erp.mm.warehouse.dto.WarehouseCreateRequest;
 import com.hwlee.erp.sd.delivery.DeliveryService;
 import com.hwlee.erp.sd.delivery.dto.DeliveryCreateRequest;
 import com.hwlee.erp.sd.delivery.dto.DeliveryLineRequest;
@@ -38,6 +45,9 @@ import org.springframework.context.annotation.Import;
  *
  * <p>10대 수주 → 6대 출하 → 6대 인보이스 → 4대 출하 → 4대 인보이스.
  * 매 단계마다 SO 라인의 shipped_qty / invoiced_qty 누적과 헤더 상태 전이를 검증한다.
+ *
+ * <p><b>Phase 4 변경</b>: 출하 확정 시 MM 재고가 자동 차감되므로, 출하 전에 충분한 재고를
+ * 입고해 둬야 한다(재고 없으면 출하 자체가 롤백). 출하/청구 누적 검증의 본질은 그대로.
  */
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
@@ -45,6 +55,9 @@ class PartialDeliveryAndInvoiceScenarioTest {
 
     @Autowired CustomerService customerService;
     @Autowired ItemService itemService;
+    @Autowired VendorService vendorService;
+    @Autowired WarehouseService warehouseService;
+    @Autowired GoodsReceiptService goodsReceiptService;
     @Autowired SalesOrderService salesOrderService;
     @Autowired DeliveryService deliveryService;
     @Autowired InvoiceService invoiceService;
@@ -65,6 +78,10 @@ class PartialDeliveryAndInvoiceScenarioTest {
                 new BigDecimal("800000"),
                 new BigDecimal("1200000")));
 
+        // Phase 4: 출하될 창고에 10대 입고 (출하 시 재고 차감)
+        Long warehouseId = warehouseId();
+        stockUp(item.id(), warehouseId, 10);
+
         // step 1: 10대 수주 → 확정
         SalesOrderResponse order = salesOrderService.create(new SalesOrderCreateRequest(
                 customer.id(), null, null, LocalDate.now(),
@@ -77,7 +94,7 @@ class PartialDeliveryAndInvoiceScenarioTest {
 
         // step 2: 6대 출하 → SHIPPING
         DeliveryResponse dlv1 = deliveryService.create(new DeliveryCreateRequest(
-                soId, LocalDate.now(),
+                soId, warehouseId, LocalDate.now(),
                 List.of(new DeliveryLineRequest(solId, new BigDecimal("6")))));
         assertThat(dlv1.number()).matches("DLV-\\d{8}-\\d{3}");
 
@@ -109,7 +126,7 @@ class PartialDeliveryAndInvoiceScenarioTest {
         // step 5: 4대 출하 → SHIPPED 가 되지만 헤더는 이미 INVOICING 이므로 그대로 INVOICING 유지
         // (실무 모델: 청구가 일부 끝난 상태에서 추가 출하는 INVOICING 상태 유지)
         deliveryService.create(new DeliveryCreateRequest(
-                soId, LocalDate.now(),
+                soId, warehouseId, LocalDate.now(),
                 List.of(new DeliveryLineRequest(solId, new BigDecimal("4")))));
 
         var afterShip2 = salesOrderService.findById(soId);
@@ -142,8 +159,9 @@ class PartialDeliveryAndInvoiceScenarioTest {
         salesOrderService.confirm(order.id());
         Long solId = salesOrderService.findById(order.id()).lines().get(0).id();
 
+        // 11대 출하는 잔여 출하 가능량(10) 초과로 DeliveryLine 생성 단계에서 거부 — 재고/이벤트 도달 전.
         assertThatThrownBy(() -> deliveryService.create(new DeliveryCreateRequest(
-                order.id(), LocalDate.now(),
+                order.id(), warehouseId(), LocalDate.now(),
                 List.of(new DeliveryLineRequest(solId, new BigDecimal("11"))))))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("잔여 출하 가능량");
@@ -159,6 +177,9 @@ class PartialDeliveryAndInvoiceScenarioTest {
                 "노트북-" + System.nanoTime(), ItemCategory.NOTEBOOK, ItemUnit.EA,
                 new BigDecimal("100000"), new BigDecimal("200000")));
 
+        Long warehouseId = warehouseId();
+        stockUp(item.id(), warehouseId, 5);
+
         var order = salesOrderService.create(new SalesOrderCreateRequest(
                 customer.id(), null, null, LocalDate.now(),
                 List.of(new SalesOrderLineRequest(item.id(), new BigDecimal("5"), new BigDecimal("200000")))));
@@ -166,7 +187,7 @@ class PartialDeliveryAndInvoiceScenarioTest {
         Long solId = salesOrderService.findById(order.id()).lines().get(0).id();
 
         var dlv = deliveryService.create(new DeliveryCreateRequest(
-                order.id(), LocalDate.now(),
+                order.id(), warehouseId, LocalDate.now(),
                 List.of(new DeliveryLineRequest(solId, new BigDecimal("5")))));
         assertThat(salesOrderService.findById(order.id()).status()).isEqualTo(SalesOrderStatus.SHIPPED);
 
@@ -174,6 +195,24 @@ class PartialDeliveryAndInvoiceScenarioTest {
         var after = salesOrderService.findById(order.id());
         assertThat(after.status()).isEqualTo(SalesOrderStatus.CONFIRMED);
         assertThat(after.lines().get(0).shippedQty()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    // === helpers ===
+
+    /** 출하될 새 창고 하나 생성, id 반환. */
+    private Long warehouseId() {
+        return warehouseService.create(new WarehouseCreateRequest(
+                "WH-" + whSuffix(), "테스트창고", "서울시")).id();
+    }
+
+    /** 주어진 품목을 창고에 qty 만큼 입고하고 확정 — 출하 시 차감될 재고 확보. */
+    private void stockUp(Long itemId, Long warehouseId, int qty) {
+        var vendor = vendorService.create(new VendorCreateRequest(
+                "거래처-" + System.nanoTime(), uniqueBusinessNo(), "인천시", PaymentTerms.NET30));
+        var gr = goodsReceiptService.create(new GoodsReceiptCreateRequest(
+                vendor.id(), warehouseId, LocalDate.now(),
+                List.of(new GoodsReceiptLineRequest(itemId, new BigDecimal(qty), new BigDecimal("1000")))));
+        goodsReceiptService.post(gr.id());
     }
 
     private static final java.util.concurrent.atomic.AtomicLong SEQ =
@@ -185,5 +224,10 @@ class PartialDeliveryAndInvoiceScenarioTest {
                 (int) ((n / 10_000_000L) % 900) + 100,
                 (int) ((n / 100_000L) % 100),
                 (int) (n % 100_000L));
+    }
+
+    private static String whSuffix() {
+        long n = SEQ.incrementAndGet();
+        return "T" + Long.toString(n, 36).toUpperCase().replace("-", "");
     }
 }

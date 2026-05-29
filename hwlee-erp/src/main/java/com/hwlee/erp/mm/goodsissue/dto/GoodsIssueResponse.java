@@ -15,6 +15,7 @@ public record GoodsIssueResponse(
         GoodsIssueStatus status,
         LocalDate issueDate,
         GoodsIssueReason reason,
+        Long deliveryId,
         LocalDateTime postedAt,
         List<GoodsIssueLineResponse> lines,
         LocalDateTime createdAt,

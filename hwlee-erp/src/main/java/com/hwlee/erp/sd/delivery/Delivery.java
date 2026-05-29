@@ -41,6 +41,14 @@ public class Delivery extends BaseEntity {
     @JoinColumn(name = "sales_order_id", nullable = false)
     private SalesOrder salesOrder;
 
+    /**
+     * 출하지 창고 ID (Phase 4). DB 에는 {@code fk_delivery_warehouse} FK 가 걸려 있지만,
+     * SD 가 MM 의 {@code Warehouse} 엔티티를 import 하지 않도록 Long 으로만 매핑한다
+     * (의존 방향 {@code MM → SD} 단방향 유지). 존재 검증은 출하 시점 MM 리스너가 수행.
+     */
+    @Column(name = "warehouse_id", nullable = false)
+    private Long warehouseId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 16)
     private DeliveryStatus status = DeliveryStatus.DRAFT;
@@ -52,13 +60,15 @@ public class Delivery extends BaseEntity {
     @OrderBy("lineNo ASC")
     private List<DeliveryLine> lines = new ArrayList<>();
 
-    public static Delivery draft(String number, SalesOrder salesOrder, LocalDate shippedDate) {
+    public static Delivery draft(String number, SalesOrder salesOrder, Long warehouseId, LocalDate shippedDate) {
         if (number == null || number.isBlank()) throw new IllegalArgumentException("number 는 비어 있을 수 없다.");
         if (salesOrder == null) throw new IllegalArgumentException("salesOrder 는 null 일 수 없다.");
+        if (warehouseId == null) throw new IllegalArgumentException("warehouseId 는 null 일 수 없다.");
         if (shippedDate == null) throw new IllegalArgumentException("shippedDate 는 null 일 수 없다.");
         Delivery d = new Delivery();
         d.number = number;
         d.salesOrder = salesOrder;
+        d.warehouseId = warehouseId;
         d.shippedDate = shippedDate;
         return d;
     }

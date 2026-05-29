@@ -14,12 +14,14 @@ import com.hwlee.erp.mm.stock.StockMovementRepository;
 import com.hwlee.erp.mm.stock.StockRepository;
 import com.hwlee.erp.mm.warehouse.Warehouse;
 import com.hwlee.erp.mm.warehouse.WarehouseRepository;
+import com.hwlee.erp.sd.delivery.event.DeliveryShippedEvent;
 import jakarta.persistence.EntityNotFoundException;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -38,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
  * </ol>
  * 동시 출고는 비관 락으로 직렬화 — 음수 재고 발생 자체가 불가능.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -84,6 +87,15 @@ public class GoodsIssueService {
     @Transactional
     public GoodsIssueResponse post(Long id) {
         GoodsIssue gi = getOrThrow(id);
+        postStock(gi);
+        return mapper.toResponse(gi);
+    }
+
+    /**
+     * DRAFT → POSTED 전이 + 라인별 비관 락 재고 차감 + StockMovement(-) 적재.
+     * 직접 출고({@link #post})와 출하 연계({@link #createAndPostFromDelivery}) 가 공유한다.
+     */
+    private void postStock(GoodsIssue gi) {
         gi.post(LocalDateTime.now(clock));
         Warehouse warehouse = gi.getWarehouse();
         LocalDateTime now = LocalDateTime.now(clock);
@@ -101,7 +113,53 @@ public class GoodsIssueService {
                     item, warehouse, line.getQuantity().negate(), appliedCost,
                     MovementReason.GOODS_ISSUE, "GI", gi.getId(), now));
         }
+    }
+
+    /**
+     * 출하 확정 사건({@link DeliveryShippedEvent}) 으로부터 GoodsIssue 를 생성하고 즉시 확정한다 (Phase 4).
+     *
+     * <p>호출자는 {@code DeliveryEventListener.onShipped} — {@code @TransactionalEventListener(BEFORE_COMMIT)}
+     * 이므로 이 메서드는 출하 트랜잭션에 그대로 참여({@code REQUIRED})한다. 가용 부족이면
+     * {@code InsufficientStockException} 이 호출자(=출하 트랜잭션)로 전파되어 전체가 롤백된다.
+     */
+    @Transactional
+    public GoodsIssueResponse createAndPostFromDelivery(DeliveryShippedEvent event) {
+        Warehouse warehouse = warehouseRepository.findById(event.warehouseId())
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Warehouse not found: id=" + event.warehouseId()));
+
+        String number = numberGenerator.nextGoodsIssueNumber(event.shippedDate());
+        GoodsIssue gi = GoodsIssue.draftForDelivery(
+                number, warehouse, event.shippedDate(), event.deliveryId());
+
+        for (DeliveryShippedEvent.Line line : event.lines()) {
+            Item item = itemRepository.findById(line.itemId())
+                    .orElseThrow(() -> new EntityNotFoundException("Item not found: id=" + line.itemId()));
+            gi.addLine(item, line.quantity());
+        }
+
+        repository.save(gi);   // id 채번 — StockMovement.refId 에 박기 위해 post 전에 저장
+        postStock(gi);
         return mapper.toResponse(gi);
+    }
+
+    /**
+     * 출하 취소 사건({@code DeliveryCancelledEvent}) 으로부터 연결된 GoodsIssue 를 취소한다 (Phase 4).
+     *
+     * <p>방어적 — 연결된 GI 가 없거나(Phase 4 적용 전 출하) 이미 POSTED 가 아니면(이미 취소됨) 조용히 무시한다.
+     */
+    @Transactional
+    public void cancelByDeliveryId(Long deliveryId) {
+        GoodsIssue gi = repository.findByDeliveryId(deliveryId).orElse(null);
+        if (gi == null) {
+            log.info("출하 id={} 에 연결된 GoodsIssue 없음 — 취소 건너뜀", deliveryId);
+            return;
+        }
+        if (gi.getStatus() != GoodsIssueStatus.POSTED) {
+            log.info("GoodsIssue id={} 가 POSTED 아님(현재 {}) — 취소 건너뜀", gi.getId(), gi.getStatus());
+            return;
+        }
+        cancel(gi.getId());   // 기존 취소 로직 재사용 — 비관 락 + 재고 복원 + ADJUSTMENT_PLUS
     }
 
     /**

@@ -58,6 +58,15 @@ public class GoodsIssue extends BaseEntity {
     @Column(name = "posted_at")
     private LocalDateTime postedAt;
 
+    /**
+     * 이 출고가 비롯된 출하 ID (Phase 4). 출하 확정 시 자동 생성된 GI 만 채워지고,
+     * 사용자가 직접 등록한 GI(실사 조정/폐기 등)는 {@code null} 이다.
+     * DB 에는 {@code fk_goods_issue_delivery} FK 가 걸려 있지만, MM 이 SD 의 {@code Delivery}
+     * 엔티티를 import 하지 않도록 Long 으로만 매핑한다(의존 방향 {@code MM → SD} 단방향).
+     */
+    @Column(name = "delivery_id")
+    private Long deliveryId;
+
     @OneToMany(mappedBy = "goodsIssue", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("lineNo ASC")
     private List<GoodsIssueLine> lines = new ArrayList<>();
@@ -72,6 +81,17 @@ public class GoodsIssue extends BaseEntity {
         gi.warehouse = warehouse;
         gi.issueDate = issueDate;
         gi.reason = reason;
+        return gi;
+    }
+
+    /**
+     * 출하 연계 전용 팩토리 (Phase 4) — {@link #draft} 와 동일하되 원천 {@code deliveryId} 를 채운다.
+     * reason 은 항상 {@link GoodsIssueReason#SHIPMENT}.
+     */
+    public static GoodsIssue draftForDelivery(String number, Warehouse warehouse, LocalDate issueDate, Long deliveryId) {
+        if (deliveryId == null) throw new IllegalArgumentException("deliveryId 는 null 일 수 없다.");
+        GoodsIssue gi = draft(number, warehouse, issueDate, GoodsIssueReason.SHIPMENT);
+        gi.deliveryId = deliveryId;
         return gi;
     }
 

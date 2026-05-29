@@ -10,6 +10,7 @@ public record DeliveryResponse(
         String number,
         Long salesOrderId,
         String salesOrderNumber,
+        Long warehouseId,
         DeliveryStatus status,
         LocalDate shippedDate,
         List<DeliveryLineResponse> lines,

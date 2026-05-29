@@ -8,6 +8,7 @@ import java.util.List;
 
 public record DeliveryCreateRequest(
         @NotNull Long salesOrderId,
+        @NotNull Long warehouseId,
         @NotNull LocalDate shippedDate,
         @NotEmpty @Valid List<DeliveryLineRequest> lines
 ) {}

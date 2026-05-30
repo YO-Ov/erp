@@ -1,12 +1,17 @@
 package com.hwlee.erp.master.customer;
 
+import com.hwlee.erp.audit.AuditEntityListener;
+import com.hwlee.erp.audit.Auditable;
 import com.hwlee.erp.common.entity.BaseEntityWithCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -26,7 +31,9 @@ import org.hibernate.annotations.SQLRestriction;
 @Table(name = "customer")
 @SQLDelete(sql = "UPDATE customer SET deleted_at = NOW() WHERE id = ?")
 @SQLRestriction("deleted_at IS NULL")
-public class Customer extends BaseEntityWithCode {
+// Phase 6: 감사 대상(선택 B). BaseEntity 의 AuditingEntityListener 와 함께 동작(둘 다 실행).
+@EntityListeners(AuditEntityListener.class)
+public class Customer extends BaseEntityWithCode implements Auditable {
 
     @Column(name = "name", nullable = false, length = 200)
     private String name;
@@ -75,6 +82,19 @@ public class Customer extends BaseEntityWithCode {
         this.creditLimit = creditLimit;
         this.paymentTerms = paymentTerms;
         // 비즈니스 규칙: business_no 는 수정 불가 (외부 식별자).
+    }
+
+    /** 감사 로그에 남길 스냅샷 — 어떤 필드를 추적할지 명시적으로 고른다. */
+    @Override
+    public Map<String, Object> auditSnapshot() {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("code", getCode());
+        snapshot.put("name", name);
+        snapshot.put("businessNo", businessNo);
+        snapshot.put("creditLimit", creditLimit);
+        snapshot.put("paymentTerms", paymentTerms);
+        snapshot.put("status", getStatus());
+        return snapshot;
     }
 
     private static void validate(String name, String businessNo, BigDecimal creditLimit, PaymentTerms paymentTerms) {

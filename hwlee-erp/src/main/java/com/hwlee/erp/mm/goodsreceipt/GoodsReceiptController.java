@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/goods-receipts")
 @RequiredArgsConstructor
+@org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('PURCHASING','ADMIN')")
 public class GoodsReceiptController {
 
     private final GoodsReceiptService service;

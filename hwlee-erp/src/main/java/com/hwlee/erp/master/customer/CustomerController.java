@@ -28,10 +28,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/customers")
 @RequiredArgsConstructor
+// master 데이터: 조회는 전 업무 역할, 변경은 ADMIN (메서드 레벨에서 좁힘)
+@org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('SALES','PURCHASING','FINANCE','ADMIN')")
 public class CustomerController {
 
     private final CustomerService service;
 
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<CustomerResponse> create(@Valid @RequestBody CustomerCreateRequest req) {
         CustomerResponse created = service.create(req);
@@ -61,11 +64,13 @@ public class CustomerController {
         );
     }
 
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public CustomerResponse update(@PathVariable Long id, @Valid @RequestBody CustomerUpdateRequest req) {
         return service.update(id, req);
     }
 
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);

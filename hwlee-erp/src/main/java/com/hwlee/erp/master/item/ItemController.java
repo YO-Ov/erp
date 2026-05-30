@@ -28,10 +28,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/items")
 @RequiredArgsConstructor
+// master 데이터: 조회는 전 업무 역할, 변경은 ADMIN (메서드 레벨에서 좁힘)
+@org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('SALES','PURCHASING','FINANCE','ADMIN')")
 public class ItemController {
 
     private final ItemService service;
 
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<ItemResponse> create(@Valid @RequestBody ItemCreateRequest req) {
         ItemResponse created = service.create(req);
@@ -61,11 +64,13 @@ public class ItemController {
         );
     }
 
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ItemResponse update(@PathVariable Long id, @Valid @RequestBody ItemUpdateRequest req) {
         return service.update(id, req);
     }
 
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);

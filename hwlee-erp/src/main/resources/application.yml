@@ -21,6 +21,12 @@ spring:
 server:
   port: 8080
 
+# Phase 6 — JWT 설정 (운영에선 환경변수 JWT_SECRET 로 주입)
+erp:
+  jwt:
+    secret: ${JWT_SECRET:hwlee-erp-local-dev-secret-key-please-change-in-prod-0123456789abcdef}
+    access-token-validity-seconds: 3600
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

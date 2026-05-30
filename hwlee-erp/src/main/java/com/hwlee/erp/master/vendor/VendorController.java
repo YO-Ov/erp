@@ -24,10 +24,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/vendors")
 @RequiredArgsConstructor
+@org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('SALES','PURCHASING','FINANCE','ADMIN')")
 public class VendorController {
 
     private final VendorService service;
 
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<VendorResponse> create(@Valid @RequestBody VendorCreateRequest req) {
         VendorResponse created = service.create(req);
@@ -59,11 +61,13 @@ public class VendorController {
         return service.search(spec, pageable);
     }
 
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public VendorResponse update(@PathVariable Long id, @Valid @RequestBody VendorUpdateRequest req) {
         return service.update(id, req);
     }
 
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);

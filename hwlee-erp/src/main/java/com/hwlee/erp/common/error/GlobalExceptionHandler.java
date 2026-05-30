@@ -11,6 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.http.ProblemDetail;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -90,6 +92,26 @@ public class GlobalExceptionHandler {
         problem.setProperty("code", "UNBALANCED_JOURNAL");
         problem.setProperty("totalDebit", ex.getTotalDebit());
         problem.setProperty("totalCredit", ex.getTotalCredit());
+        return problem;
+    }
+
+    // 인증 실패 (잘못된 자격증명/비활성/잠금 등) → 401.
+    // 단, Security 필터 단계에서 발생하는 인증 예외는 RestAuthenticationEntryPoint 가 처리한다.
+    // 이 핸들러는 컨트롤러 도달 이후(예: AuthService 로그인) 발생분을 잡는다.
+    @ExceptionHandler(AuthenticationException.class)
+    public ProblemDetail handleAuthentication(AuthenticationException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED,
+                "이메일 또는 비밀번호가 올바르지 않습니다.");
+        problem.setTitle("Unauthorized");
+        return problem;
+    }
+
+    // 인가 실패 (@PreAuthorize 거부) → 403.
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN,
+                "이 작업을 수행할 권한이 없습니다.");
+        problem.setTitle("Forbidden");
         return problem;
     }
 

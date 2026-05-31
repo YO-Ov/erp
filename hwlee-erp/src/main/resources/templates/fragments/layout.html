@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<!--
+  공통 셸 레이아웃(데코레이터). 각 화면은 아래처럼 자신의 본문만 'content' 조각으로 넘긴다:
+
+    <html th:replace="~{fragments/layout :: document('견적', 'quotation', ~{::content})}">
+    <body><div th:fragment="content"> ...본문... </div></body></html>
+
+  파라미터: title(상단바/탭 제목), active(사이드바 강조 키), content(본문 조각)
+-->
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:fragment="document(title, active, content)">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="'현우ERP · ' + ${title}">현우ERP</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/css/app.css">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/erp.js"></script>
+</head>
+<body>
+<div class="app-layout">
+
+    <!-- ── 좌측 사이드바 ───────────────────────────────────── -->
+    <aside class="app-sidebar">
+        <a class="sidebar-brand" href="/">
+            <span class="brand-mark"><i class="bi bi-box-seam"></i></span>
+            현우<span class="brand-erp">ERP</span>
+        </a>
+        <nav class="sidebar-nav">
+            <a class="nav-link" th:classappend="${active == 'dashboard'} ? 'active'" href="/">
+                <i class="bi bi-grid-1x2"></i> 대시보드
+            </a>
+
+            <div sec:authorize="hasAnyRole('SALES','ADMIN')">
+                <div class="nav-section">영업 (SD)</div>
+                <a class="nav-link" th:classappend="${active == 'quotation'} ? 'active'" href="/sd/quotations">
+                    <i class="bi bi-file-earmark-text"></i> 견적
+                </a>
+                <a class="nav-link" th:classappend="${active == 'order'} ? 'active'" href="/sd/sales-orders">
+                    <i class="bi bi-cart-check"></i> 수주
+                </a>
+                <a class="nav-link" th:classappend="${active == 'delivery'} ? 'active'" href="/sd/deliveries">
+                    <i class="bi bi-truck"></i> 출하
+                </a>
+                <a class="nav-link" th:classappend="${active == 'invoice'} ? 'active'" href="/sd/invoices">
+                    <i class="bi bi-receipt"></i> 인보이스
+                </a>
+            </div>
+
+            <div sec:authorize="hasRole('ADMIN')">
+                <div class="nav-section">관리자</div>
+                <a class="nav-link" th:classappend="${active == 'admin-users'} ? 'active'" href="/admin/users">
+                    <i class="bi bi-people"></i> 사용자
+                </a>
+                <a class="nav-link" th:classappend="${active == 'admin-roles'} ? 'active'" href="/admin/roles">
+                    <i class="bi bi-shield-lock"></i> 역할
+                </a>
+            </div>
+        </nav>
+    </aside>
+
+    <div class="sidebar-backdrop" onclick="document.body.classList.remove('sidebar-open')"></div>
+
+    <!-- ── 본문 영역 ───────────────────────────────────────── -->
+    <div class="app-body">
+        <header class="app-topbar">
+            <button class="sidebar-toggle" onclick="document.body.classList.toggle('sidebar-open')">
+                <i class="bi bi-list"></i>
+            </button>
+            <div class="topbar-title" th:text="${title}">제목</div>
+            <div class="topbar-right">
+                <span class="user-chip">
+                    <i class="bi bi-person-circle"></i>
+                    <span sec:authentication="name">사용자</span>
+                </span>
+                <button class="btn btn-sm btn-outline-secondary" onclick="ERP.logout()">
+                    <i class="bi bi-box-arrow-right"></i> 로그아웃
+                </button>
+            </div>
+        </header>
+
+        <main class="app-content">
+            <div th:replace="${content}">본문</div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

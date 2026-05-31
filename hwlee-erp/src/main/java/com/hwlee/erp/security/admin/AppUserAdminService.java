@@ -24,11 +24,22 @@ public class AppUserAdminService {
     private final RoleRepository roleRepository;
 
     public List<AppUser> findAllUsers() {
-        return appUserRepository.findAll();
+        List<AppUser> users = appUserRepository.findAll();
+        // OSIV=false 라 뷰 렌더링 시점엔 세션이 닫혀 있다 → 화면에서 쓸 지연 연관을
+        // 트랜잭션(여기) 안에서 미리 초기화한다. (직원·역할)
+        users.forEach(u -> {
+            if (u.getEmployee() != null) {
+                u.getEmployee().getName();
+            }
+            u.getRoles().size();
+        });
+        return users;
     }
 
     public List<Role> findAllRoles() {
-        return roleRepository.findAll();
+        List<Role> roles = roleRepository.findAll();
+        roles.forEach(role -> role.getPermissions().size()); // 권한 컬렉션 초기화
+        return roles;
     }
 
     /** 사용자의 역할 집합을 통째로 교체 (체크박스 선택분으로). */

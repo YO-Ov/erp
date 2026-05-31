@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('견적 상세', 'quotation', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>견적 상세 <span id="h-number" class="text-muted fs-6 fw-normal"></span></h1>
+            <div class="crumb">영업 (SD) · Quotation</div>
+        </div>
+        <a href="/sd/quotations" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-2">상태</dt>
+                <dd class="col-sm-4" id="d-status">-</dd>
+                <dt class="col-sm-2">고객</dt>
+                <dd class="col-sm-4" id="d-customer">-</dd>
+
+                <dt class="col-sm-2">발행일</dt>
+                <dd class="col-sm-4" id="d-issued">-</dd>
+                <dt class="col-sm-2">유효기간</dt>
+                <dd class="col-sm-4" id="d-valid">-</dd>
+
+                <dt class="col-sm-2">합계 금액</dt>
+                <dd class="col-sm-4 fw-bold" id="d-total">-</dd>
+                <dt class="col-sm-2">등록</dt>
+                <dd class="col-sm-4 small text-muted" id="d-audit">-</dd>
+            </dl>
+        </div>
+    </div>
+
+    <!-- 상태별 액션 버튼 -->
+    <div class="mb-3" id="actions"></div>
+
+    <h6>품목 라인</h6>
+    <table class="table table-bordered align-middle bg-white">
+        <thead class="table-light">
+        <tr>
+            <th style="width:60px;">#</th>
+            <th>품목</th>
+            <th class="text-end">수량</th>
+            <th class="text-end">단가</th>
+            <th class="text-end">라인 합계</th>
+        </tr>
+        </thead>
+        <tbody id="lines"></tbody>
+    </table>
+</div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const STATUS = {
+        DRAFT:     {label: '초안',   color: 'secondary'},
+        SENT:      {label: '발송됨', color: 'primary'},
+        ACCEPTED:  {label: '수락됨', color: 'success'},
+        EXPIRED:   {label: '만료',   color: 'warning'},
+        CANCELLED: {label: '취소됨', color: 'dark'},
+    };
+
+    async function load() {
+        try {
+            const q = await ERP.api('/api/quotations/' + ID);
+            render(q);
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    function render(q) {
+        const s = STATUS[q.status] || {label: q.status, color: 'secondary'};
+        document.getElementById('h-number').textContent = q.number;
+        document.getElementById('d-status').innerHTML = ERP.badge(s.label, s.color);
+        document.getElementById('d-customer').textContent = `${q.customerName} (${q.customerCode})`;
+        document.getElementById('d-issued').textContent = q.issuedDate ?? '-';
+        document.getElementById('d-valid').textContent = q.validUntil ?? '-';
+        document.getElementById('d-total').textContent = ERP.won(q.totalAmount);
+        document.getElementById('d-audit').textContent =
+            `${q.createdBy ?? '?'} · ${(q.createdAt ?? '').replace('T', ' ').slice(0, 16)}`;
+
+        document.getElementById('lines').innerHTML = (q.lines || []).map(l => `
+            <tr>
+                <td>${l.lineNo}</td>
+                <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
+                <td class="text-end">${ERP.num(l.quantity)}</td>
+                <td class="text-end">${ERP.won(l.unitPrice)}</td>
+                <td class="text-end">${ERP.won(l.lineTotal)}</td>
+            </tr>`).join('');
+
+        renderActions(q.status);
+    }
+
+    // 상태머신: DRAFT(수정/발송/취소), SENT(승인/취소), 그 외(읽기전용)
+    function renderActions(status) {
+        const box = document.getElementById('actions');
+        const btns = [];
+        if (status === 'DRAFT') {
+            btns.push(`<a href="/sd/quotations/${ID}/edit" class="btn btn-sm btn-outline-primary">수정</a>`);
+            btns.push(`<button class="btn btn-sm btn-primary" onclick="act('send','발송')">발송</button>`);
+            btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소</button>`);
+        } else if (status === 'SENT') {
+            btns.push(`<button class="btn btn-sm btn-success" onclick="act('accept','승인')">승인</button>`);
+            btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소</button>`);
+        } else {
+            box.innerHTML = '<span class="text-muted small">최종 상태입니다(읽기 전용).</span>';
+            return;
+        }
+        box.innerHTML = btns.join(' ');
+    }
+
+    async function act(action, label) {
+        if (!confirm(`이 견적을 ${label}하시겠습니까?`)) return;
+        try {
+            const q = await ERP.api(`/api/quotations/${ID}/${action}`, {method: 'POST'});
+            ERP.flash(`${label} 완료`, 'success');
+            render(q);
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', load);
+</script>
+</div>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('수주 상세', 'order', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>수주 상세 <span id="h-number" class="text-muted fs-6 fw-normal"></span></h1>
+            <div class="crumb">영업 (SD) · Sales Order</div>
+        </div>
+        <a href="/sd/sales-orders" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <div class="card mb-3"><div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-2">상태</dt><dd class="col-sm-4" id="d-status">-</dd>
+            <dt class="col-sm-2">고객</dt><dd class="col-sm-4" id="d-customer">-</dd>
+            <dt class="col-sm-2">영업담당</dt><dd class="col-sm-4" id="d-salesperson">-</dd>
+            <dt class="col-sm-2">견적</dt><dd class="col-sm-4" id="d-quotation">-</dd>
+            <dt class="col-sm-2">주문일</dt><dd class="col-sm-4" id="d-order">-</dd>
+            <dt class="col-sm-2">확정일시</dt><dd class="col-sm-4" id="d-confirmed">-</dd>
+            <dt class="col-sm-2">합계 금액</dt><dd class="col-sm-4 fw-bold" id="d-total">-</dd>
+            <dt class="col-sm-2">등록</dt><dd class="col-sm-4 small text-muted" id="d-audit">-</dd>
+        </dl>
+    </div></div>
+
+    <div class="mb-3" id="actions"></div>
+
+    <h6>품목 라인 <span class="text-muted small">(주문량 → 출하량 → 청구량 진행)</span></h6>
+    <table class="table table-bordered align-middle bg-white">
+        <thead class="table-light">
+        <tr>
+            <th style="width:50px;">#</th><th>품목</th>
+            <th class="text-end">주문량</th><th class="text-end">출하량</th><th class="text-end">청구량</th>
+            <th class="text-end">단가</th><th class="text-end">라인 합계</th>
+        </tr>
+        </thead>
+        <tbody id="lines"></tbody>
+    </table>
+
+    <div class="d-flex gap-2 mt-3" id="next-actions"></div>
+</div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const STATUS = {
+        DRAFT:     {label: '초안',     color: 'secondary'},
+        CONFIRMED: {label: '확정',     color: 'primary'},
+        SHIPPING:  {label: '부분출하', color: 'info'},
+        SHIPPED:   {label: '출하완료', color: 'info'},
+        INVOICING: {label: '부분청구', color: 'warning'},
+        INVOICED:  {label: '청구완료', color: 'success'},
+        CANCELLED: {label: '취소됨',   color: 'dark'},
+    };
+
+    async function load() {
+        try { render(await ERP.api('/api/sales-orders/' + ID)); }
+        catch (e) { ERP.flashError(e); }
+    }
+
+    function render(o) {
+        const s = STATUS[o.status] || {label: o.status, color: 'secondary'};
+        document.getElementById('h-number').textContent = o.number;
+        document.getElementById('d-status').innerHTML = ERP.badge(s.label, s.color);
+        document.getElementById('d-customer').textContent = `${o.customerName} (${o.customerCode})`;
+        document.getElementById('d-salesperson').textContent = o.salespersonName ?? '-';
+        document.getElementById('d-quotation').innerHTML = o.quotationId
+            ? `<a href="/sd/quotations/${o.quotationId}">${ERP.esc(o.quotationNumber)}</a>` : '-';
+        document.getElementById('d-order').textContent = o.orderDate ?? '-';
+        document.getElementById('d-confirmed').textContent = o.confirmedAt
+            ? o.confirmedAt.replace('T', ' ').slice(0, 16) : '-';
+        document.getElementById('d-total').textContent = ERP.won(o.totalAmount);
+        document.getElementById('d-audit').textContent =
+            `${o.createdBy ?? '?'} · ${(o.createdAt ?? '').replace('T', ' ').slice(0, 16)}`;
+
+        document.getElementById('lines').innerHTML = (o.lines || []).map(l => `
+            <tr>
+                <td>${l.lineNo}</td>
+                <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
+                <td class="text-end">${ERP.num(l.orderQty)}</td>
+                <td class="text-end">${ERP.num(l.shippedQty)}</td>
+                <td class="text-end">${ERP.num(l.invoicedQty)}</td>
+                <td class="text-end">${ERP.won(l.unitPrice)}</td>
+                <td class="text-end">${ERP.won(l.lineTotal)}</td>
+            </tr>`).join('');
+
+        renderActions(o.status);
+    }
+
+    // DRAFT(수정/확정/취소), CONFIRMED(취소). 출하/청구 진행 중엔 헤더 액션 없음.
+    function renderActions(status) {
+        const box = document.getElementById('actions');
+        const next = document.getElementById('next-actions');
+        const btns = [];
+        if (status === 'DRAFT') {
+            btns.push(`<a href="/sd/sales-orders/${ID}/edit" class="btn btn-sm btn-outline-primary">수정</a>`);
+            btns.push(`<button class="btn btn-sm btn-primary" onclick="act('confirm','확정')">확정 (신용한도 검증)</button>`);
+            btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소</button>`);
+        } else if (status === 'CONFIRMED') {
+            btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소</button>`);
+        }
+        box.innerHTML = btns.length ? btns.join(' ')
+            : '<span class="text-muted small">헤더 액션 없음(출하/청구로 진행 중이거나 종료된 수주).</span>';
+
+        // 후속 문서 만들기 — 출하는 잔여가 있는 CONFIRMED/SHIPPING, 청구는 출하분이 있는 단계
+        const flow = [];
+        if (['CONFIRMED', 'SHIPPING'].includes(status))
+            flow.push(`<a href="/sd/deliveries/new?salesOrderId=${ID}" class="btn btn-sm btn-success">＋ 이 수주로 출하 생성</a>`);
+        if (['SHIPPING', 'SHIPPED', 'INVOICING'].includes(status))
+            flow.push(`<a href="/sd/invoices/new?salesOrderId=${ID}" class="btn btn-sm btn-warning">＋ 이 수주로 인보이스 발행</a>`);
+        next.innerHTML = flow.join(' ');
+    }
+
+    async function act(action, label) {
+        if (!confirm(`이 수주를 ${label}하시겠습니까?`)) return;
+        try {
+            render(await ERP.api(`/api/sales-orders/${ID}/${action}`, {method: 'POST'}));
+            ERP.flash(`${label} 완료`, 'success');
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    document.addEventListener('DOMContentLoaded', load);
+</script>
+</div>
+</body>
+</html>

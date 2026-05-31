@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('수주 작성', 'order', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1 id="title">신규 수주</h1>
+            <div class="crumb">영업 (SD) · Sales Order</div>
+        </div>
+        <a href="/sd/sales-orders" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <form id="form">
+        <div class="row g-3 mb-3">
+            <div class="col-md-3" id="quotation-box">
+                <label class="form-label">견적에서 불러오기 <span class="text-muted small">(선택)</span></label>
+                <select id="quotation" class="form-select">
+                    <option value="">직접 입력</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">고객 <span class="text-danger">*</span></label>
+                <select id="customer" class="form-select" required><option value="">선택…</option></select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">영업담당 <span class="text-muted small">(선택)</span></label>
+                <select id="salesperson" class="form-select"><option value="">선택…</option></select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">주문일 <span class="text-danger">*</span></label>
+                <input type="date" id="orderDate" class="form-control" required>
+            </div>
+        </div>
+
+        <h6>품목 라인 <span class="text-danger">*</span></h6>
+        <table class="table table-bordered align-middle bg-white">
+            <thead class="table-light">
+            <tr>
+                <th>품목</th>
+                <th style="width:140px;" class="text-end">주문량</th>
+                <th style="width:160px;" class="text-end">단가</th>
+                <th style="width:160px;" class="text-end">라인 합계</th>
+                <th style="width:50px;"></th>
+            </tr>
+            </thead>
+            <tbody id="lines"></tbody>
+            <tfoot>
+            <tr><td colspan="3" class="text-end fw-bold">합계</td>
+                <td class="text-end fw-bold" id="grandTotal">₩0</td><td></td></tr>
+            </tfoot>
+        </table>
+        <button type="button" class="btn btn-sm btn-outline-secondary mb-3" onclick="addLine()">＋ 라인 추가</button>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">저장</button>
+            <a href="/sd/sales-orders" class="btn btn-outline-secondary">취소</a>
+        </div>
+    </form>
+</div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const isEdit = ID != null;
+    let items = [];
+    let pickedQuotationId = null; // 견적에서 불러온 경우 그 견적 id 를 수주에 링크
+
+    async function loadItems() {
+        const data = await ERP.api('/api/items' + ERP.query({status: 'ACTIVE', size: 500}));
+        items = data.content || [];
+    }
+    async function loadCustomers() {
+        const data = await ERP.api('/api/customers' + ERP.query({status: 'ACTIVE', size: 500}));
+        fill('customer', (data.content || []).map(c => [c.id, `${c.name} (${c.code})`]));
+    }
+    async function loadSalespersons() {
+        const data = await ERP.api('/api/employees');
+        const list = Array.isArray(data) ? data : (data.content || []);
+        fill('salesperson', list.map(e => [e.id, `${e.name} (${e.code})`]));
+    }
+    async function loadAcceptedQuotations() {
+        const data = await ERP.api('/api/quotations' + ERP.query({status: 'ACCEPTED', size: 200}));
+        fill('quotation', (data.content || []).map(q => [q.id, `${q.number} · ${q.customerName}`]));
+    }
+    function fill(id, pairs) {
+        const sel = document.getElementById(id);
+        pairs.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); });
+    }
+
+    function itemOptions(selectedId) {
+        return ['<option value="">선택…</option>']
+            .concat(items.map(i =>
+                `<option value="${i.id}" data-price="${i.standardPrice ?? 0}"
+                    ${selectedId === i.id ? 'selected' : ''}>${ERP.esc(i.name)} (${ERP.esc(i.code)})</option>`)).join('');
+    }
+
+    function addLine(line) {
+        const tbody = document.getElementById('lines');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><select class="form-select form-select-sm line-item" onchange="onItemChange(this)">${itemOptions(line?.itemId)}</select></td>
+            <td><input type="number" step="any" min="0" class="form-control form-control-sm text-end line-qty"
+                       value="${line?.orderQty ?? ''}" oninput="recalc()"></td>
+            <td><input type="number" step="any" min="0" class="form-control form-control-sm text-end line-price"
+                       value="${line?.unitPrice ?? ''}" oninput="recalc()"></td>
+            <td class="text-end line-total">₩0</td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove();recalc()">✕</button></td>`;
+        tbody.appendChild(tr);
+        recalc();
+    }
+    function onItemChange(sel) {
+        const opt = sel.selectedOptions[0];
+        const priceInput = sel.closest('tr').querySelector('.line-price');
+        if (opt && opt.dataset.price && !priceInput.value) priceInput.value = opt.dataset.price;
+        recalc();
+    }
+    function recalc() {
+        let grand = 0;
+        document.querySelectorAll('#lines tr').forEach(tr => {
+            const qty = parseFloat(tr.querySelector('.line-qty').value) || 0;
+            const price = parseFloat(tr.querySelector('.line-price').value) || 0;
+            tr.querySelector('.line-total').textContent = ERP.won(qty * price);
+            grand += qty * price;
+        });
+        document.getElementById('grandTotal').textContent = ERP.won(grand);
+    }
+    function collectLines() {
+        const lines = [];
+        document.querySelectorAll('#lines tr').forEach(tr => {
+            const itemId = tr.querySelector('.line-item').value;
+            if (itemId) lines.push({
+                itemId: Number(itemId),
+                orderQty: tr.querySelector('.line-qty').value,
+                unitPrice: tr.querySelector('.line-price').value,
+            });
+        });
+        return lines;
+    }
+
+    // 견적 선택 → 고객/라인 자동 채우기
+    async function onQuotationChange() {
+        const qid = document.getElementById('quotation').value;
+        document.getElementById('lines').innerHTML = '';
+        if (!qid) { pickedQuotationId = null; addLine(); return; }
+        try {
+            const q = await ERP.api('/api/quotations/' + qid);
+            pickedQuotationId = q.id;
+            const csel = document.getElementById('customer');
+            csel.value = q.customerId;
+            (q.lines || []).forEach(l => addLine({itemId: l.itemId, orderQty: l.quantity, unitPrice: l.unitPrice}));
+            recalc();
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    async function submit(e) {
+        e.preventDefault();
+        const lines = collectLines();
+        if (lines.length === 0) { ERP.flash('품목 라인을 최소 1개 입력하세요.', 'warning'); return; }
+        const sp = document.getElementById('salesperson').value;
+        const body = {
+            salespersonId: sp ? Number(sp) : null,
+            orderDate: document.getElementById('orderDate').value,
+            lines,
+        };
+        try {
+            let saved;
+            if (isEdit) {
+                saved = await ERP.api('/api/sales-orders/' + ID, {method: 'PUT', body});
+            } else {
+                body.customerId = Number(document.getElementById('customer').value);
+                body.quotationId = pickedQuotationId;
+                saved = await ERP.api('/api/sales-orders', {method: 'POST', body});
+            }
+            location.href = '/sd/sales-orders/' + saved.id;
+        } catch (err) { ERP.flashError(err); }
+    }
+
+    async function init() {
+        try {
+            await Promise.all([loadItems(), loadCustomers(), loadSalespersons()]);
+            if (isEdit) {
+                document.getElementById('title').textContent = '수주 수정';
+                document.getElementById('quotation-box').style.display = 'none'; // 수정 시 견적 불러오기 숨김
+                const o = await ERP.api('/api/sales-orders/' + ID);
+                const csel = document.getElementById('customer');
+                csel.value = o.customerId; csel.disabled = true; // 고객 변경 불가
+                if (o.salespersonId) document.getElementById('salesperson').value = o.salespersonId;
+                document.getElementById('orderDate').value = o.orderDate ?? '';
+                (o.lines || []).forEach(addLine);
+            } else {
+                await loadAcceptedQuotations();
+                document.getElementById('quotation').addEventListener('change', onQuotationChange);
+                addLine();
+            }
+            recalc();
+        } catch (err) { ERP.flashError(err); }
+        document.getElementById('form').addEventListener('submit', submit);
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+</script>
+</div>
+</body>
+</html>

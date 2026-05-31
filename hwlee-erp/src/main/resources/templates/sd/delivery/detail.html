@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('출하 상세', 'delivery', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>출하 상세 <span id="h-number" class="text-muted fs-6 fw-normal"></span></h1>
+            <div class="crumb">영업 (SD) · Delivery</div>
+        </div>
+        <a href="/sd/deliveries" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <div class="card mb-3"><div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-2">상태</dt><dd class="col-sm-4" id="d-status">-</dd>
+            <dt class="col-sm-2">수주</dt><dd class="col-sm-4" id="d-so">-</dd>
+            <dt class="col-sm-2">창고 ID</dt><dd class="col-sm-4" id="d-wh">-</dd>
+            <dt class="col-sm-2">출하일</dt><dd class="col-sm-4" id="d-date">-</dd>
+            <dt class="col-sm-2">등록</dt><dd class="col-sm-4 small text-muted" id="d-audit">-</dd>
+        </dl>
+    </div></div>
+
+    <div class="alert alert-info small">
+        출하 확정 시 수주의 출하량이 누적되고 <b>MM 재고가 자동 차감</b>됩니다(Phase 4 이벤트 연동). 취소하면 재고가 복원됩니다.
+    </div>
+
+    <div class="mb-3" id="actions"></div>
+
+    <h6>출하 라인</h6>
+    <table class="table table-bordered align-middle bg-white">
+        <thead class="table-light">
+        <tr><th style="width:50px;">#</th><th>품목</th><th class="text-end">출하량</th></tr>
+        </thead>
+        <tbody id="lines"></tbody>
+    </table>
+</div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const STATUS = {
+        DRAFT:     {label: '초안',   color: 'secondary'},
+        SHIPPED:   {label: '출하됨', color: 'info'},
+        CANCELLED: {label: '취소됨', color: 'dark'},
+    };
+
+    async function load() {
+        try { render(await ERP.api('/api/deliveries/' + ID)); }
+        catch (e) { ERP.flashError(e); }
+    }
+    function render(d) {
+        const s = STATUS[d.status] || {label: d.status, color: 'secondary'};
+        document.getElementById('h-number').textContent = d.number;
+        document.getElementById('d-status').innerHTML = ERP.badge(s.label, s.color);
+        document.getElementById('d-so').innerHTML =
+            `<a href="/sd/sales-orders/${d.salesOrderId}">${ERP.esc(d.salesOrderNumber)}</a>`;
+        document.getElementById('d-wh').textContent = d.warehouseId ?? '-';
+        document.getElementById('d-date').textContent = d.shippedDate ?? '-';
+        document.getElementById('d-audit').textContent =
+            `${d.createdBy ?? '?'} · ${(d.createdAt ?? '').replace('T', ' ').slice(0, 16)}`;
+        document.getElementById('lines').innerHTML = (d.lines || []).map(l => `
+            <tr><td>${l.lineNo}</td>
+                <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
+                <td class="text-end">${ERP.num(l.quantity)}</td></tr>`).join('');
+
+        document.getElementById('actions').innerHTML = (d.status === 'SHIPPED')
+            ? `<button class="btn btn-sm btn-outline-danger" onclick="cancel()">출하 취소 (재고 복원)</button>`
+            : '<span class="text-muted small">취소됨/종료된 출하입니다.</span>';
+    }
+    async function cancel() {
+        if (!confirm('출하를 취소하시겠습니까? 수주 출하량 감소 및 재고가 복원됩니다.')) return;
+        try {
+            render(await ERP.api(`/api/deliveries/${ID}/cancel`, {method: 'POST'}));
+            ERP.flash('출하 취소 완료', 'success');
+        } catch (e) { ERP.flashError(e); }
+    }
+    document.addEventListener('DOMContentLoaded', load);
+</script>
+</div>
+</body>
+</html>

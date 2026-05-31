@@ -16,7 +16,7 @@ public class PageController {
     }
 
     @GetMapping("/")
-    public String menu() {
-        return "menu";
+    public String dashboard() {
+        return "dashboard";
     }
 }

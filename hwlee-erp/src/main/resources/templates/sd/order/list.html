@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('수주 목록', 'order', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>수주</h1>
+            <div class="crumb">영업 (SD) · Sales Order</div>
+        </div>
+        <a href="/sd/sales-orders/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 신규 수주</a>
+    </div>
+
+    <div class="filter-bar">
+    <form id="searchForm" class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label small text-muted mb-0">고객</label>
+            <select id="f-customer" class="form-select form-select-sm"><option value="">전체</option></select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-0">영업담당</label>
+            <select id="f-salesperson" class="form-select form-select-sm"><option value="">전체</option></select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-0">상태</label>
+            <select id="f-status" class="form-select form-select-sm">
+                <option value="">전체</option>
+                <option value="DRAFT">초안</option>
+                <option value="CONFIRMED">확정</option>
+                <option value="SHIPPING">부분출하</option>
+                <option value="SHIPPED">출하완료</option>
+                <option value="INVOICING">부분청구</option>
+                <option value="INVOICED">청구완료</option>
+                <option value="CANCELLED">취소됨</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-0">주문일 from</label>
+            <input type="date" id="f-from" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-0">주문일 to</label>
+            <input type="date" id="f-to" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-1">
+            <button type="submit" class="btn btn-sm btn-outline-primary w-100">검색</button>
+        </div>
+    </form>
+    </div>
+
+    <div class="table-wrap">
+    <table class="table table-hover align-middle mb-0">
+        <thead>
+        <tr>
+            <th>번호</th><th>고객</th><th>영업담당</th><th>주문일</th>
+            <th class="text-end">금액</th><th>상태</th><th style="width:80px;"></th>
+        </tr>
+        </thead>
+        <tbody id="rows"><tr><td colspan="7" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
+    </table>
+    </div>
+    <nav class="mt-3"><ul class="pagination pagination-sm" id="pager"></ul></nav>
+</div>
+
+<script>
+    const STATUS = {
+        DRAFT:     {label: '초안',     color: 'secondary'},
+        CONFIRMED: {label: '확정',     color: 'primary'},
+        SHIPPING:  {label: '부분출하', color: 'info'},
+        SHIPPED:   {label: '출하완료', color: 'info'},
+        INVOICING: {label: '부분청구', color: 'warning'},
+        INVOICED:  {label: '청구완료', color: 'success'},
+        CANCELLED: {label: '취소됨',   color: 'dark'},
+    };
+    let page = 0;
+    const SIZE = 10;
+
+    async function loadCustomers() {
+        try {
+            const data = await ERP.api('/api/customers' + ERP.query({status: 'ACTIVE', size: 500}));
+            fill('f-customer', (data.content || []).map(c => [c.id, `${c.name} (${c.code})`]));
+        } catch (e) {}
+    }
+    async function loadSalespersons() {
+        try {
+            const data = await ERP.api('/api/employees');
+            const list = Array.isArray(data) ? data : (data.content || []);
+            fill('f-salesperson', list.map(e => [e.id, `${e.name} (${e.code})`]));
+        } catch (e) {}
+    }
+    function fill(id, pairs) {
+        const sel = document.getElementById(id);
+        pairs.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); });
+    }
+
+    function filters() {
+        return {
+            customerId: document.getElementById('f-customer').value,
+            salespersonId: document.getElementById('f-salesperson').value,
+            status: document.getElementById('f-status').value,
+            dateFrom: document.getElementById('f-from').value,
+            dateTo: document.getElementById('f-to').value,
+        };
+    }
+
+    async function load() {
+        const tbody = document.getElementById('rows');
+        try {
+            const data = await ERP.api('/api/sales-orders' + ERP.query({...filters(), page, size: SIZE, sort: 'id,desc'}));
+            const list = data.content || [];
+            tbody.innerHTML = list.length === 0
+                ? '<tr><td colspan="7" class="text-center text-muted py-4">수주가 없습니다.</td></tr>'
+                : list.map(o => {
+                    const s = STATUS[o.status] || {label: o.status, color: 'secondary'};
+                    return `<tr style="cursor:pointer" onclick="location.href='/sd/sales-orders/${o.id}'">
+                        <td>${ERP.esc(o.number)}</td>
+                        <td>${ERP.esc(o.customerName)} <span class="text-muted small">${ERP.esc(o.customerCode)}</span></td>
+                        <td>${ERP.esc(o.salespersonName) || '<span class="text-muted">-</span>'}</td>
+                        <td>${o.orderDate ?? ''}</td>
+                        <td class="text-end">${ERP.won(o.totalAmount)}</td>
+                        <td>${ERP.badge(s.label, s.color)}</td>
+                        <td><a class="btn btn-sm btn-outline-secondary" href="/sd/sales-orders/${o.id}"
+                               onclick="event.stopPropagation()">상세</a></td></tr>`;
+                }).join('');
+            renderPager(data.totalPages || 0, data.number || 0);
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            ERP.flashError(e);
+        }
+    }
+
+    function renderPager(totalPages, current) {
+        const pager = document.getElementById('pager');
+        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+        let html = '';
+        for (let i = 0; i < totalPages; i++)
+            html += `<li class="page-item ${i === current ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="goto(${i});return false;">${i + 1}</a></li>`;
+        pager.innerHTML = html;
+    }
+    function goto(p) { page = p; load(); }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadCustomers(); loadSalespersons(); load();
+        document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); page = 0; load(); });
+    });
+</script>
+</div>
+</body>
+</html>

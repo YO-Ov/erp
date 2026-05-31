@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('견적 목록', 'quotation', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>견적</h1>
+            <div class="crumb">영업 (SD) · Quotation</div>
+        </div>
+        <a href="/sd/quotations/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 신규 견적</a>
+    </div>
+
+    <!-- 검색 필터 -->
+    <div class="filter-bar">
+    <form id="searchForm" class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label small text-muted mb-0">고객</label>
+            <select id="f-customer" class="form-select form-select-sm">
+                <option value="">전체</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-0">상태</label>
+            <select id="f-status" class="form-select form-select-sm">
+                <option value="">전체</option>
+                <option value="DRAFT">초안</option>
+                <option value="SENT">발송됨</option>
+                <option value="ACCEPTED">수락됨</option>
+                <option value="EXPIRED">만료</option>
+                <option value="CANCELLED">취소됨</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-0">발행일 from</label>
+            <input type="date" id="f-from" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-0">발행일 to</label>
+            <input type="date" id="f-to" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-3">
+            <button type="submit" class="btn btn-sm btn-outline-primary">검색</button>
+            <button type="button" id="btn-reset" class="btn btn-sm btn-outline-secondary">초기화</button>
+        </div>
+    </form>
+    </div>
+
+    <div class="table-wrap">
+    <table class="table table-hover align-middle mb-0">
+        <thead>
+        <tr>
+            <th>번호</th>
+            <th>고객</th>
+            <th>발행일</th>
+            <th>유효기간</th>
+            <th class="text-end">금액</th>
+            <th>상태</th>
+            <th style="width:80px;"></th>
+        </tr>
+        </thead>
+        <tbody id="rows">
+        <tr><td colspan="7" class="text-center text-muted py-4">불러오는 중…</td></tr>
+        </tbody>
+    </table>
+    </div>
+
+    <nav class="mt-3">
+        <ul class="pagination pagination-sm" id="pager"></ul>
+    </nav>
+</div>
+
+<script>
+    // 상태값 → 한글 라벨 + 뱃지 색상
+    const STATUS = {
+        DRAFT:     {label: '초안',   color: 'secondary'},
+        SENT:      {label: '발송됨', color: 'primary'},
+        ACCEPTED:  {label: '수락됨', color: 'success'},
+        EXPIRED:   {label: '만료',   color: 'warning'},
+        CANCELLED: {label: '취소됨', color: 'dark'},
+    };
+
+    let page = 0;
+    const SIZE = 10;
+
+    async function loadCustomers() {
+        try {
+            const data = await ERP.api('/api/customers' + ERP.query({status: 'ACTIVE', size: 200}));
+            const sel = document.getElementById('f-customer');
+            (data.content || []).forEach(c => {
+                const o = document.createElement('option');
+                o.value = c.id;
+                o.textContent = `${c.name} (${c.code})`;
+                sel.appendChild(o);
+            });
+        } catch (e) { /* 필터 드롭다운 실패는 치명적이지 않음 */ }
+    }
+
+    function filters() {
+        return {
+            customerId: document.getElementById('f-customer').value,
+            status: document.getElementById('f-status').value,
+            dateFrom: document.getElementById('f-from').value,
+            dateTo: document.getElementById('f-to').value,
+        };
+    }
+
+    async function load() {
+        const tbody = document.getElementById('rows');
+        try {
+            const q = ERP.query({...filters(), page, size: SIZE, sort: 'id,desc'});
+            const data = await ERP.api('/api/quotations' + q);
+            const list = data.content || [];
+            if (list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">견적이 없습니다.</td></tr>';
+            } else {
+                tbody.innerHTML = list.map(q => {
+                    const s = STATUS[q.status] || {label: q.status, color: 'secondary'};
+                    return `<tr style="cursor:pointer" onclick="location.href='/sd/quotations/${q.id}'">
+                        <td>${ERP.esc(q.number)}</td>
+                        <td>${ERP.esc(q.customerName)} <span class="text-muted small">${ERP.esc(q.customerCode)}</span></td>
+                        <td>${q.issuedDate ?? ''}</td>
+                        <td>${q.validUntil ?? '<span class="text-muted">-</span>'}</td>
+                        <td class="text-end">${ERP.won(q.totalAmount)}</td>
+                        <td>${ERP.badge(s.label, s.color)}</td>
+                        <td><a class="btn btn-sm btn-outline-secondary" href="/sd/quotations/${q.id}"
+                               onclick="event.stopPropagation()">상세</a></td>
+                    </tr>`;
+                }).join('');
+            }
+            renderPager(data.totalPages || 0, data.number || 0);
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            ERP.flashError(e);
+        }
+    }
+
+    function renderPager(totalPages, current) {
+        const pager = document.getElementById('pager');
+        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+        let html = '';
+        for (let i = 0; i < totalPages; i++) {
+            html += `<li class="page-item ${i === current ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="goto(${i});return false;">${i + 1}</a></li>`;
+        }
+        pager.innerHTML = html;
+    }
+
+    function goto(p) { page = p; load(); }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadCustomers();
+        load();
+        document.getElementById('searchForm').addEventListener('submit', e => {
+            e.preventDefault(); page = 0; load();
+        });
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            document.getElementById('searchForm').reset(); page = 0; load();
+        });
+    });
+</script>
+</div>
+</body>
+</html>

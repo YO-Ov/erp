@@ -19,5 +19,12 @@ public final class SystemAccounts {
     public static final String SALES = "4100";         // 매출
     public static final String COGS = "5100";          // 매출원가 (Cost of Goods Sold)
 
+    // Phase 7 — HR 인건비 분개용 계정
+    public static final String SALARY_EXPENSE = "5200";        // 급여비용 (직원 총지급액 gross)
+    public static final String LEGAL_WELFARE = "5300";         // 법정복리비 (4대보험 회사부담분)
+    public static final String WITHHOLDING_TAX = "2400";       // 예수금-소득세 (떼어둔 소득세)
+    public static final String WITHHOLDING_INSURANCE = "2500"; // 예수금-사회보험 (4대보험 직원분+회사분)
+    public static final String SALARY_PAYABLE = "2600";        // 미지급급여 (직원에게 줄 실수령액)
+
     private SystemAccounts() {}
 }

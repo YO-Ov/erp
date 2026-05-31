@@ -26,8 +26,10 @@ public class TransactionNumberGenerator {
     static final String PREFIX_GOODS_ISSUE = "GI";
     static final String PREFIX_JOURNAL_ENTRY = "JE";
     static final String PREFIX_PAYMENT = "PAY";
+    static final String PREFIX_PAYROLL_RUN = "PR";
 
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final DateTimeFormatter MONTH_FORMAT = DateTimeFormatter.ofPattern("yyyyMM");
 
     private final CodeGenerator codeGenerator;
 
@@ -61,6 +63,17 @@ public class TransactionNumberGenerator {
 
     public String nextPaymentNumber(LocalDate paymentDate) {
         return codeGenerator.nextTransactionCode(PREFIX_PAYMENT, periodKey(paymentDate));
+    }
+
+    /**
+     * 급여대장 번호 — 월 단위 periodKey 로 발급. 예: {@code PR-202605-001}.
+     * 다른 트랜잭션 번호(일 단위)와 달리 급여는 "월 1건" 이므로 월 키를 쓴다.
+     */
+    public String nextPayrollNumber(java.time.YearMonth period) {
+        if (period == null) {
+            throw new IllegalArgumentException("period 는 null 일 수 없다.");
+        }
+        return codeGenerator.nextTransactionCode(PREFIX_PAYROLL_RUN, period.format(MONTH_FORMAT));
     }
 
     private static String periodKey(LocalDate date) {

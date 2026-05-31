@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('대시보드', 'dashboard', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<body>
+<div th:fragment="content">
+
+    <div class="page-head">
+        <div>
+            <h1>대시보드</h1>
+            <div class="crumb">홈 · 개요</div>
+        </div>
+    </div>
+
+    <!-- 통계 카드 (데이터 연동 예정 — 현재는 플레이스홀더) -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-xl-3">
+            <div class="card"><div class="card-body stat-card">
+                <div class="stat-icon" style="background:#2563eb"><i class="bi bi-cart-check"></i></div>
+                <div><div class="stat-label">이번 달 수주</div><div class="stat-value">—</div></div>
+            </div></div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="card"><div class="card-body stat-card">
+                <div class="stat-icon" style="background:#0ea5e9"><i class="bi bi-truck"></i></div>
+                <div><div class="stat-label">출하 대기</div><div class="stat-value">—</div></div>
+            </div></div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="card"><div class="card-body stat-card">
+                <div class="stat-icon" style="background:#22c55e"><i class="bi bi-receipt"></i></div>
+                <div><div class="stat-label">이번 달 매출</div><div class="stat-value">—</div></div>
+            </div></div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="card"><div class="card-body stat-card">
+                <div class="stat-icon" style="background:#f59e0b"><i class="bi bi-box-seam"></i></div>
+                <div><div class="stat-label">재고 품목</div><div class="stat-value">—</div></div>
+            </div></div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="card h-100"><div class="card-body">
+                <h6 class="fw-bold mb-3">개요</h6>
+                <div class="empty-state">
+                    <i class="bi bi-bar-chart-line"></i>
+                    대시보드 위젯은 준비 중입니다.<br>
+                    <span class="small">좌측 메뉴에서 업무 화면으로 이동하세요.</span>
+                </div>
+            </div></div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card h-100"><div class="card-body">
+                <h6 class="fw-bold mb-3">바로가기</h6>
+                <div class="list-group list-group-flush" sec:authorize="hasAnyRole('SALES','ADMIN')">
+                    <a class="list-group-item list-group-item-action d-flex align-items-center gap-2 px-0" href="/sd/quotations">
+                        <i class="bi bi-file-earmark-text text-primary"></i> 견적 관리</a>
+                    <a class="list-group-item list-group-item-action d-flex align-items-center gap-2 px-0" href="/sd/sales-orders">
+                        <i class="bi bi-cart-check text-primary"></i> 수주 관리</a>
+                    <a class="list-group-item list-group-item-action d-flex align-items-center gap-2 px-0" href="/sd/deliveries">
+                        <i class="bi bi-truck text-primary"></i> 출하 관리</a>
+                    <a class="list-group-item list-group-item-action d-flex align-items-center gap-2 px-0" href="/sd/invoices">
+                        <i class="bi bi-receipt text-primary"></i> 인보이스 관리</a>
+                </div>
+                <p class="text-muted small mb-0 mt-2" sec:authorize="!hasAnyRole('SALES','ADMIN')">
+                    접근 가능한 업무 메뉴가 없습니다.
+                </p>
+            </div></div>
+        </div>
+    </div>
+
+</div>
+</body>
+</html>

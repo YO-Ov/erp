@@ -9,6 +9,8 @@ import com.hwlee.erp.mm.goodsreceipt.event.GoodsReceiptPostedEvent;
 import com.hwlee.erp.mm.stock.MovementReason;
 import com.hwlee.erp.mm.stock.StockMovement;
 import com.hwlee.erp.mm.stock.StockMovementRepository;
+import com.hwlee.erp.hr.payroll.event.PayrollConfirmedEvent;
+import com.hwlee.erp.hr.payroll.event.PayrollPaidEvent;
 import com.hwlee.erp.sd.delivery.event.DeliveryShippedEvent;
 import com.hwlee.erp.sd.invoice.event.InvoiceIssuedEvent;
 import jakarta.persistence.EntityNotFoundException;
@@ -196,6 +198,65 @@ public class AutoJournalService {
 
         entry.post(LocalDateTime.now(clock));
         log.info("출금 자동 전표 생성: {} (paymentId={}, amount={})", number, paymentId, amount);
+        return journalRepository.save(entry);
+    }
+
+    /**
+     * 급여 확정 분개 — 급여대장 확정 사건으로부터 (Phase 7).
+     * <pre>
+     *   차) 급여비용   Σgross
+     *   차) 법정복리비 Σinsurance_company           (4대보험 회사부담분 = 회사 추가비용)
+     *           대) 예수금-소득세   Σincome_tax
+     *           대) 예수금-사회보험 Σ(insurance_employee + insurance_company)
+     *           대) 미지급급여      Σnet
+     * </pre>
+     *
+     * <p>차변 합 = Σgross + Σins_company, 대변 합 = Σtax + Σ(ins_emp+ins_company) + Σnet.
+     * net = gross − tax − ins_emp 이므로 양변이 항상 일치 → 복식부기 불변식 통과(라운딩과 무관).
+     */
+    @Transactional
+    public JournalEntry createPayrollEntry(PayrollConfirmedEvent event) {
+        String number = numberGenerator.nextJournalEntryNumber(event.entryDate());
+        JournalEntry entry = JournalEntry.draft(
+                number, event.entryDate(),
+                "급여 " + event.number(),
+                JournalSource.PAYROLL, event.payrollRunId());
+
+        entry.addDebit(account(SystemAccounts.SALARY_EXPENSE), event.totalGross());
+        entry.addDebit(account(SystemAccounts.LEGAL_WELFARE),  event.totalInsuranceCompany());
+        entry.addCredit(account(SystemAccounts.WITHHOLDING_TAX),       event.totalIncomeTax());
+        entry.addCredit(account(SystemAccounts.WITHHOLDING_INSURANCE),
+                event.totalInsuranceEmployee().add(event.totalInsuranceCompany()));
+        entry.addCredit(account(SystemAccounts.SALARY_PAYABLE),        event.totalNet());
+
+        entry.post(LocalDateTime.now(clock));
+        log.info("급여 확정 자동 전표 생성: {} (payrollRunId={}, gross={}, net={})",
+                number, event.payrollRunId(), event.totalGross(), event.totalNet());
+        return journalRepository.save(entry);
+    }
+
+    /**
+     * 급여 지급 분개 — 급여대장 지급 사건으로부터 (Phase 7).
+     * <pre>
+     *   차) 미지급급여 Σnet
+     *   대) 현금       Σnet
+     * </pre>
+     * 확정 시 인식한 미지급급여(부채)를 현금 유출로 상계 — 발생주의의 2단계 중 지급 단계.
+     */
+    @Transactional
+    public JournalEntry createSalaryPaymentEntry(PayrollPaidEvent event) {
+        String number = numberGenerator.nextJournalEntryNumber(event.paymentDate());
+        JournalEntry entry = JournalEntry.draft(
+                number, event.paymentDate(),
+                "급여지급 " + event.number(),
+                JournalSource.PAYROLL, event.payrollRunId());
+
+        entry.addDebit(account(SystemAccounts.SALARY_PAYABLE), event.totalNet());
+        entry.addCredit(account(SystemAccounts.CASH),          event.totalNet());
+
+        entry.post(LocalDateTime.now(clock));
+        log.info("급여 지급 자동 전표 생성: {} (payrollRunId={}, net={})",
+                number, event.payrollRunId(), event.totalNet());
         return journalRepository.save(entry);
     }
 

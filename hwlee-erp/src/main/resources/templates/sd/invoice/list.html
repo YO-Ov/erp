@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('인보이스 목록', 'invoice', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>인보이스</h1>
+            <div class="crumb">영업 (SD) · Invoice</div>
+        </div>
+        <a href="/sd/invoices/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 신규 인보이스</a>
+    </div>
+
+    <div class="filter-bar">
+    <form id="searchForm" class="row g-2 align-items-end">
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-0">수주 ID</label>
+            <input type="number" id="f-so" class="form-control form-control-sm" placeholder="예: 12">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-0">상태</label>
+            <select id="f-status" class="form-select form-select-sm">
+                <option value="">전체</option>
+                <option value="ISSUED">발행됨</option>
+                <option value="CANCELLED">취소됨</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-0">발행일 from</label>
+            <input type="date" id="f-from" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted mb-0">발행일 to</label>
+            <input type="date" id="f-to" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-sm btn-outline-primary">검색</button>
+        </div>
+    </form>
+    </div>
+
+    <div class="table-wrap">
+    <table class="table table-hover align-middle mb-0">
+        <thead>
+        <tr><th>번호</th><th>수주</th><th>발행일</th><th class="text-end">합계(VAT포함)</th><th>상태</th><th style="width:80px;"></th></tr>
+        </thead>
+        <tbody id="rows"><tr><td colspan="6" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
+    </table>
+    </div>
+    <nav class="mt-3"><ul class="pagination pagination-sm" id="pager"></ul></nav>
+</div>
+
+<script>
+    const STATUS = {
+        DRAFT:     {label: '초안',   color: 'secondary'},
+        ISSUED:    {label: '발행됨', color: 'success'},
+        CANCELLED: {label: '취소됨', color: 'dark'},
+    };
+    let page = 0;
+    const SIZE = 10;
+
+    function filters() {
+        return {
+            salesOrderId: document.getElementById('f-so').value,
+            status: document.getElementById('f-status').value,
+            dateFrom: document.getElementById('f-from').value,
+            dateTo: document.getElementById('f-to').value,
+        };
+    }
+    async function load() {
+        const tbody = document.getElementById('rows');
+        try {
+            const data = await ERP.api('/api/invoices' + ERP.query({...filters(), page, size: SIZE, sort: 'id,desc'}));
+            const list = data.content || [];
+            tbody.innerHTML = list.length === 0
+                ? '<tr><td colspan="6" class="text-center text-muted py-4">인보이스가 없습니다.</td></tr>'
+                : list.map(v => {
+                    const s = STATUS[v.status] || {label: v.status, color: 'secondary'};
+                    return `<tr style="cursor:pointer" onclick="location.href='/sd/invoices/${v.id}'">
+                        <td>${ERP.esc(v.number)}</td>
+                        <td><a href="/sd/sales-orders/${v.salesOrderId}" onclick="event.stopPropagation()">${ERP.esc(v.salesOrderNumber)}</a></td>
+                        <td>${v.invoiceDate ?? ''}</td>
+                        <td class="text-end">${ERP.won(v.totalAmount)}</td>
+                        <td>${ERP.badge(s.label, s.color)}</td>
+                        <td><a class="btn btn-sm btn-outline-secondary" href="/sd/invoices/${v.id}"
+                               onclick="event.stopPropagation()">상세</a></td></tr>`;
+                }).join('');
+            renderPager(data.totalPages || 0, data.number || 0);
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            ERP.flashError(e);
+        }
+    }
+    function renderPager(totalPages, current) {
+        const pager = document.getElementById('pager');
+        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+        let html = '';
+        for (let i = 0; i < totalPages; i++)
+            html += `<li class="page-item ${i === current ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="goto(${i});return false;">${i + 1}</a></li>`;
+        pager.innerHTML = html;
+    }
+    function goto(p) { page = p; load(); }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        load();
+        document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); page = 0; load(); });
+    });
+</script>
+</div>
+</body>
+</html>

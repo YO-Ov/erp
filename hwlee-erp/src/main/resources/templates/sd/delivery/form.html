@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('출하 작성', 'delivery', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>신규 출하</h1>
+            <div class="crumb">영업 (SD) · Delivery</div>
+        </div>
+        <a href="/sd/deliveries" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <form id="form">
+        <div class="row g-3 mb-3">
+            <div class="col-md-5">
+                <label class="form-label">수주 <span class="text-danger">*</span></label>
+                <select id="so" class="form-select" required><option value="">선택…</option></select>
+                <div class="form-text">확정(CONFIRMED) 또는 부분출하(SHIPPING) 상태의 수주만 출하할 수 있습니다.</div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">창고 <span class="text-danger">*</span></label>
+                <select id="warehouse" class="form-select" required><option value="">선택…</option></select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">출하일 <span class="text-danger">*</span></label>
+                <input type="date" id="shippedDate" class="form-control" required>
+            </div>
+        </div>
+
+        <h6>출하 라인 <span class="text-muted small">(잔여 = 주문량 − 기출하량)</span></h6>
+        <table class="table table-bordered align-middle bg-white">
+            <thead class="table-light">
+            <tr>
+                <th>품목</th>
+                <th class="text-end">주문량</th>
+                <th class="text-end">기출하</th>
+                <th class="text-end">잔여</th>
+                <th style="width:150px;" class="text-end">이번 출하량</th>
+            </tr>
+            </thead>
+            <tbody id="lines"><tr><td colspan="5" class="text-center text-muted py-3">수주를 먼저 선택하세요.</td></tr></tbody>
+        </table>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">출하 확정</button>
+            <a href="/sd/deliveries" class="btn btn-outline-secondary">취소</a>
+        </div>
+    </form>
+</div>
+
+<script th:inline="javascript">
+    const PRESET_SO = ERP.param('salesOrderId'); // 수주 상세에서 넘어온 경우
+
+    async function loadShippableOrders() {
+        const data = await ERP.api('/api/sales-orders' + ERP.query({size: 200, sort: 'id,desc'}));
+        const list = (data.content || []).filter(o => ['CONFIRMED', 'SHIPPING'].includes(o.status));
+        const sel = document.getElementById('so');
+        list.forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o.id;
+            opt.textContent = `${o.number} · ${o.customerName}`;
+            sel.appendChild(opt);
+        });
+    }
+    async function loadWarehouses() {
+        const data = await ERP.api('/api/warehouses' + ERP.query({status: 'ACTIVE', size: 200}));
+        const sel = document.getElementById('warehouse');
+        (data.content || []).forEach(w => {
+            const opt = document.createElement('option');
+            opt.value = w.id; opt.textContent = `${w.name} (${w.code})`;
+            sel.appendChild(opt);
+        });
+    }
+
+    async function onSoChange() {
+        const id = document.getElementById('so').value;
+        const tbody = document.getElementById('lines');
+        if (!id) { tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">수주를 먼저 선택하세요.</td></tr>'; return; }
+        try {
+            const o = await ERP.api('/api/sales-orders/' + id);
+            const rows = (o.lines || []).map(l => {
+                const remaining = Number(l.orderQty) - Number(l.shippedQty);
+                return `<tr data-line="${l.id}" data-remaining="${remaining}">
+                    <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
+                    <td class="text-end">${ERP.num(l.orderQty)}</td>
+                    <td class="text-end">${ERP.num(l.shippedQty)}</td>
+                    <td class="text-end fw-bold">${ERP.num(remaining)}</td>
+                    <td><input type="number" step="any" min="0" max="${remaining}"
+                               class="form-control form-control-sm text-end line-qty"
+                               value="${remaining > 0 ? remaining : 0}" ${remaining <= 0 ? 'disabled' : ''}></td></tr>`;
+            }).join('');
+            tbody.innerHTML = rows || '<tr><td colspan="5" class="text-center text-muted py-3">라인이 없습니다.</td></tr>';
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    function collectLines() {
+        const lines = [];
+        document.querySelectorAll('#lines tr[data-line]').forEach(tr => {
+            const qty = parseFloat(tr.querySelector('.line-qty').value) || 0;
+            if (qty > 0) lines.push({salesOrderLineId: Number(tr.dataset.line), quantity: qty});
+        });
+        return lines;
+    }
+
+    async function submit(e) {
+        e.preventDefault();
+        const lines = collectLines();
+        if (lines.length === 0) { ERP.flash('출하할 수량을 1개 이상 입력하세요.', 'warning'); return; }
+        const body = {
+            salesOrderId: Number(document.getElementById('so').value),
+            warehouseId: Number(document.getElementById('warehouse').value),
+            shippedDate: document.getElementById('shippedDate').value,
+            lines,
+        };
+        try {
+            const saved = await ERP.api('/api/deliveries', {method: 'POST', body});
+            location.href = '/sd/deliveries/' + saved.id;
+        } catch (err) { ERP.flashError(err); }
+    }
+
+    async function init() {
+        // 출하일 기본값 = 오늘
+        document.getElementById('shippedDate').value = new Date().toISOString().slice(0, 10);
+        try {
+            await Promise.all([loadShippableOrders(), loadWarehouses()]);
+            if (PRESET_SO) {
+                document.getElementById('so').value = PRESET_SO;
+                await onSoChange();
+            }
+        } catch (e) { ERP.flashError(e); }
+        document.getElementById('so').addEventListener('change', onSoChange);
+        document.getElementById('form').addEventListener('submit', submit);
+    }
+    document.addEventListener('DOMContentLoaded', init);
+</script>
+</div>
+</body>
+</html>

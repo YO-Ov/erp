@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('인보이스 상세', 'invoice', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>인보이스 상세 <span id="h-number" class="text-muted fs-6 fw-normal"></span></h1>
+            <div class="crumb">영업 (SD) · Invoice</div>
+        </div>
+        <a href="/sd/invoices" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <div class="card mb-3"><div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-2">상태</dt><dd class="col-sm-4" id="d-status">-</dd>
+            <dt class="col-sm-2">수주</dt><dd class="col-sm-4" id="d-so">-</dd>
+            <dt class="col-sm-2">발행일</dt><dd class="col-sm-4" id="d-date">-</dd>
+            <dt class="col-sm-2">등록</dt><dd class="col-sm-4 small text-muted" id="d-audit">-</dd>
+        </dl>
+    </div></div>
+
+    <div class="alert alert-info small">
+        인보이스 발행 시 수주의 청구량이 누적되고 <b>FI 매출 분개가 자동 생성</b>됩니다(Phase 5).
+        분개: 차) 매출채권 / 대) 매출 + 부가세예수금. 취소하면 청구량이 감소합니다.
+    </div>
+
+    <div class="mb-3" id="actions"></div>
+
+    <h6>청구 라인</h6>
+    <table class="table table-bordered align-middle bg-white">
+        <thead class="table-light">
+        <tr><th style="width:50px;">#</th><th>품목</th><th class="text-end">청구량</th>
+            <th class="text-end">단가</th><th class="text-end">라인 합계</th></tr>
+        </thead>
+        <tbody id="lines"></tbody>
+    </table>
+
+    <div class="row justify-content-end">
+        <div class="col-md-4">
+            <table class="table table-sm">
+                <tr><td>공급가액(소계)</td><td class="text-end" id="d-subtotal">-</td></tr>
+                <tr><td>부가세 (10%)</td><td class="text-end" id="d-tax">-</td></tr>
+                <tr class="fw-bold border-top"><td>합계</td><td class="text-end" id="d-total">-</td></tr>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const STATUS = {
+        DRAFT:     {label: '초안',   color: 'secondary'},
+        ISSUED:    {label: '발행됨', color: 'success'},
+        CANCELLED: {label: '취소됨', color: 'dark'},
+    };
+
+    async function load() {
+        try { render(await ERP.api('/api/invoices/' + ID)); }
+        catch (e) { ERP.flashError(e); }
+    }
+    function render(v) {
+        const s = STATUS[v.status] || {label: v.status, color: 'secondary'};
+        document.getElementById('h-number').textContent = v.number;
+        document.getElementById('d-status').innerHTML = ERP.badge(s.label, s.color);
+        document.getElementById('d-so').innerHTML =
+            `<a href="/sd/sales-orders/${v.salesOrderId}">${ERP.esc(v.salesOrderNumber)}</a>`;
+        document.getElementById('d-date').textContent = v.invoiceDate ?? '-';
+        document.getElementById('d-audit').textContent =
+            `${v.createdBy ?? '?'} · ${(v.createdAt ?? '').replace('T', ' ').slice(0, 16)}`;
+        document.getElementById('lines').innerHTML = (v.lines || []).map(l => `
+            <tr><td>${l.lineNo}</td>
+                <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
+                <td class="text-end">${ERP.num(l.quantity)}</td>
+                <td class="text-end">${ERP.won(l.unitPrice)}</td>
+                <td class="text-end">${ERP.won(l.lineTotal)}</td></tr>`).join('');
+        document.getElementById('d-subtotal').textContent = ERP.won(v.subtotal);
+        document.getElementById('d-tax').textContent = ERP.won(v.taxAmount);
+        document.getElementById('d-total').textContent = ERP.won(v.totalAmount);
+
+        document.getElementById('actions').innerHTML = (v.status === 'ISSUED')
+            ? `<button class="btn btn-sm btn-outline-danger" onclick="cancel()">인보이스 취소</button>`
+            : '<span class="text-muted small">취소됨/종료된 인보이스입니다.</span>';
+    }
+    async function cancel() {
+        if (!confirm('인보이스를 취소하시겠습니까? 수주 청구량이 감소합니다.')) return;
+        try {
+            render(await ERP.api(`/api/invoices/${ID}/cancel`, {method: 'POST'}));
+            ERP.flash('인보이스 취소 완료', 'success');
+        } catch (e) { ERP.flashError(e); }
+    }
+    document.addEventListener('DOMContentLoaded', load);
+</script>
+</div>
+</body>
+</html>

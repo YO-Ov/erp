@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('인보이스 작성', 'invoice', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>신규 인보이스</h1>
+            <div class="crumb">영업 (SD) · Invoice</div>
+        </div>
+        <a href="/sd/invoices" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <form id="form">
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label class="form-label">수주 <span class="text-danger">*</span></label>
+                <select id="so" class="form-select" required><option value="">선택…</option></select>
+                <div class="form-text">출하분이 있는 수주만 청구할 수 있습니다(청구가능 = 출하량 − 기청구량).</div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">발행일 <span class="text-danger">*</span></label>
+                <input type="date" id="invoiceDate" class="form-control" required>
+            </div>
+        </div>
+
+        <h6>청구 라인</h6>
+        <table class="table table-bordered align-middle bg-white">
+            <thead class="table-light">
+            <tr>
+                <th>품목</th>
+                <th class="text-end">출하량</th>
+                <th class="text-end">기청구</th>
+                <th class="text-end">청구가능</th>
+                <th class="text-end">단가</th>
+                <th style="width:150px;" class="text-end">이번 청구량</th>
+            </tr>
+            </thead>
+            <tbody id="lines"><tr><td colspan="6" class="text-center text-muted py-3">수주를 먼저 선택하세요.</td></tr></tbody>
+        </table>
+
+        <div class="row justify-content-end mb-3">
+            <div class="col-md-4">
+                <table class="table table-sm">
+                    <tr><td>공급가액(소계)</td><td class="text-end" id="p-subtotal">₩0</td></tr>
+                    <tr><td>부가세 (10%)</td><td class="text-end" id="p-tax">₩0</td></tr>
+                    <tr class="fw-bold border-top"><td>합계</td><td class="text-end" id="p-total">₩0</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">인보이스 발행</button>
+            <a href="/sd/invoices" class="btn btn-outline-secondary">취소</a>
+        </div>
+    </form>
+</div>
+
+<script th:inline="javascript">
+    const PRESET_SO = ERP.param('salesOrderId');
+
+    async function loadBillableOrders() {
+        const data = await ERP.api('/api/sales-orders' + ERP.query({size: 200, sort: 'id,desc'}));
+        const list = (data.content || []).filter(o => ['SHIPPING', 'SHIPPED', 'INVOICING'].includes(o.status));
+        const sel = document.getElementById('so');
+        list.forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o.id; opt.textContent = `${o.number} · ${o.customerName}`;
+            sel.appendChild(opt);
+        });
+    }
+
+    async function onSoChange() {
+        const id = document.getElementById('so').value;
+        const tbody = document.getElementById('lines');
+        if (!id) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">수주를 먼저 선택하세요.</td></tr>'; preview(); return; }
+        try {
+            const o = await ERP.api('/api/sales-orders/' + id);
+            tbody.innerHTML = (o.lines || []).map(l => {
+                const billable = Number(l.shippedQty) - Number(l.invoicedQty);
+                return `<tr data-line="${l.id}" data-price="${l.unitPrice}">
+                    <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
+                    <td class="text-end">${ERP.num(l.shippedQty)}</td>
+                    <td class="text-end">${ERP.num(l.invoicedQty)}</td>
+                    <td class="text-end fw-bold">${ERP.num(billable)}</td>
+                    <td class="text-end">${ERP.won(l.unitPrice)}</td>
+                    <td><input type="number" step="any" min="0" max="${billable}"
+                               class="form-control form-control-sm text-end line-qty"
+                               value="${billable > 0 ? billable : 0}" ${billable <= 0 ? 'disabled' : ''}
+                               oninput="preview()"></td></tr>`;
+            }).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">라인이 없습니다.</td></tr>';
+            preview();
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    // 부가세 10% 미리보기(서버 계산과 동일한 규칙)
+    function preview() {
+        let subtotal = 0;
+        document.querySelectorAll('#lines tr[data-line]').forEach(tr => {
+            const qty = parseFloat(tr.querySelector('.line-qty').value) || 0;
+            subtotal += qty * Number(tr.dataset.price);
+        });
+        const tax = Math.round(subtotal * 0.10);
+        document.getElementById('p-subtotal').textContent = ERP.won(subtotal);
+        document.getElementById('p-tax').textContent = ERP.won(tax);
+        document.getElementById('p-total').textContent = ERP.won(subtotal + tax);
+    }
+
+    function collectLines() {
+        const lines = [];
+        document.querySelectorAll('#lines tr[data-line]').forEach(tr => {
+            const qty = parseFloat(tr.querySelector('.line-qty').value) || 0;
+            if (qty > 0) lines.push({salesOrderLineId: Number(tr.dataset.line), quantity: qty});
+        });
+        return lines;
+    }
+
+    async function submit(e) {
+        e.preventDefault();
+        const lines = collectLines();
+        if (lines.length === 0) { ERP.flash('청구할 수량을 1개 이상 입력하세요.', 'warning'); return; }
+        const body = {
+            salesOrderId: Number(document.getElementById('so').value),
+            invoiceDate: document.getElementById('invoiceDate').value,
+            lines,
+        };
+        try {
+            const saved = await ERP.api('/api/invoices', {method: 'POST', body});
+            location.href = '/sd/invoices/' + saved.id;
+        } catch (err) { ERP.flashError(err); }
+    }
+
+    async function init() {
+        document.getElementById('invoiceDate').value = new Date().toISOString().slice(0, 10);
+        try {
+            await loadBillableOrders();
+            if (PRESET_SO) {
+                document.getElementById('so').value = PRESET_SO;
+                await onSoChange();
+            }
+        } catch (e) { ERP.flashError(e); }
+        document.getElementById('so').addEventListener('change', onSoChange);
+        document.getElementById('form').addEventListener('submit', submit);
+    }
+    document.addEventListener('DOMContentLoaded', init);
+</script>
+</div>
+</body>
+</html>

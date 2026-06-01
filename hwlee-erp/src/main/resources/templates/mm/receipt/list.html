@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html th:replace="~{fragments/layout :: document('수주 목록', 'order', ~{::content})}"
+<html th:replace="~{fragments/layout :: document('입고 목록', 'receipt', ~{::content})}"
       lang="ko" xmlns:th="http://www.thymeleaf.org">
 <body>
 <div th:fragment="content">
@@ -7,36 +7,32 @@
 
     <div class="page-head">
         <div>
-            <h1>수주</h1>
-            <div class="crumb">영업 (SD) · Sales Order</div>
+            <h1>입고</h1>
+            <div class="crumb">자재 (MM) · Goods Receipt</div>
         </div>
-        <a href="/sd/sales-orders/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 신규 수주</a>
+        <a href="/mm/goods-receipts/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 신규 입고</a>
     </div>
 
     <form id="searchForm" class="filter-bar">
         <div class="filter-field ff-wide">
-            <label>고객</label>
-            <select id="f-customer" class="form-select form-select-sm"><option value="">전체</option></select>
+            <label>거래처</label>
+            <select id="f-vendor" class="form-select form-select-sm"><option value="">전체</option></select>
         </div>
         <div class="filter-field">
-            <label>영업담당</label>
-            <select id="f-salesperson" class="form-select form-select-sm"><option value="">전체</option></select>
+            <label>창고</label>
+            <select id="f-warehouse" class="form-select form-select-sm"><option value="">전체</option></select>
         </div>
         <div class="filter-field ff-narrow">
             <label>상태</label>
             <select id="f-status" class="form-select form-select-sm">
                 <option value="">전체</option>
                 <option value="DRAFT">초안</option>
-                <option value="CONFIRMED">확정</option>
-                <option value="SHIPPING">부분출하</option>
-                <option value="SHIPPED">출하완료</option>
-                <option value="INVOICING">부분청구</option>
-                <option value="INVOICED">청구완료</option>
+                <option value="POSTED">전기됨</option>
                 <option value="CANCELLED">취소됨</option>
             </select>
         </div>
         <div class="filter-field ff-range">
-            <label>주문일</label>
+            <label>입고일</label>
             <div class="date-range">
                 <input type="date" id="f-from" class="form-control form-control-sm">
                 <span class="tilde">~</span>
@@ -53,11 +49,10 @@
     <table class="table table-hover align-middle mb-0">
         <thead>
         <tr>
-            <th>번호</th><th>고객</th><th>영업담당</th><th>주문일</th>
-            <th class="text-end">금액</th><th>상태</th><th style="width:80px;"></th>
+            <th>번호</th><th>거래처</th><th>창고</th><th>입고일</th><th>상태</th><th style="width:80px;"></th>
         </tr>
         </thead>
-        <tbody id="rows"><tr><td colspan="7" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
+        <tbody id="rows"><tr><td colspan="6" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
     </table>
     </div>
     <nav class="mt-3"><ul class="pagination pagination-sm" id="pager"></ul></nav>
@@ -65,28 +60,23 @@
 
 <script>
     const STATUS = {
-        DRAFT:     {label: '초안',     color: 'secondary'},
-        CONFIRMED: {label: '확정',     color: 'primary'},
-        SHIPPING:  {label: '부분출하', color: 'info'},
-        SHIPPED:   {label: '출하완료', color: 'info'},
-        INVOICING: {label: '부분청구', color: 'warning'},
-        INVOICED:  {label: '청구완료', color: 'success'},
-        CANCELLED: {label: '취소됨',   color: 'dark'},
+        DRAFT:     {label: '초안',   color: 'secondary'},
+        POSTED:    {label: '전기됨', color: 'success'},
+        CANCELLED: {label: '취소됨', color: 'dark'},
     };
     let page = 0;
     const SIZE = 10;
 
-    async function loadCustomers() {
+    async function loadVendors() {
         try {
-            const data = await ERP.api('/api/customers' + ERP.query({status: 'ACTIVE', size: 500}));
-            fill('f-customer', (data.content || []).map(c => [c.id, `${c.name} (${c.code})`]));
+            const data = await ERP.api('/api/vendors' + ERP.query({status: 'ACTIVE', size: 500}));
+            fill('f-vendor', (data.content || []).map(v => [v.id, `${v.name} (${v.code})`]));
         } catch (e) {}
     }
-    async function loadSalespersons() {
+    async function loadWarehouses() {
         try {
-            const data = await ERP.api('/api/employees');
-            const list = Array.isArray(data) ? data : (data.content || []);
-            fill('f-salesperson', list.map(e => [e.id, `${e.name} (${e.code})`]));
+            const data = await ERP.api('/api/warehouses' + ERP.query({status: 'ACTIVE', size: 200}));
+            fill('f-warehouse', (data.content || []).map(w => [w.id, `${w.name} (${w.code})`]));
         } catch (e) {}
     }
     function fill(id, pairs) {
@@ -96,8 +86,8 @@
 
     function filters() {
         return {
-            customerId: document.getElementById('f-customer').value,
-            salespersonId: document.getElementById('f-salesperson').value,
+            vendorId: document.getElementById('f-vendor').value,
+            warehouseId: document.getElementById('f-warehouse').value,
             status: document.getElementById('f-status').value,
             dateFrom: document.getElementById('f-from').value,
             dateTo: document.getElementById('f-to').value,
@@ -107,25 +97,24 @@
     async function load() {
         const tbody = document.getElementById('rows');
         try {
-            const data = await ERP.api('/api/sales-orders' + ERP.query({...filters(), page, size: SIZE, sort: 'id,desc'}));
+            const data = await ERP.api('/api/goods-receipts' + ERP.query({...filters(), page, size: SIZE, sort: 'id,desc'}));
             const list = data.content || [];
             tbody.innerHTML = list.length === 0
-                ? '<tr><td colspan="7" class="text-center text-muted py-4">수주가 없습니다.</td></tr>'
-                : list.map(o => {
-                    const s = STATUS[o.status] || {label: o.status, color: 'secondary'};
-                    return `<tr style="cursor:pointer" onclick="location.href='/sd/sales-orders/${o.id}'">
-                        <td>${ERP.esc(o.number)}</td>
-                        <td>${ERP.esc(o.customerName)} <span class="text-muted small">${ERP.esc(o.customerCode)}</span></td>
-                        <td>${ERP.esc(o.salespersonName) || '<span class="text-muted">-</span>'}</td>
-                        <td>${o.orderDate ?? ''}</td>
-                        <td class="text-end">${ERP.won(o.totalAmount)}</td>
+                ? '<tr><td colspan="6" class="text-center text-muted py-4">입고가 없습니다.</td></tr>'
+                : list.map(r => {
+                    const s = STATUS[r.status] || {label: r.status, color: 'secondary'};
+                    return `<tr style="cursor:pointer" onclick="location.href='/mm/goods-receipts/${r.id}'">
+                        <td>${ERP.esc(r.number)}</td>
+                        <td>${ERP.esc(r.vendorName)} <span class="text-muted small">${ERP.esc(r.vendorCode)}</span></td>
+                        <td>${ERP.esc(r.warehouseName)} <span class="text-muted small">${ERP.esc(r.warehouseCode)}</span></td>
+                        <td>${r.receiptDate ?? ''}</td>
                         <td>${ERP.badge(s.label, s.color)}</td>
-                        <td><a class="btn btn-sm btn-outline-secondary" href="/sd/sales-orders/${o.id}"
+                        <td><a class="btn btn-sm btn-outline-secondary" href="/mm/goods-receipts/${r.id}"
                                onclick="event.stopPropagation()">상세</a></td></tr>`;
                 }).join('');
             renderPager(data.totalPages || 0, data.number || 0);
         } catch (e) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">불러오기 실패</td></tr>';
             ERP.flashError(e);
         }
     }
@@ -142,7 +131,7 @@
     function goto(p) { page = p; load(); }
 
     document.addEventListener('DOMContentLoaded', () => {
-        loadCustomers(); loadSalespersons(); load();
+        loadVendors(); loadWarehouses(); load();
         document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); page = 0; load(); });
         document.getElementById('btn-reset').addEventListener('click', () => {
             document.getElementById('searchForm').reset(); page = 0; load();

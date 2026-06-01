@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html th:replace="~{fragments/layout :: document('인보이스 목록', 'invoice', ~{::content})}"
+<html th:replace="~{fragments/layout :: document('창고 목록', 'warehouse', ~{::content})}"
       lang="ko" xmlns:th="http://www.thymeleaf.org">
 <body>
 <div th:fragment="content">
@@ -7,32 +7,25 @@
 
     <div class="page-head">
         <div>
-            <h1>인보이스</h1>
-            <div class="crumb">영업 (SD) · Invoice</div>
+            <h1>창고</h1>
+            <div class="crumb">자재 (MM) · Warehouse</div>
         </div>
-        <a href="/sd/invoices/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 신규 인보이스</a>
+        <a href="/mm/warehouses/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 신규 창고</a>
     </div>
 
     <form id="searchForm" class="filter-bar">
-        <div class="filter-field ff-narrow">
-            <label>수주 ID</label>
-            <input type="number" id="f-so" class="form-control form-control-sm" placeholder="예: 12">
+        <div class="filter-field ff-wide">
+            <label>이름</label>
+            <input type="text" id="f-name" class="form-control form-control-sm" placeholder="창고명 검색">
         </div>
         <div class="filter-field ff-narrow">
             <label>상태</label>
             <select id="f-status" class="form-select form-select-sm">
                 <option value="">전체</option>
-                <option value="ISSUED">발행됨</option>
-                <option value="CANCELLED">취소됨</option>
+                <option value="ACTIVE">활성</option>
+                <option value="INACTIVE">휴면</option>
+                <option value="BLOCKED">정지</option>
             </select>
-        </div>
-        <div class="filter-field ff-range">
-            <label>발행일</label>
-            <div class="date-range">
-                <input type="date" id="f-from" class="form-control form-control-sm">
-                <span class="tilde">~</span>
-                <input type="date" id="f-to" class="form-control form-control-sm">
-            </div>
         </div>
         <div class="filter-actions">
             <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> 검색</button>
@@ -43,9 +36,11 @@
     <div class="table-wrap">
     <table class="table table-hover align-middle mb-0">
         <thead>
-        <tr><th>번호</th><th>수주</th><th>발행일</th><th class="text-end">합계(VAT포함)</th><th>상태</th><th style="width:80px;"></th></tr>
+        <tr>
+            <th>코드</th><th>이름</th><th>주소</th><th>상태</th><th style="width:80px;"></th>
+        </tr>
         </thead>
-        <tbody id="rows"><tr><td colspan="6" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
+        <tbody id="rows"><tr><td colspan="5" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
     </table>
     </div>
     <nav class="mt-3"><ul class="pagination pagination-sm" id="pager"></ul></nav>
@@ -53,45 +48,44 @@
 
 <script>
     const STATUS = {
-        DRAFT:     {label: '초안',   color: 'secondary'},
-        ISSUED:    {label: '발행됨', color: 'success'},
-        CANCELLED: {label: '취소됨', color: 'dark'},
+        ACTIVE:   {label: '활성', color: 'success'},
+        INACTIVE: {label: '휴면', color: 'secondary'},
+        BLOCKED:  {label: '정지', color: 'danger'},
     };
     let page = 0;
     const SIZE = 10;
 
     function filters() {
         return {
-            salesOrderId: document.getElementById('f-so').value,
+            name: document.getElementById('f-name').value,
             status: document.getElementById('f-status').value,
-            dateFrom: document.getElementById('f-from').value,
-            dateTo: document.getElementById('f-to').value,
         };
     }
+
     async function load() {
         const tbody = document.getElementById('rows');
         try {
-            const data = await ERP.api('/api/invoices' + ERP.query({...filters(), page, size: SIZE, sort: 'id,desc'}));
+            const data = await ERP.api('/api/warehouses' + ERP.query({...filters(), page, size: SIZE, sort: 'code,asc'}));
             const list = data.content || [];
             tbody.innerHTML = list.length === 0
-                ? '<tr><td colspan="6" class="text-center text-muted py-4">인보이스가 없습니다.</td></tr>'
-                : list.map(v => {
-                    const s = STATUS[v.status] || {label: v.status, color: 'secondary'};
-                    return `<tr style="cursor:pointer" onclick="location.href='/sd/invoices/${v.id}'">
-                        <td>${ERP.esc(v.number)}</td>
-                        <td><a href="/sd/sales-orders/${v.salesOrderId}" onclick="event.stopPropagation()">${ERP.esc(v.salesOrderNumber)}</a></td>
-                        <td>${v.invoiceDate ?? ''}</td>
-                        <td class="text-end">${ERP.won(v.totalAmount)}</td>
+                ? '<tr><td colspan="5" class="text-center text-muted py-4">창고가 없습니다.</td></tr>'
+                : list.map(w => {
+                    const s = STATUS[w.status] || {label: w.status, color: 'secondary'};
+                    return `<tr style="cursor:pointer" onclick="location.href='/mm/warehouses/${w.id}'">
+                        <td>${ERP.esc(w.code)}</td>
+                        <td>${ERP.esc(w.name)}</td>
+                        <td class="text-muted">${ERP.esc(w.address) || '-'}</td>
                         <td>${ERP.badge(s.label, s.color)}</td>
-                        <td><a class="btn btn-sm btn-outline-secondary" href="/sd/invoices/${v.id}"
+                        <td><a class="btn btn-sm btn-outline-secondary" href="/mm/warehouses/${w.id}"
                                onclick="event.stopPropagation()">상세</a></td></tr>`;
                 }).join('');
             renderPager(data.totalPages || 0, data.number || 0);
         } catch (e) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4">불러오기 실패</td></tr>';
             ERP.flashError(e);
         }
     }
+
     function renderPager(totalPages, current) {
         const pager = document.getElementById('pager');
         if (totalPages <= 1) { pager.innerHTML = ''; return; }

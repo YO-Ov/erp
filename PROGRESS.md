@@ -15,10 +15,30 @@
 
 - **Phase**: 7 — HR 간이 모듈 (인사/급여) ✅ **전체 완료** (7단계 사이클 끝)
 - **단계**: 5~7 모두 완료 (구현 + 워크스루 6편 + 시연 가이드)
-- **다음 할 일**: 현재 **두 트랙** 병행.
-  - ⭐ **화면 트랙(활성)**: 프론트엔드 백필 — SD ✅ 완료, **다음은 MM(자재) 화면**. 아래 "프론트엔드(화면) 백필" 절의 "다음 세션 시작점" 참조.
+- **다음 할 일**: ⛔ **먼저 아래 "미해결 버그"부터 고칠 것** (모든 화면 공통, 진행보다 우선).
+  - ⭐ **화면 트랙(활성)**: 프론트엔드 백필 — SD·MM 화면 작성됨, 단 **공통 렌더 버그로 JS 미동작**(아래 참조). 버그 수정 후 → FI(회계) 화면.
   - **도메인 트랙**: Phase 8 — PP(생산) BOM/생산지시 (도메인 브리핑부터). `ERP-STUDY-PLAN.md` 참조.
-- **마지막 갱신**: 2026-05-31
+- **마지막 갱신**: 2026-06-01 (⛔ 전 화면 공통 JS 미실행 버그 발견 — 수정 전 중단)
+
+---
+
+## ⛔ 미해결 버그 — 전 화면 페이지 `<script>`가 렌더에서 누락 (최우선)
+
+- **증상**(사용자가 브라우저에서 확인): 목록이 "불러오는 중…"에서 안 바뀜(=`load()` 미실행), 검색 누르면 선택한 날짜 등 입력값이 사라짐(=JS 핸들러 미부착 → 네이티브 폼 전송으로 페이지 새로고침). 입고 화면에서 첫 확인, **SD도 동일**.
+- **근본 원인**(렌더된 실제 HTML로 확정): 각 템플릿의 페이지 `<script>`가 `th:fragment="content"` div **바깥(형제 위치)** 에 있음. 레이아웃이 `~{::content}`로 그 fragment만 가져오므로 **스크립트가 최종 페이지에서 통째로 누락**됨. `curl`로 `/sd/sales-orders` 받아 `grep "searchForm').addEventListener"` → **0건**(스크립트 부재) 확인.
+- **범위**: 레이아웃 데코레이터를 쓰는 **모든 페이지** — SD 14 + MM 11 + 대시보드/관리자 등. **git HEAD부터 있던 선재(先在) 버그**(MM 신규 작성분이 SD 패턴을 그대로 복사해 전파). 기존/금번 "검증"이 **HTTP 200(껍데기)만 보고 실제 브라우저 렌더를 안 봐서** 못 잡음.
+- **수정 방법**(기계적, div 균형 유지): 본문 끝의 fragment-닫는 `</div>` 를 `<script>…</script>` **뒤로** 이동 = 스크립트를 fragment 안에 포함.
+  ```
+  현재(버그):                         수정 후:
+  <div th:fragment="content">         <div th:fragment="content">
+    …본문…                              …본문…
+  </div>   ← 조기 종료                  <script>…</script>
+  <script>…</script>                  </div>   ← 여기서 종료
+  </div>                              </body>
+  ```
+  - 패턴: 각 파일에서 `</nav>`(목록) 또는 본문 끝 `</div>` 직후·`<script` 직전에 있는 **단독 `</div>` 한 줄을 제거**하면, `</script>` 뒤의 기존 `</div>`가 fragment를 닫게 됨. (여는 div 1 = 닫는 div 1 제거라 균형 유지)
+- **다음 세션 시작점**: ① 위 수정을 전 템플릿 일괄 적용 → ② 앱 기동(`SPRING_PROFILES_ACTIVE=local ./gradlew bootRun`, MySQL 3307) → ③ **실제 렌더 검증**: `curl`로 페이지 받아 페이지 스크립트(`searchForm`/`load`)가 응답에 포함되는지 grep + 가능하면 헤드리스 브라우저(없으면 사용자 육안)로 **표에 행이 칠해지는지**까지 확인(HTTP 200만으론 불충분 — 이번 교훈).
+- **참고**: 디자인 변경(필터바/카드 폼/라벨/날짜)·MM 화면·상태머신 로직 자체는 정상. **오직 스크립트 위치만 문제**. 데이터 유무 오해도 이 버그 때문(재고 1·입고 1·창고 1·출고 0건은 실제 DB 사실이나, 화면엔 JS 미실행으로 아무것도 안 칠해졌던 것).
 - **⭐ 프론트엔드(화면) 백필 진행 중** (사용자 요청, Phase 횡단 작업): "기능을 화면으로 보며 이해"하기 위해 모듈별 풀 CRUD 화면을 **SD→MM→FI→HR** 순으로 소급 구현 중.
   - 공통 토대: `templates/fragments/layout.html`(**데코레이터 셸** `document(title,active,content)` — 좌측 사이드바+상단바+콘텐츠 슬롯), `static/css/app.css`(ERP 어드민 테마), `static/js/erp.js`(REST 호출 래퍼·401 리다이렉트·금액/날짜 포맷·flash). 방식 = MVC 컨트롤러가 껍데기 HTML 서빙 + JS 가 기존 REST API 호출(JWT HttpOnly 쿠키 자동 인증). Bootstrap 5.3 + bootstrap-icons CDN.
   - **UI 셸 개편(포트폴리오 지향)**: 로그인→**대시보드**(`/`=dashboard.html, 통계 플레이스홀더+바로가기) 진입. 상단 네비→**좌측 사이드바**(역할별 메뉴 그룹, 아이콘). 로그인 화면 리디자인. 기존 menu.html 삭제. 전 화면(SD 12 + admin 2 + 대시보드)을 셸로 통일.
@@ -30,10 +50,21 @@
     3. `layout.html` 사이드바에 **MM 메뉴 그룹 추가**(재고/입고/출고/창고) + 각 `active` 키. (현재 사이드바엔 영업 SD·관리자만 있음.)
     4. MM REST API: `/api/stocks`(재고현황·이동), `/api/goods-receipts`(입고: vendorId·warehouseId·receiptDate·lines[itemId,quantity,unitCost], 생성후 `/{id}/post` 전기), `/api/goods-issues`(출고), `/api/warehouses`(창고 CRUD). 상태머신/DTO는 각 컨트롤러·dto 패키지 확인 후 진행.
     5. 다 만들면 앱 띄워(`SPRING_PROFILES_ACTIVE=local ./gradlew bootRun`, MySQL 3307 필요) 페이지 HTTP 200·렌더 검증.
-  - **화면 백필 순서**: SD ✅ → **MM(다음)** → FI(전표/계정/입출금) → HR(계약/근태/급여).
+  - **화면 백필 순서**: SD(작성됨·⛔버그) → MM(작성됨·⛔버그) → **공통 버그 수정 → FI(전표/계정/입출금)** → HR(계약/근태/급여).
+  - **MM(자재) 화면 작성됨**(2026-06-01, ⛔ 위 "미해결 버그"로 현재 화면 미동작 — 코드/구조는 완성): `mm/web/MaterialsViewController`(@PreAuthorize PURCHASING/ADMIN) + 11개 화면. 사이드바에 **자재(MM) 그룹**(재고/입고/출고/창고) 추가. 모두 직전 개선한 새 디자인(인라인 `filter-bar`·`table-wrap`·카드 폼·`line-table`·`form-actions`)으로 구축.
+    - **재고(Stock)**: 목록(검색 품목/창고/재고>0) + 상세(재고현황+평가액 / `/api/stock-movements` 이동이력). 조회 전용.
+    - **입고(GoodsReceipt)**: 목록/상세/생성·수정. 생성=vendor/warehouse/receiptDate+lines[itemId,qty,unitCost](품목 선택 시 표준원가 자동). 상세 액션: DRAFT→전기(post), POSTED→취소(cancel). 합계 자동계산.
+    - **출고(GoodsIssue)**: 목록/상세/생성·수정. 생성=warehouse/issueDate/reason+lines[itemId,qty]. 상태머신 동일. `deliveryId` 있으면 "출하(SD) 자동생성" 표시하고 직접 액션 숨김.
+    - **창고(Warehouse)**: 목록(이름/상태 검색)/상세/생성·수정/삭제. code(WH-XXX, 생성 후 잠금)/name/address. status는 DTO에 없어 미편집.
+    - 상태 전이 규칙(엔티티 확인): 입고·출고 공통 DRAFT→POSTED(post)→CANCELLED(cancel). **DRAFT는 취소 불가**(cancel은 POSTED만). 화면 버튼도 이에 맞춤.
+    - **검증(불충분 — 교훈)**(2026-06-01): `compileJava` 그린. MM 11개 라우트 HTTP 200·REST API 7종 200까지만 확인했고 **실제 브라우저 렌더를 안 봐서 위 공통 JS 누락 버그를 못 잡음**. 다음엔 200이 아니라 응답에 페이지 스크립트가 포함되는지 + 표가 칠해지는지까지 봐야 함.
+    - **다음 세션 시작점(화면 트랙)**: **FI(회계) 화면**. `fi/web/`에 @Controller(@PreAuthorize FINANCE/ADMIN) + `/fi/...` 라우트. 사이드바에 **회계(FI) 그룹** 추가(전표/계정/입출금). REST: `/api/journal-entries`(전표), `/api/accounts`(계정과목), `/api/payments`(입출금). MM/SD 화면 코드 복붙 변형이 가장 빠름.
   - **참고(이미 검증된 토대)**: `static/js/erp.js`(api·flash·won·query·param), `static/css/app.css`(테마), `templates/fragments/layout.html`(셸), `templates/sd/**`(목록/상세/폼 예시 12종), `templates/dashboard.html`. SD 화면 코드를 복붙 변형하면 가장 빠름.
   - **Tabler 톤 통일 완료**(2026-05-31): `app.css` 전면 리튠(Inter 폰트·네이비 사이드바·Tabler 블루 #206bc4·크리스프 라운드·소프트 보더/섀도·소프트 뱃지), `erp.js` `ERP.badge` 소프트화. SD 14개(목록 4 `page-head`+`filter-bar`+`table-wrap`, 상세/폼 8 헤더 `page-head`) + `admin/users` 뱃지 + `login` 색/폰트 정렬. 기능 무변경.
-  - **⭐ 다음 진도 UI-TODO — 검색 필터바(`filter-bar`) 디자인 개선**: 사용자 피드백 — 현재 검색 조건 영역이 "투박"함(맨 라벨+기본 select/date input 나열). 개선 방향(예시): ① 인풋을 더 콤팩트/정렬되게(라벨을 인풋 안 placeholder 또는 작은 상단 라벨+일관 높이), ② date input 커스텀 스타일(브라우저 기본 "연도.월.일" 못생김 → 아이콘+통일 보더), ③ 검색/초기화 버튼 정렬·아이콘, ④ 필터바를 카드 톤과 한 줄로 단정하게(구분선/여백), 가능하면 "필터 칩" 또는 접이식. **지금 적용하지 말고 다음 세션(MM 화면 작업 시 함께)에서 `filter-bar` 공통 스타일로 한 번에 개선** — SD/MM 전 목록에 일괄 반영되도록 `app.css` `.filter-bar` + 목록 마크업 패턴으로 처리. 참고 톤: Tabler의 필터/검색 폼.
+  - **✅ 검색 필터바(`filter-bar`) 디자인 개선 완료**(2026-06-01): 사용자 선택 = **"단정한 인라인 바"**. `app.css` `.filter-bar` 를 Bootstrap `row/col` 그리드 → **flex 인라인 바**로 재작성. 공통 패턴: `<form class="filter-bar">` 안에 `.filter-field`(작은 상단 uppercase 라벨 + 컨트롤, 높이 34px 통일, `.ff-wide`/`.ff-narrow`/`.ff-range` 폭 변형), 날짜는 `.ff-range > .date-range`(date 2개를 `~` 로 묶음, `::-webkit-calendar-picker-indicator` 톤 정리), 액션은 `.filter-actions`(우측 정렬, 검색=파랑 채움+🔍, 초기화=아이콘 버튼 ↺). SD 4개 목록(견적/수주/출하/인보이스) 마크업 일괄 교체 + 초기화 버튼/핸들러 없던 3곳(order/delivery/invoice)에 추가. **MM 등 이후 목록은 이 패턴 그대로 복붙**하면 됨.
+    - **생성/수정 폼도 동일 톤 적용**(2026-06-01): SD 4개 `form.html`을 **카드 섹션 패턴**으로 — 기본정보 필드를 `.card>.card-body`(`.form-card`)로, 라인 입력 테이블을 `.card>.card-header(섹션명)+.card-body` + `table.line-table`(리스트와 톤 통일, table-bordered 제거)로, 하단 버튼을 `.form-actions`(우측 정렬·상단 구분선, 취소 좌/주버튼 우)로. date 입력 캘린더 아이콘 폴리시는 `.filter-bar` 한정 → **전역**으로 확대. `app.css`에 `.card>.card-header`/`.line-table`/`.form-actions` 추가. JS·id·라인 동작 무변경.
+    - **라벨 톤 통일**(2026-06-01): 사용자 피드백 — 목록 필터바(작은 대문자 회색 라벨)와 폼(일반 검정 라벨)이 이질적. 선택 = **"라벨만 통일, 입력은 넓게"**. `.filter-field>label` + `.app-content .form-label`을 **공통 타이포**(.7rem·600·uppercase·muted·자간 .04em)로 묶고, 폼 입력 컨트롤은 표준 크기 유지(입력 편의). 라벨 내 `(선택)` 부가표기는 대문자/강조 제외, 빨간 `*`는 유지. 로그인 화면은 `.app-content` 밖이라 영향 없음.
+    - **날짜 입력 크기 통일**(2026-06-01): 사용자 피드백 — 목록(필터바)의 date 입력은 34px, 폼은 38px라 크기 다름. 선택 = **"날짜 입력만 양쪽 통일"**. `.app-content input[type=date].form-control { height:34px; font-size:.82rem }` 로 앱 전체 날짜 입력을 **콤팩트(34px) 기준**으로 통일(필터바 가로 한 줄을 균일하게 유지하려고 키우는 대신 줄이는 방향 선택). 트레이드오프: 폼에서 날짜 칸이 옆 select(38px)보다 약간 낮음. ⚠️ 로컬 앱 렌더 검증(HTTP 200)은 MySQL 3307 필요 — 다음 실행 세션에서 같이 확인 권장(순수 템플릿/CSS/JS 변경이라 빌드 영향 없음).
   - **남은 다듬기(여유될 때)**: 대시보드 통계 카드에 실제 수치 연동(현재 `—` 플레이스홀더).
 - **단계 6~7 산출물**: `doc/08-phase-7-HR-인사급여/3-코드-워크스루/`(01~06) + `4-시연-가이드.md`. README 인덱스 갱신 완료.
 - **단계 5 구현 요약** (Phase 7):

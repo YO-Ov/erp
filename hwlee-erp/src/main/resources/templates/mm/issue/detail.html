@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('출고 상세', 'issue', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>출고 상세 <span id="h-number" class="text-muted fs-6 fw-normal"></span></h1>
+            <div class="crumb">자재 (MM) · Goods Issue</div>
+        </div>
+        <a href="/mm/goods-issues" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-2">상태</dt>
+                <dd class="col-sm-4" id="d-status">-</dd>
+                <dt class="col-sm-2">출고일</dt>
+                <dd class="col-sm-4" id="d-date">-</dd>
+
+                <dt class="col-sm-2">창고</dt>
+                <dd class="col-sm-4" id="d-warehouse">-</dd>
+                <dt class="col-sm-2">사유</dt>
+                <dd class="col-sm-4" id="d-reason">-</dd>
+
+                <dt class="col-sm-2">출하 연계</dt>
+                <dd class="col-sm-4" id="d-delivery">-</dd>
+                <dt class="col-sm-2">전기 일시</dt>
+                <dd class="col-sm-4" id="d-posted">-</dd>
+
+                <dt class="col-sm-2">등록</dt>
+                <dd class="col-sm-10 small text-muted" id="d-audit">-</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="mb-3" id="actions"></div>
+
+    <div class="card mb-3">
+        <div class="card-header">출고 라인</div>
+        <div class="card-body">
+            <table class="table line-table align-middle mb-0">
+                <thead>
+                <tr><th style="width:60px;">#</th><th>품목</th><th class="text-end">수량</th></tr>
+                </thead>
+                <tbody id="lines"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const STATUS = {
+        DRAFT:     {label: '초안',   color: 'secondary'},
+        POSTED:    {label: '전기됨', color: 'success'},
+        CANCELLED: {label: '취소됨', color: 'dark'},
+    };
+    const REASON = {
+        SHIPMENT:   {label: '출하', color: 'info'},
+        ADJUSTMENT: {label: '조정', color: 'secondary'},
+        SCRAP:      {label: '폐기', color: 'dark'},
+    };
+
+    async function load() {
+        try {
+            render(await ERP.api('/api/goods-issues/' + ID));
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    function render(g) {
+        const s = STATUS[g.status] || {label: g.status, color: 'secondary'};
+        const rs = REASON[g.reason] || {label: g.reason, color: 'secondary'};
+        document.getElementById('h-number').textContent = g.number;
+        document.getElementById('d-status').innerHTML = ERP.badge(s.label, s.color);
+        document.getElementById('d-date').textContent = g.issueDate ?? '-';
+        document.getElementById('d-warehouse').textContent = `${g.warehouseName} (${g.warehouseCode})`;
+        document.getElementById('d-reason').innerHTML = ERP.badge(rs.label, rs.color);
+        document.getElementById('d-delivery').innerHTML = g.deliveryId
+            ? `<a href="/sd/deliveries/${g.deliveryId}">출하 #${g.deliveryId}</a>`
+            : '<span class="text-muted">직접 출고</span>';
+        document.getElementById('d-posted').textContent =
+            g.postedAt ? g.postedAt.replace('T', ' ').slice(0, 16) : '-';
+        document.getElementById('d-audit').textContent =
+            `${g.createdBy ?? '?'} · ${(g.createdAt ?? '').replace('T', ' ').slice(0, 16)}`;
+
+        document.getElementById('lines').innerHTML = (g.lines || []).map(l => `
+            <tr>
+                <td>${l.lineNo}</td>
+                <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
+                <td class="text-end">${ERP.num(l.quantity)}</td>
+            </tr>`).join('');
+
+        renderActions(g.status, g.deliveryId);
+    }
+
+    // 상태머신: DRAFT(수정/전기), POSTED(취소), 그 외 읽기전용.
+    // 출하 연계(deliveryId) 출고는 SD 가 관리하므로 직접 전기/수정 노출 안 함.
+    function renderActions(status, deliveryId) {
+        const box = document.getElementById('actions');
+        if (deliveryId) {
+            box.innerHTML = '<span class="text-muted small">출하(SD)에서 자동 생성된 출고입니다.</span>';
+            return;
+        }
+        const btns = [];
+        if (status === 'DRAFT') {
+            btns.push(`<a href="/mm/goods-issues/${ID}/edit" class="btn btn-sm btn-outline-primary">수정</a>`);
+            btns.push(`<button class="btn btn-sm btn-primary" onclick="act('post','전기')">전기(재고 차감)</button>`);
+        } else if (status === 'POSTED') {
+            btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소(재고 원복)</button>`);
+        } else {
+            box.innerHTML = '<span class="text-muted small">최종 상태입니다(읽기 전용).</span>';
+            return;
+        }
+        box.innerHTML = btns.join(' ');
+    }
+
+    async function act(action, label) {
+        if (!confirm(`이 출고를 ${label}하시겠습니까?`)) return;
+        try {
+            render(await ERP.api(`/api/goods-issues/${ID}/${action}`, {method: 'POST'}));
+            ERP.flash(`${label} 완료`, 'success');
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', load);
+</script>
+</div>
+</body>
+</html>

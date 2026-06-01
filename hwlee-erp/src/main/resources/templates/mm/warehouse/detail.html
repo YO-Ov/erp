@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('창고 상세', 'warehouse', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>창고 상세 <span id="h-code" class="text-muted fs-6 fw-normal"></span></h1>
+            <div class="crumb">자재 (MM) · Warehouse</div>
+        </div>
+        <a href="/mm/warehouses" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-2">코드</dt>
+                <dd class="col-sm-4" id="d-code">-</dd>
+                <dt class="col-sm-2">상태</dt>
+                <dd class="col-sm-4" id="d-status">-</dd>
+
+                <dt class="col-sm-2">이름</dt>
+                <dd class="col-sm-4" id="d-name">-</dd>
+                <dt class="col-sm-2">주소</dt>
+                <dd class="col-sm-4" id="d-address">-</dd>
+
+                <dt class="col-sm-2">등록</dt>
+                <dd class="col-sm-4 small text-muted" id="d-created">-</dd>
+                <dt class="col-sm-2">수정</dt>
+                <dd class="col-sm-4 small text-muted" id="d-updated">-</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="mb-3" id="actions"></div>
+</div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const STATUS = {
+        ACTIVE:   {label: '활성', color: 'success'},
+        INACTIVE: {label: '휴면', color: 'secondary'},
+        BLOCKED:  {label: '정지', color: 'danger'},
+    };
+
+    async function load() {
+        try {
+            render(await ERP.api('/api/warehouses/' + ID));
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    function render(w) {
+        const s = STATUS[w.status] || {label: w.status, color: 'secondary'};
+        document.getElementById('h-code').textContent = w.code;
+        document.getElementById('d-code').textContent = w.code;
+        document.getElementById('d-status').innerHTML = ERP.badge(s.label, s.color);
+        document.getElementById('d-name').textContent = w.name;
+        document.getElementById('d-address').textContent = w.address || '-';
+        document.getElementById('d-created').textContent =
+            `${w.createdBy ?? '?'} · ${(w.createdAt ?? '').replace('T', ' ').slice(0, 16)}`;
+        document.getElementById('d-updated').textContent =
+            `${w.updatedBy ?? '?'} · ${(w.updatedAt ?? '').replace('T', ' ').slice(0, 16)}`;
+
+        document.getElementById('actions').innerHTML =
+            `<a href="/mm/warehouses/${ID}/edit" class="btn btn-sm btn-outline-primary">수정</a>
+             <button class="btn btn-sm btn-outline-danger" onclick="del()">삭제</button>`;
+    }
+
+    async function del() {
+        if (!confirm('이 창고를 삭제하시겠습니까?')) return;
+        try {
+            await ERP.api('/api/warehouses/' + ID, {method: 'DELETE'});
+            location.href = '/mm/warehouses';
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', load);
+</script>
+</div>
+</body>
+</html>

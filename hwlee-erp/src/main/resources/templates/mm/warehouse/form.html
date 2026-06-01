@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('창고 작성', 'warehouse', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1 id="title">신규 창고</h1>
+            <div class="crumb">자재 (MM) · Warehouse</div>
+        </div>
+        <a href="/mm/warehouses" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <form id="form">
+        <div class="card form-card mb-3"><div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">코드 <span class="text-danger">*</span></label>
+                    <input type="text" id="code" class="form-control" required placeholder="WH-SEOUL">
+                    <div class="form-text">WH-XXX 형식 (대문자/숫자/_/-). 생성 후 변경 불가.</div>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">이름 <span class="text-danger">*</span></label>
+                    <input type="text" id="name" class="form-control" required placeholder="서울 중앙창고">
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label">주소 <span class="text-muted small">(선택)</span></label>
+                    <input type="text" id="address" class="form-control" placeholder="서울특별시 …">
+                </div>
+            </div>
+        </div></div>
+
+        <div class="form-actions">
+            <a href="/mm/warehouses" class="btn btn-outline-secondary">취소</a>
+            <button type="submit" class="btn btn-primary" id="submitBtn">저장</button>
+        </div>
+    </form>
+</div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const isEdit = ID != null;
+
+    async function submit(e) {
+        e.preventDefault();
+        const name = document.getElementById('name').value.trim();
+        const address = document.getElementById('address').value.trim() || null;
+        try {
+            let saved;
+            if (isEdit) {
+                saved = await ERP.api('/api/warehouses/' + ID, {method: 'PUT', body: {name, address}});
+            } else {
+                const code = document.getElementById('code').value.trim();
+                saved = await ERP.api('/api/warehouses', {method: 'POST', body: {code, name, address}});
+            }
+            location.href = '/mm/warehouses/' + saved.id;
+        } catch (err) {
+            ERP.flashError(err);
+        }
+    }
+
+    async function init() {
+        if (isEdit) {
+            document.getElementById('title').textContent = '창고 수정';
+            try {
+                const w = await ERP.api('/api/warehouses/' + ID);
+                const code = document.getElementById('code');
+                code.value = w.code;
+                code.disabled = true; // 코드는 수정 불가
+                document.getElementById('name').value = w.name ?? '';
+                document.getElementById('address').value = w.address ?? '';
+            } catch (err) {
+                ERP.flashError(err);
+            }
+        }
+        document.getElementById('form').addEventListener('submit', submit);
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+</script>
+</div>
+</body>
+</html>

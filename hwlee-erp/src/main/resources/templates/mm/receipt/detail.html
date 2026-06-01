@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('입고 상세', 'receipt', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>입고 상세 <span id="h-number" class="text-muted fs-6 fw-normal"></span></h1>
+            <div class="crumb">자재 (MM) · Goods Receipt</div>
+        </div>
+        <a href="/mm/goods-receipts" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-2">상태</dt>
+                <dd class="col-sm-4" id="d-status">-</dd>
+                <dt class="col-sm-2">입고일</dt>
+                <dd class="col-sm-4" id="d-date">-</dd>
+
+                <dt class="col-sm-2">거래처</dt>
+                <dd class="col-sm-4" id="d-vendor">-</dd>
+                <dt class="col-sm-2">창고</dt>
+                <dd class="col-sm-4" id="d-warehouse">-</dd>
+
+                <dt class="col-sm-2">전기 일시</dt>
+                <dd class="col-sm-4" id="d-posted">-</dd>
+                <dt class="col-sm-2">등록</dt>
+                <dd class="col-sm-4 small text-muted" id="d-audit">-</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="mb-3" id="actions"></div>
+
+    <div class="card mb-3">
+        <div class="card-header">입고 라인</div>
+        <div class="card-body">
+            <table class="table line-table align-middle mb-0">
+                <thead>
+                <tr>
+                    <th style="width:60px;">#</th><th>품목</th>
+                    <th class="text-end">수량</th><th class="text-end">단가</th><th class="text-end">라인 합계</th>
+                </tr>
+                </thead>
+                <tbody id="lines"></tbody>
+                <tfoot>
+                <tr><td colspan="4" class="text-end fw-bold">합계</td>
+                    <td class="text-end fw-bold" id="grandTotal">₩0</td></tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const STATUS = {
+        DRAFT:     {label: '초안',   color: 'secondary'},
+        POSTED:    {label: '전기됨', color: 'success'},
+        CANCELLED: {label: '취소됨', color: 'dark'},
+    };
+
+    async function load() {
+        try {
+            render(await ERP.api('/api/goods-receipts/' + ID));
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    function render(r) {
+        const s = STATUS[r.status] || {label: r.status, color: 'secondary'};
+        document.getElementById('h-number').textContent = r.number;
+        document.getElementById('d-status').innerHTML = ERP.badge(s.label, s.color);
+        document.getElementById('d-date').textContent = r.receiptDate ?? '-';
+        document.getElementById('d-vendor').textContent = `${r.vendorName} (${r.vendorCode})`;
+        document.getElementById('d-warehouse').textContent = `${r.warehouseName} (${r.warehouseCode})`;
+        document.getElementById('d-posted').textContent =
+            r.postedAt ? r.postedAt.replace('T', ' ').slice(0, 16) : '-';
+        document.getElementById('d-audit').textContent =
+            `${r.createdBy ?? '?'} · ${(r.createdAt ?? '').replace('T', ' ').slice(0, 16)}`;
+
+        let grand = 0;
+        document.getElementById('lines').innerHTML = (r.lines || []).map(l => {
+            grand += Number(l.lineTotal) || 0;
+            return `<tr>
+                <td>${l.lineNo}</td>
+                <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
+                <td class="text-end">${ERP.num(l.quantity)}</td>
+                <td class="text-end">${ERP.won(l.unitCost)}</td>
+                <td class="text-end">${ERP.won(l.lineTotal)}</td></tr>`;
+        }).join('');
+        document.getElementById('grandTotal').textContent = ERP.won(grand);
+
+        renderActions(r.status);
+    }
+
+    // 상태머신: DRAFT(수정/전기), POSTED(취소), 그 외 읽기전용
+    function renderActions(status) {
+        const box = document.getElementById('actions');
+        const btns = [];
+        if (status === 'DRAFT') {
+            btns.push(`<a href="/mm/goods-receipts/${ID}/edit" class="btn btn-sm btn-outline-primary">수정</a>`);
+            btns.push(`<button class="btn btn-sm btn-primary" onclick="act('post','전기')">전기(재고 반영)</button>`);
+        } else if (status === 'POSTED') {
+            btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소(재고 원복)</button>`);
+        } else {
+            box.innerHTML = '<span class="text-muted small">최종 상태입니다(읽기 전용).</span>';
+            return;
+        }
+        box.innerHTML = btns.join(' ');
+    }
+
+    async function act(action, label) {
+        if (!confirm(`이 입고를 ${label}하시겠습니까?`)) return;
+        try {
+            render(await ERP.api(`/api/goods-receipts/${ID}/${action}`, {method: 'POST'}));
+            ERP.flash(`${label} 완료`, 'success');
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', load);
+</script>
+</div>
+</body>
+</html>

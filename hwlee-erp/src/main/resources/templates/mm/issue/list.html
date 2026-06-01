@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html th:replace="~{fragments/layout :: document('인보이스 목록', 'invoice', ~{::content})}"
+<html th:replace="~{fragments/layout :: document('출고 목록', 'issue', ~{::content})}"
       lang="ko" xmlns:th="http://www.thymeleaf.org">
 <body>
 <div th:fragment="content">
@@ -7,27 +7,37 @@
 
     <div class="page-head">
         <div>
-            <h1>인보이스</h1>
-            <div class="crumb">영업 (SD) · Invoice</div>
+            <h1>출고</h1>
+            <div class="crumb">자재 (MM) · Goods Issue</div>
         </div>
-        <a href="/sd/invoices/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 신규 인보이스</a>
+        <a href="/mm/goods-issues/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 신규 출고</a>
     </div>
 
     <form id="searchForm" class="filter-bar">
+        <div class="filter-field">
+            <label>창고</label>
+            <select id="f-warehouse" class="form-select form-select-sm"><option value="">전체</option></select>
+        </div>
         <div class="filter-field ff-narrow">
-            <label>수주 ID</label>
-            <input type="number" id="f-so" class="form-control form-control-sm" placeholder="예: 12">
+            <label>사유</label>
+            <select id="f-reason" class="form-select form-select-sm">
+                <option value="">전체</option>
+                <option value="SHIPMENT">출하</option>
+                <option value="ADJUSTMENT">조정</option>
+                <option value="SCRAP">폐기</option>
+            </select>
         </div>
         <div class="filter-field ff-narrow">
             <label>상태</label>
             <select id="f-status" class="form-select form-select-sm">
                 <option value="">전체</option>
-                <option value="ISSUED">발행됨</option>
+                <option value="DRAFT">초안</option>
+                <option value="POSTED">전기됨</option>
                 <option value="CANCELLED">취소됨</option>
             </select>
         </div>
         <div class="filter-field ff-range">
-            <label>발행일</label>
+            <label>출고일</label>
             <div class="date-range">
                 <input type="date" id="f-from" class="form-control form-control-sm">
                 <span class="tilde">~</span>
@@ -43,7 +53,9 @@
     <div class="table-wrap">
     <table class="table table-hover align-middle mb-0">
         <thead>
-        <tr><th>번호</th><th>수주</th><th>발행일</th><th class="text-end">합계(VAT포함)</th><th>상태</th><th style="width:80px;"></th></tr>
+        <tr>
+            <th>번호</th><th>창고</th><th>사유</th><th>출고일</th><th>상태</th><th style="width:80px;"></th>
+        </tr>
         </thead>
         <tbody id="rows"><tr><td colspan="6" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
     </table>
@@ -54,36 +66,54 @@
 <script>
     const STATUS = {
         DRAFT:     {label: '초안',   color: 'secondary'},
-        ISSUED:    {label: '발행됨', color: 'success'},
+        POSTED:    {label: '전기됨', color: 'success'},
         CANCELLED: {label: '취소됨', color: 'dark'},
+    };
+    const REASON = {
+        SHIPMENT:   {label: '출하', color: 'info'},
+        ADJUSTMENT: {label: '조정', color: 'secondary'},
+        SCRAP:      {label: '폐기', color: 'dark'},
     };
     let page = 0;
     const SIZE = 10;
 
+    async function loadWarehouses() {
+        try {
+            const data = await ERP.api('/api/warehouses' + ERP.query({status: 'ACTIVE', size: 200}));
+            const sel = document.getElementById('f-warehouse');
+            (data.content || []).forEach(w => {
+                const o = document.createElement('option'); o.value = w.id; o.textContent = `${w.name} (${w.code})`; sel.appendChild(o);
+            });
+        } catch (e) {}
+    }
+
     function filters() {
         return {
-            salesOrderId: document.getElementById('f-so').value,
+            warehouseId: document.getElementById('f-warehouse').value,
+            reason: document.getElementById('f-reason').value,
             status: document.getElementById('f-status').value,
             dateFrom: document.getElementById('f-from').value,
             dateTo: document.getElementById('f-to').value,
         };
     }
+
     async function load() {
         const tbody = document.getElementById('rows');
         try {
-            const data = await ERP.api('/api/invoices' + ERP.query({...filters(), page, size: SIZE, sort: 'id,desc'}));
+            const data = await ERP.api('/api/goods-issues' + ERP.query({...filters(), page, size: SIZE, sort: 'id,desc'}));
             const list = data.content || [];
             tbody.innerHTML = list.length === 0
-                ? '<tr><td colspan="6" class="text-center text-muted py-4">인보이스가 없습니다.</td></tr>'
-                : list.map(v => {
-                    const s = STATUS[v.status] || {label: v.status, color: 'secondary'};
-                    return `<tr style="cursor:pointer" onclick="location.href='/sd/invoices/${v.id}'">
-                        <td>${ERP.esc(v.number)}</td>
-                        <td><a href="/sd/sales-orders/${v.salesOrderId}" onclick="event.stopPropagation()">${ERP.esc(v.salesOrderNumber)}</a></td>
-                        <td>${v.invoiceDate ?? ''}</td>
-                        <td class="text-end">${ERP.won(v.totalAmount)}</td>
+                ? '<tr><td colspan="6" class="text-center text-muted py-4">출고가 없습니다.</td></tr>'
+                : list.map(g => {
+                    const s = STATUS[g.status] || {label: g.status, color: 'secondary'};
+                    const rs = REASON[g.reason] || {label: g.reason, color: 'secondary'};
+                    return `<tr style="cursor:pointer" onclick="location.href='/mm/goods-issues/${g.id}'">
+                        <td>${ERP.esc(g.number)}</td>
+                        <td>${ERP.esc(g.warehouseName)} <span class="text-muted small">${ERP.esc(g.warehouseCode)}</span></td>
+                        <td>${ERP.badge(rs.label, rs.color)}</td>
+                        <td>${g.issueDate ?? ''}</td>
                         <td>${ERP.badge(s.label, s.color)}</td>
-                        <td><a class="btn btn-sm btn-outline-secondary" href="/sd/invoices/${v.id}"
+                        <td><a class="btn btn-sm btn-outline-secondary" href="/mm/goods-issues/${g.id}"
                                onclick="event.stopPropagation()">상세</a></td></tr>`;
                 }).join('');
             renderPager(data.totalPages || 0, data.number || 0);
@@ -92,6 +122,7 @@
             ERP.flashError(e);
         }
     }
+
     function renderPager(totalPages, current) {
         const pager = document.getElementById('pager');
         if (totalPages <= 1) { pager.innerHTML = ''; return; }
@@ -104,7 +135,7 @@
     function goto(p) { page = p; load(); }
 
     document.addEventListener('DOMContentLoaded', () => {
-        load();
+        loadWarehouses(); load();
         document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); page = 0; load(); });
         document.getElementById('btn-reset').addEventListener('click', () => {
             document.getElementById('searchForm').reset(); page = 0; load();

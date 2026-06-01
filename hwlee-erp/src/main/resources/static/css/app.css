@@ -196,11 +196,73 @@ body {
 .form-control:focus, .form-select:focus {
     border-color: #9cc1ea; box-shadow: 0 0 0 .2rem rgba(32, 107, 196, .12);
 }
-.form-label { color: var(--text); }
+.app-content .form-label { margin-bottom: .35rem; }
+/* 라벨 안의 (선택) 같은 부가 표기는 대문자/색 강조에서 제외 */
+.app-content .form-label .text-muted { text-transform: none; font-weight: 400; }
 
+/* ── 필터바 (검색 조건) — 단정한 인라인 바 ───────────────────── */
 .filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: .6rem .85rem;
     background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 1rem 1.1rem; margin-bottom: 1.25rem; box-shadow: 0 1px 2px rgba(28, 36, 52, .04);
+    padding: .85rem 1rem; margin-bottom: 1.25rem; box-shadow: 0 1px 2px rgba(28, 36, 52, .04);
+}
+.filter-field { display: flex; flex-direction: column; gap: .28rem; width: 158px; }
+.filter-field.ff-wide   { width: 200px; }
+.filter-field.ff-narrow { width: 124px; }
+.filter-field.ff-range  { width: auto; }
+.filter-field > label {
+    margin: 0; padding-left: .15rem; white-space: nowrap;
+}
+/* 필터바 라벨 + 폼 라벨 공통 타이포 — 한 앱처럼 보이도록 통일 */
+.filter-field > label,
+.app-content .form-label {
+    font-size: .7rem; font-weight: 600; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--muted);
+}
+.filter-bar .form-control,
+.filter-bar .form-select {
+    height: 34px; width: 100%;
+    padding: .25rem .6rem; font-size: .82rem;
+}
+/* 기간(날짜 범위): 두 date 입력을 ~ 로 묶음 */
+.ff-range .date-range { display: flex; align-items: center; gap: .4rem; }
+.ff-range .date-range .form-control { width: 146px; }
+.ff-range .date-range .tilde { color: var(--muted); font-size: .85rem; }
+/* date 입력 캘린더 아이콘 다듬기(브라우저 기본 모양 톤 정리) — 전역 */
+input[type=date] { color: var(--text); }
+/* 날짜 입력 크기는 목록(필터바)·폼 양쪽에서 동일하게 통일(콤팩트 기준) */
+.app-content input[type=date].form-control { height: 34px; font-size: .82rem; }
+input[type=date]::-webkit-calendar-picker-indicator {
+    opacity: .5; cursor: pointer; margin-left: .1rem;
+}
+input[type=date]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
+/* 액션 버튼: 우측 정렬 + 컨트롤과 높이 통일 */
+.filter-actions { margin-left: auto; display: flex; align-items: flex-end; gap: .4rem; }
+.filter-actions .btn { height: 34px; display: inline-flex; align-items: center; gap: .35rem; }
+.filter-actions .btn-icon { width: 34px; justify-content: center; padding: 0; }
+
+/* ── 입력 폼 (생성/수정) — 카드 섹션 톤 ───────────────────────── */
+.card > .card-header {
+    background: #fff; border-bottom: 1px solid var(--border);
+    padding: .8rem 1.4rem; font-weight: 600; font-size: .9rem; color: var(--text);
+}
+.card > .card-header .text-muted,
+.card > .card-header .small { font-weight: 400; }
+.form-card .card-body > .row:last-child { margin-bottom: 0; }
+/* 라인 입력 테이블: 카드 안에서 헤더 톤을 리스트와 통일 */
+.line-table { margin-bottom: 1rem; }
+.line-table > thead th {
+    background: #f7f9fc; font-size: .73rem; text-transform: uppercase;
+    letter-spacing: .04em; color: var(--muted); font-weight: 600; vertical-align: middle;
+}
+.line-table tfoot td { background: #fafbfd; }
+/* 하단 액션 줄: 우측 정렬 + 상단 구분선 */
+.form-actions {
+    display: flex; gap: .5rem; justify-content: flex-end;
+    padding-top: 1rem; border-top: 1px solid var(--border); margin-top: .25rem;
 }
 
 dl.detail-dl dt { color: var(--muted); font-weight: 600; font-size: .85rem; }

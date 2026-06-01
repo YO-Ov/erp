@@ -14,16 +14,15 @@
     </div>
 
     <!-- 검색 필터 -->
-    <div class="filter-bar">
-    <form id="searchForm" class="row g-2 align-items-end">
-        <div class="col-md-3">
-            <label class="form-label small text-muted mb-0">고객</label>
+    <form id="searchForm" class="filter-bar">
+        <div class="filter-field ff-wide">
+            <label>고객</label>
             <select id="f-customer" class="form-select form-select-sm">
                 <option value="">전체</option>
             </select>
         </div>
-        <div class="col-md-2">
-            <label class="form-label small text-muted mb-0">상태</label>
+        <div class="filter-field ff-narrow">
+            <label>상태</label>
             <select id="f-status" class="form-select form-select-sm">
                 <option value="">전체</option>
                 <option value="DRAFT">초안</option>
@@ -33,20 +32,19 @@
                 <option value="CANCELLED">취소됨</option>
             </select>
         </div>
-        <div class="col-md-2">
-            <label class="form-label small text-muted mb-0">발행일 from</label>
-            <input type="date" id="f-from" class="form-control form-control-sm">
+        <div class="filter-field ff-range">
+            <label>발행일</label>
+            <div class="date-range">
+                <input type="date" id="f-from" class="form-control form-control-sm">
+                <span class="tilde">~</span>
+                <input type="date" id="f-to" class="form-control form-control-sm">
+            </div>
         </div>
-        <div class="col-md-2">
-            <label class="form-label small text-muted mb-0">발행일 to</label>
-            <input type="date" id="f-to" class="form-control form-control-sm">
-        </div>
-        <div class="col-md-3">
-            <button type="submit" class="btn btn-sm btn-outline-primary">검색</button>
-            <button type="button" id="btn-reset" class="btn btn-sm btn-outline-secondary">초기화</button>
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> 검색</button>
+            <button type="button" id="btn-reset" class="btn btn-sm btn-outline-secondary btn-icon" title="초기화"><i class="bi bi-arrow-counterclockwise"></i></button>
         </div>
     </form>
-    </div>
 
     <div class="table-wrap">
     <table class="table table-hover align-middle mb-0">

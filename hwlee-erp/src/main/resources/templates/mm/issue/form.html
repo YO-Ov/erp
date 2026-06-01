@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('출고 작성', 'issue', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1 id="title">신규 출고</h1>
+            <div class="crumb">자재 (MM) · Goods Issue</div>
+        </div>
+        <a href="/mm/goods-issues" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <form id="form">
+        <div class="card form-card mb-3"><div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">창고 <span class="text-danger">*</span></label>
+                    <select id="warehouse" class="form-select" required><option value="">선택…</option></select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">사유 <span class="text-danger">*</span></label>
+                    <select id="reason" class="form-select" required>
+                        <option value="">선택…</option>
+                        <option value="ADJUSTMENT">조정</option>
+                        <option value="SCRAP">폐기</option>
+                        <option value="SHIPMENT">출하</option>
+                    </select>
+                    <div class="form-text">출하(SHIPMENT)는 보통 SD 출하에서 자동 생성됩니다.</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">출고일 <span class="text-danger">*</span></label>
+                    <input type="date" id="issueDate" class="form-control" required>
+                </div>
+            </div>
+        </div></div>
+
+        <div class="card mb-3">
+            <div class="card-header">출고 라인 <span class="text-danger">*</span></div>
+            <div class="card-body">
+                <table class="table line-table align-middle mb-0">
+                    <thead>
+                    <tr>
+                        <th>품목</th>
+                        <th style="width:180px;" class="text-end">수량</th>
+                        <th style="width:50px;"></th>
+                    </tr>
+                    </thead>
+                    <tbody id="lines"></tbody>
+                </table>
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-3" onclick="addLine()">＋ 라인 추가</button>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="/mm/goods-issues" class="btn btn-outline-secondary">취소</a>
+            <button type="submit" class="btn btn-primary" id="submitBtn">저장</button>
+        </div>
+    </form>
+</div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const isEdit = ID != null;
+    let items = [];
+
+    async function loadItems() {
+        const data = await ERP.api('/api/items' + ERP.query({status: 'ACTIVE', size: 500}));
+        items = data.content || [];
+    }
+    async function loadWarehouses(selectedId) {
+        const data = await ERP.api('/api/warehouses' + ERP.query({status: 'ACTIVE', size: 200}));
+        const sel = document.getElementById('warehouse');
+        (data.content || []).forEach(w => {
+            const o = document.createElement('option');
+            o.value = w.id; o.textContent = `${w.name} (${w.code})`;
+            if (selectedId && w.id === selectedId) o.selected = true;
+            sel.appendChild(o);
+        });
+    }
+
+    function itemOptions(selectedId) {
+        return ['<option value="">선택…</option>']
+            .concat(items.map(i =>
+                `<option value="${i.id}" ${selectedId === i.id ? 'selected' : ''}>${ERP.esc(i.name)} (${ERP.esc(i.code)})</option>`))
+            .join('');
+    }
+
+    function addLine(line) {
+        const tbody = document.getElementById('lines');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><select class="form-select form-select-sm line-item">${itemOptions(line?.itemId)}</select></td>
+            <td><input type="number" step="any" min="0" class="form-control form-control-sm text-end line-qty"
+                       value="${line?.quantity ?? ''}"></td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger"
+                        onclick="this.closest('tr').remove()">✕</button></td>`;
+        tbody.appendChild(tr);
+    }
+
+    function collectLines() {
+        const lines = [];
+        document.querySelectorAll('#lines tr').forEach(tr => {
+            const itemId = tr.querySelector('.line-item').value;
+            const quantity = tr.querySelector('.line-qty').value;
+            if (itemId) lines.push({itemId: Number(itemId), quantity});
+        });
+        return lines;
+    }
+
+    async function submit(e) {
+        e.preventDefault();
+        const lines = collectLines();
+        if (lines.length === 0) { ERP.flash('출고 라인을 최소 1개 입력하세요.', 'warning'); return; }
+
+        const body = {
+            warehouseId: Number(document.getElementById('warehouse').value),
+            issueDate: document.getElementById('issueDate').value,
+            reason: document.getElementById('reason').value,
+            lines,
+        };
+        try {
+            const saved = isEdit
+                ? await ERP.api('/api/goods-issues/' + ID, {method: 'PUT', body})
+                : await ERP.api('/api/goods-issues', {method: 'POST', body});
+            location.href = '/mm/goods-issues/' + saved.id;
+        } catch (err) {
+            ERP.flashError(err);
+        }
+    }
+
+    async function init() {
+        try {
+            await Promise.all([loadItems(), loadWarehouses()]);
+            if (isEdit) {
+                document.getElementById('title').textContent = '출고 수정';
+                const g = await ERP.api('/api/goods-issues/' + ID);
+                document.getElementById('warehouse').value = g.warehouseId;
+                document.getElementById('reason').value = g.reason ?? '';
+                document.getElementById('issueDate').value = g.issueDate ?? '';
+                (g.lines || []).forEach(addLine);
+            } else {
+                addLine();
+            }
+        } catch (err) {
+            ERP.flashError(err);
+        }
+        document.getElementById('form').addEventListener('submit', submit);
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+</script>
+</div>
+</body>
+</html>

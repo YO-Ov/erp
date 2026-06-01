@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('재고 상세', 'stock', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>재고 상세 <span id="h-item" class="text-muted fs-6 fw-normal"></span></h1>
+            <div class="crumb">자재 (MM) · Stock</div>
+        </div>
+        <a href="/mm/stocks" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-2">품목</dt>
+                <dd class="col-sm-4" id="d-item">-</dd>
+                <dt class="col-sm-2">창고</dt>
+                <dd class="col-sm-4" id="d-warehouse">-</dd>
+
+                <dt class="col-sm-2">재고 수량</dt>
+                <dd class="col-sm-4 fw-bold" id="d-qty">-</dd>
+                <dt class="col-sm-2">평균 단가</dt>
+                <dd class="col-sm-4" id="d-cost">-</dd>
+
+                <dt class="col-sm-2">재고 평가액</dt>
+                <dd class="col-sm-4" id="d-value">-</dd>
+                <dt class="col-sm-2">갱신</dt>
+                <dd class="col-sm-4 small text-muted" id="d-updated">-</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">재고 이동 이력 <span class="text-muted small">(최근순)</span></div>
+        <div class="card-body">
+            <table class="table line-table align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>일시</th><th>사유</th>
+                    <th class="text-end">수량 변동</th><th class="text-end">단가</th><th>참조</th>
+                </tr>
+                </thead>
+                <tbody id="moves"><tr><td colspan="5" class="text-center text-muted py-3">불러오는 중…</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const REASON = {
+        GOODS_RECEIPT:    {label: '입고',     color: 'success'},
+        GOODS_ISSUE:      {label: '출고',     color: 'info'},
+        ADJUSTMENT_PLUS:  {label: '조정(+)',  color: 'secondary'},
+        ADJUSTMENT_MINUS: {label: '조정(−)',  color: 'secondary'},
+        SCRAP:            {label: '폐기',     color: 'dark'},
+    };
+
+    async function load() {
+        try {
+            const s = await ERP.api('/api/stocks/' + ID);
+            renderStock(s);
+            await loadMoves(s.itemId, s.warehouseId);
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    function renderStock(s) {
+        document.getElementById('h-item').textContent = `${s.itemName} @ ${s.warehouseName}`;
+        document.getElementById('d-item').textContent = `${s.itemName} (${s.itemCode})`;
+        document.getElementById('d-warehouse').textContent = `${s.warehouseName} (${s.warehouseCode})`;
+        document.getElementById('d-qty').textContent = ERP.num(s.qtyOnHand);
+        document.getElementById('d-cost').textContent = ERP.won(s.averageCost);
+        const value = (Number(s.qtyOnHand) || 0) * (Number(s.averageCost) || 0);
+        document.getElementById('d-value').textContent = ERP.won(value);
+        document.getElementById('d-updated').textContent = (s.updatedAt ?? '').replace('T', ' ').slice(0, 16);
+    }
+
+    async function loadMoves(itemId, warehouseId) {
+        const tbody = document.getElementById('moves');
+        try {
+            const data = await ERP.api('/api/stock-movements'
+                + ERP.query({itemId, warehouseId, size: 50, sort: 'id,desc'}));
+            const list = data.content || [];
+            tbody.innerHTML = list.length === 0
+                ? '<tr><td colspan="5" class="text-center text-muted py-3">이동 이력이 없습니다.</td></tr>'
+                : list.map(m => {
+                    const r = REASON[m.reason] || {label: m.reason, color: 'secondary'};
+                    const delta = Number(m.qtyDelta) || 0;
+                    const sign = delta > 0 ? 'text-success' : 'text-danger';
+                    const ref = m.refType ? `${ERP.esc(m.refType)} #${m.refId ?? ''}` : '<span class="text-muted">-</span>';
+                    return `<tr>
+                        <td class="small">${(m.movedAt ?? '').replace('T', ' ').slice(0, 16)}</td>
+                        <td>${ERP.badge(r.label, r.color)}</td>
+                        <td class="text-end ${sign}">${delta > 0 ? '+' : ''}${ERP.num(m.qtyDelta)}</td>
+                        <td class="text-end">${ERP.won(m.unitCost)}</td>
+                        <td class="small">${ref}</td></tr>`;
+                }).join('');
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-3">이력 불러오기 실패</td></tr>';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', load);
+</script>
+</div>
+</body>
+</html>

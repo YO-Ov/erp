@@ -50,6 +50,22 @@
                 </a>
             </div>
 
+            <div sec:authorize="hasAnyRole('PURCHASING','ADMIN')">
+                <div class="nav-section">자재 (MM)</div>
+                <a class="nav-link" th:classappend="${active == 'stock'} ? 'active'" href="/mm/stocks">
+                    <i class="bi bi-boxes"></i> 재고
+                </a>
+                <a class="nav-link" th:classappend="${active == 'receipt'} ? 'active'" href="/mm/goods-receipts">
+                    <i class="bi bi-box-arrow-in-down"></i> 입고
+                </a>
+                <a class="nav-link" th:classappend="${active == 'issue'} ? 'active'" href="/mm/goods-issues">
+                    <i class="bi bi-box-arrow-up"></i> 출고
+                </a>
+                <a class="nav-link" th:classappend="${active == 'warehouse'} ? 'active'" href="/mm/warehouses">
+                    <i class="bi bi-building"></i> 창고
+                </a>
+            </div>
+
             <div sec:authorize="hasRole('ADMIN')">
                 <div class="nav-section">관리자</div>
                 <a class="nav-link" th:classappend="${active == 'admin-users'} ? 'active'" href="/admin/users">

@@ -14,48 +14,54 @@
     </div>
 
     <form id="form">
-        <div class="row g-3 mb-3">
-            <div class="col-md-4">
-                <label class="form-label">고객 <span class="text-danger">*</span></label>
-                <select id="customer" class="form-select" required>
-                    <option value="">선택…</option>
-                </select>
+        <div class="card form-card mb-3"><div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">고객 <span class="text-danger">*</span></label>
+                    <select id="customer" class="form-select" required>
+                        <option value="">선택…</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">발행일 <span class="text-danger">*</span></label>
+                    <input type="date" id="issuedDate" class="form-control" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">유효기간 <span class="text-muted small">(선택)</span></label>
+                    <input type="date" id="validUntil" class="form-control">
+                </div>
             </div>
-            <div class="col-md-3">
-                <label class="form-label">발행일 <span class="text-danger">*</span></label>
-                <input type="date" id="issuedDate" class="form-control" required>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">유효기간 <span class="text-muted small">(선택)</span></label>
-                <input type="date" id="validUntil" class="form-control">
+        </div></div>
+
+        <div class="card mb-3">
+            <div class="card-header">품목 라인 <span class="text-danger">*</span></div>
+            <div class="card-body">
+                <table class="table line-table align-middle mb-0">
+                    <thead>
+                    <tr>
+                        <th>품목</th>
+                        <th style="width:140px;" class="text-end">수량</th>
+                        <th style="width:160px;" class="text-end">단가</th>
+                        <th style="width:160px;" class="text-end">라인 합계</th>
+                        <th style="width:50px;"></th>
+                    </tr>
+                    </thead>
+                    <tbody id="lines"></tbody>
+                    <tfoot>
+                    <tr>
+                        <td colspan="3" class="text-end fw-bold">합계</td>
+                        <td class="text-end fw-bold" id="grandTotal">₩0</td>
+                        <td></td>
+                    </tr>
+                    </tfoot>
+                </table>
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-3" onclick="addLine()">＋ 라인 추가</button>
             </div>
         </div>
 
-        <h6>품목 라인 <span class="text-danger">*</span></h6>
-        <table class="table table-bordered align-middle bg-white">
-            <thead class="table-light">
-            <tr>
-                <th>품목</th>
-                <th style="width:140px;" class="text-end">수량</th>
-                <th style="width:160px;" class="text-end">단가</th>
-                <th style="width:160px;" class="text-end">라인 합계</th>
-                <th style="width:50px;"></th>
-            </tr>
-            </thead>
-            <tbody id="lines"></tbody>
-            <tfoot>
-            <tr>
-                <td colspan="3" class="text-end fw-bold">합계</td>
-                <td class="text-end fw-bold" id="grandTotal">₩0</td>
-                <td></td>
-            </tr>
-            </tfoot>
-        </table>
-        <button type="button" class="btn btn-sm btn-outline-secondary mb-3" onclick="addLine()">＋ 라인 추가</button>
-
-        <div class="d-flex gap-2">
-            <button type="submit" class="btn btn-primary" id="submitBtn">저장</button>
+        <div class="form-actions">
             <a href="/sd/quotations" class="btn btn-outline-secondary">취소</a>
+            <button type="submit" class="btn btn-primary" id="submitBtn">저장</button>
         </div>
     </form>
 </div>

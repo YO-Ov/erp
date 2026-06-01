@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('입고 작성', 'receipt', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1 id="title">신규 입고</h1>
+            <div class="crumb">자재 (MM) · Goods Receipt</div>
+        </div>
+        <a href="/mm/goods-receipts" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <form id="form">
+        <div class="card form-card mb-3"><div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">거래처 <span class="text-danger">*</span></label>
+                    <select id="vendor" class="form-select" required><option value="">선택…</option></select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">창고 <span class="text-danger">*</span></label>
+                    <select id="warehouse" class="form-select" required><option value="">선택…</option></select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">입고일 <span class="text-danger">*</span></label>
+                    <input type="date" id="receiptDate" class="form-control" required>
+                </div>
+            </div>
+        </div></div>
+
+        <div class="card mb-3">
+            <div class="card-header">입고 라인 <span class="text-danger">*</span></div>
+            <div class="card-body">
+                <table class="table line-table align-middle mb-0">
+                    <thead>
+                    <tr>
+                        <th>품목</th>
+                        <th style="width:140px;" class="text-end">수량</th>
+                        <th style="width:160px;" class="text-end">단가</th>
+                        <th style="width:160px;" class="text-end">라인 합계</th>
+                        <th style="width:50px;"></th>
+                    </tr>
+                    </thead>
+                    <tbody id="lines"></tbody>
+                    <tfoot>
+                    <tr><td colspan="3" class="text-end fw-bold">합계</td>
+                        <td class="text-end fw-bold" id="grandTotal">₩0</td><td></td></tr>
+                    </tfoot>
+                </table>
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-3" onclick="addLine()">＋ 라인 추가</button>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="/mm/goods-receipts" class="btn btn-outline-secondary">취소</a>
+            <button type="submit" class="btn btn-primary" id="submitBtn">저장</button>
+        </div>
+    </form>
+</div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const isEdit = ID != null;
+    let items = [];
+
+    async function loadItems() {
+        const data = await ERP.api('/api/items' + ERP.query({status: 'ACTIVE', size: 500}));
+        items = data.content || [];
+    }
+    async function loadSelect(id, path, query, selectedId) {
+        const data = await ERP.api(path + ERP.query(query));
+        const sel = document.getElementById(id);
+        (data.content || []).forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o.id; opt.textContent = `${o.name} (${o.code})`;
+            if (selectedId && o.id === selectedId) opt.selected = true;
+            sel.appendChild(opt);
+        });
+    }
+
+    function itemOptions(selectedId) {
+        return ['<option value="">선택…</option>']
+            .concat(items.map(i =>
+                `<option value="${i.id}" data-cost="${i.standardCost ?? 0}"
+                    ${selectedId === i.id ? 'selected' : ''}>${ERP.esc(i.name)} (${ERP.esc(i.code)})</option>`))
+            .join('');
+    }
+
+    function addLine(line) {
+        const tbody = document.getElementById('lines');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><select class="form-select form-select-sm line-item" onchange="onItemChange(this)">
+                ${itemOptions(line?.itemId)}</select></td>
+            <td><input type="number" step="any" min="0" class="form-control form-control-sm text-end line-qty"
+                       value="${line?.quantity ?? ''}" oninput="recalc()"></td>
+            <td><input type="number" step="any" min="0" class="form-control form-control-sm text-end line-cost"
+                       value="${line?.unitCost ?? ''}" oninput="recalc()"></td>
+            <td class="text-end line-total">₩0</td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger"
+                        onclick="this.closest('tr').remove();recalc()">✕</button></td>`;
+        tbody.appendChild(tr);
+        recalc();
+    }
+
+    // 품목 선택 시 단가가 비어 있으면 표준원가로 자동 채움(수정 가능)
+    function onItemChange(sel) {
+        const opt = sel.selectedOptions[0];
+        const costInput = sel.closest('tr').querySelector('.line-cost');
+        if (opt && opt.dataset.cost && !costInput.value) costInput.value = opt.dataset.cost;
+        recalc();
+    }
+
+    function recalc() {
+        let grand = 0;
+        document.querySelectorAll('#lines tr').forEach(tr => {
+            const qty = parseFloat(tr.querySelector('.line-qty').value) || 0;
+            const cost = parseFloat(tr.querySelector('.line-cost').value) || 0;
+            const total = qty * cost;
+            tr.querySelector('.line-total').textContent = ERP.won(total);
+            grand += total;
+        });
+        document.getElementById('grandTotal').textContent = ERP.won(grand);
+    }
+
+    function collectLines() {
+        const lines = [];
+        document.querySelectorAll('#lines tr').forEach(tr => {
+            const itemId = tr.querySelector('.line-item').value;
+            const quantity = tr.querySelector('.line-qty').value;
+            const unitCost = tr.querySelector('.line-cost').value;
+            if (itemId) lines.push({itemId: Number(itemId), quantity, unitCost});
+        });
+        return lines;
+    }
+
+    async function submit(e) {
+        e.preventDefault();
+        const lines = collectLines();
+        if (lines.length === 0) { ERP.flash('입고 라인을 최소 1개 입력하세요.', 'warning'); return; }
+
+        const body = {
+            vendorId: Number(document.getElementById('vendor').value),
+            warehouseId: Number(document.getElementById('warehouse').value),
+            receiptDate: document.getElementById('receiptDate').value,
+            lines,
+        };
+        try {
+            const saved = isEdit
+                ? await ERP.api('/api/goods-receipts/' + ID, {method: 'PUT', body})
+                : await ERP.api('/api/goods-receipts', {method: 'POST', body});
+            location.href = '/mm/goods-receipts/' + saved.id;
+        } catch (err) {
+            ERP.flashError(err);
+        }
+    }
+
+    async function init() {
+        try {
+            await Promise.all([
+                loadItems(),
+                loadSelect('vendor', '/api/vendors', {status: 'ACTIVE', size: 500}),
+                loadSelect('warehouse', '/api/warehouses', {status: 'ACTIVE', size: 200}),
+            ]);
+            if (isEdit) {
+                document.getElementById('title').textContent = '입고 수정';
+                const r = await ERP.api('/api/goods-receipts/' + ID);
+                document.getElementById('vendor').value = r.vendorId;
+                document.getElementById('warehouse').value = r.warehouseId;
+                document.getElementById('receiptDate').value = r.receiptDate ?? '';
+                (r.lines || []).forEach(addLine);
+            } else {
+                addLine();
+            }
+            recalc();
+        } catch (err) {
+            ERP.flashError(err);
+        }
+        document.getElementById('form').addEventListener('submit', submit);
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+</script>
+</div>
+</body>
+</html>

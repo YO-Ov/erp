@@ -13,33 +13,32 @@
         <a href="/sd/deliveries/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 신규 출하</a>
     </div>
 
-    <div class="filter-bar">
-    <form id="searchForm" class="row g-2 align-items-end">
-        <div class="col-md-2">
-            <label class="form-label small text-muted mb-0">수주 ID</label>
+    <form id="searchForm" class="filter-bar">
+        <div class="filter-field ff-narrow">
+            <label>수주 ID</label>
             <input type="number" id="f-so" class="form-control form-control-sm" placeholder="예: 12">
         </div>
-        <div class="col-md-2">
-            <label class="form-label small text-muted mb-0">상태</label>
+        <div class="filter-field ff-narrow">
+            <label>상태</label>
             <select id="f-status" class="form-select form-select-sm">
                 <option value="">전체</option>
                 <option value="SHIPPED">출하됨</option>
                 <option value="CANCELLED">취소됨</option>
             </select>
         </div>
-        <div class="col-md-2">
-            <label class="form-label small text-muted mb-0">출하일 from</label>
-            <input type="date" id="f-from" class="form-control form-control-sm">
+        <div class="filter-field ff-range">
+            <label>출하일</label>
+            <div class="date-range">
+                <input type="date" id="f-from" class="form-control form-control-sm">
+                <span class="tilde">~</span>
+                <input type="date" id="f-to" class="form-control form-control-sm">
+            </div>
         </div>
-        <div class="col-md-2">
-            <label class="form-label small text-muted mb-0">출하일 to</label>
-            <input type="date" id="f-to" class="form-control form-control-sm">
-        </div>
-        <div class="col-md-2">
-            <button type="submit" class="btn btn-sm btn-outline-primary">검색</button>
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> 검색</button>
+            <button type="button" id="btn-reset" class="btn btn-sm btn-outline-secondary btn-icon" title="초기화"><i class="bi bi-arrow-counterclockwise"></i></button>
         </div>
     </form>
-    </div>
 
     <div class="table-wrap">
     <table class="table table-hover align-middle mb-0">
@@ -106,6 +105,9 @@
     document.addEventListener('DOMContentLoaded', () => {
         load();
         document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); page = 0; load(); });
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            document.getElementById('searchForm').reset(); page = 0; load();
+        });
     });
 </script>
 </div>

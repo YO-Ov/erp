@@ -25,7 +25,7 @@ class EmployeeCrudIntegrationTest {
     void 직원_생성시_EMP_코드_발급_및_부서_연결() {
         EmployeeResponse e = service.create(new EmployeeCreateRequest(
                 "신입사원-" + System.nanoTime(),
-                "new" + System.nanoTime() + "@hwlee-erp.example",
+                "new" + System.nanoTime() + "@hyunwoo.com",
                 "DEPT-SALES",
                 LocalDate.of(2026, 5, 20)
         ));
@@ -38,7 +38,7 @@ class EmployeeCrudIntegrationTest {
     @Test
     @DisplayName("이메일_중복_등록은_거부된다")
     void 이메일_중복_등록은_거부된다() {
-        String email = "dup" + System.nanoTime() + "@hwlee-erp.example";
+        String email = "dup" + System.nanoTime() + "@hyunwoo.com";
         service.create(new EmployeeCreateRequest("A", email, "DEPT-SALES", LocalDate.of(2026, 1, 1)));
         assertThatThrownBy(() ->
                 service.create(new EmployeeCreateRequest("B", email, "DEPT-FINANCE", LocalDate.of(2026, 1, 1)))
@@ -50,7 +50,7 @@ class EmployeeCrudIntegrationTest {
     void 존재하지_않는_부서_코드는_거부() {
         assertThatThrownBy(() ->
                 service.create(new EmployeeCreateRequest(
-                        "X", "x" + System.nanoTime() + "@hwlee-erp.example",
+                        "X", "x" + System.nanoTime() + "@hyunwoo.com",
                         "DEPT-NOWHERE", LocalDate.of(2026, 1, 1)))
         ).isInstanceOf(jakarta.persistence.EntityNotFoundException.class);
     }

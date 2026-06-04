@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/items")
 @RequiredArgsConstructor
 // master 데이터: 조회는 전 업무 역할, 변경은 ADMIN (메서드 레벨에서 좁힘)
-@org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('SALES','PURCHASING','FINANCE','ADMIN')")
+@org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('SALES','PURCHASING','FINANCE','PRODUCTION','ADMIN')")
 public class ItemController {
 
     private final ItemService service;

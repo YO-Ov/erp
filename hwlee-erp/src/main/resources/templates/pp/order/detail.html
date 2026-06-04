@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('생산지시 상세', 'production', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>생산지시 <span id="h-number" class="text-muted fs-6 fw-normal"></span></h1>
+            <div class="crumb">생산 (PP) · Production Order</div>
+        </div>
+        <a href="/pp/production-orders" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-2">완제품</dt>
+                <dd class="col-sm-4" id="d-product">-</dd>
+                <dt class="col-sm-2">상태</dt>
+                <dd class="col-sm-4" id="d-status">-</dd>
+
+                <dt class="col-sm-2">생산 수량</dt>
+                <dd class="col-sm-4" id="d-qty">-</dd>
+                <dt class="col-sm-2">창고</dt>
+                <dd class="col-sm-4" id="d-warehouse">-</dd>
+
+                <dt class="col-sm-2">지시일</dt>
+                <dd class="col-sm-4" id="d-orderdate">-</dd>
+                <dt class="col-sm-2">완료 일시</dt>
+                <dd class="col-sm-4" id="d-completed">-</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="mb-3" id="actions"></div>
+
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>소요 자재 <span id="avail-badge"></span></span>
+        </div>
+        <div class="card-body">
+            <table class="table line-table align-middle mb-0">
+                <thead>
+                <tr>
+                    <th style="width:50px;">#</th><th>부품</th>
+                    <th class="text-end">소요량</th><th class="text-end">현재고</th>
+                    <th class="text-end">출고 단가</th><th>충분</th>
+                </tr>
+                </thead>
+                <tbody id="lines"></tbody>
+            </table>
+            <p class="text-muted small mt-2 mb-0">현재고·충분 여부는 조회 시점 기준(완료 시 부품이 실제 출고됩니다).</p>
+        </div>
+    </div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const STATUS = {
+        PLANNED:   {label: '계획', color: 'secondary'},
+        RELEASED:  {label: '착수', color: 'primary'},
+        COMPLETED: {label: '완료', color: 'success'},
+        CANCELLED: {label: '취소', color: 'dark'},
+    };
+
+    let availability = null;
+
+    async function load() {
+        try {
+            const order = await ERP.api('/api/production-orders/' + ID);
+            // 가용성은 완료/취소가 아닐 때만 의미 — 조회 시도(실패해도 무시)
+            availability = null;
+            if (order.status === 'PLANNED' || order.status === 'RELEASED') {
+                try { availability = await ERP.api(`/api/production-orders/${ID}/material-availability`); } catch (e) {}
+            }
+            render(order);
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    function render(o) {
+        const s = STATUS[o.status] || {label: o.status, color: 'secondary'};
+        document.getElementById('h-number').textContent = o.number;
+        document.getElementById('d-product').textContent = `${o.productName} (${o.productCode})`;
+        document.getElementById('d-status').innerHTML = ERP.badge(s.label, s.color);
+        document.getElementById('d-qty').textContent = ERP.num(o.quantity);
+        document.getElementById('d-warehouse').textContent = o.warehouseName ?? '-';
+        document.getElementById('d-orderdate').textContent = o.orderDate ?? '-';
+        document.getElementById('d-completed').textContent =
+            o.completedAt ? o.completedAt.replace('T', ' ').slice(0, 16) : '-';
+
+        // 가용성 매핑 (componentItemId 기준)
+        const availByItem = {};
+        if (availability) (availability.lines || []).forEach(a => availByItem[a.componentItemId] = a);
+
+        document.getElementById('lines').innerHTML = (o.lines || []).map(l => {
+            const a = availByItem[l.componentItemId];
+            const onHand = a ? ERP.num(a.onHandQty) : '<span class="text-muted">-</span>';
+            const suff = a
+                ? (a.sufficient ? '<span class="text-success"><i class="bi bi-check-lg"></i></span>'
+                                : '<span class="text-danger fw-bold">부족</span>')
+                : '<span class="text-muted">-</span>';
+            const cost = l.issuedUnitCost != null ? ERP.won(l.issuedUnitCost) : '<span class="text-muted">-</span>';
+            return `<tr>
+                <td>${l.lineNo}</td>
+                <td>${ERP.esc(l.componentName)} <span class="text-muted small">${ERP.esc(l.componentCode)}</span></td>
+                <td class="text-end">${ERP.num(l.requiredQty)}</td>
+                <td class="text-end">${onHand}</td>
+                <td class="text-end">${cost}</td>
+                <td>${suff}</td></tr>`;
+        }).join('');
+
+        // 가용성 요약 뱃지
+        const badge = document.getElementById('avail-badge');
+        if (availability) {
+            badge.innerHTML = availability.producible
+                ? ERP.badge('생산 가능', 'success') : ERP.badge('자재 부족', 'danger');
+        } else badge.innerHTML = '';
+
+        renderActions(o.status);
+    }
+
+    // 상태머신: PLANNED(착수/취소), RELEASED(완료/취소), 그 외 읽기전용
+    function renderActions(status) {
+        const box = document.getElementById('actions');
+        const btns = [];
+        if (status === 'PLANNED') {
+            btns.push(`<button class="btn btn-sm btn-primary" onclick="act('release','착수')">생산 착수</button>`);
+            btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소</button>`);
+        } else if (status === 'RELEASED') {
+            btns.push(`<button class="btn btn-sm btn-success" onclick="act('complete','완료')">생산 완료 (부품 출고 + 완제품 입고)</button>`);
+            btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소</button>`);
+        } else {
+            box.innerHTML = '<span class="text-muted small">종료된 생산지시입니다(읽기 전용).</span>';
+            return;
+        }
+        box.innerHTML = btns.join(' ');
+    }
+
+    async function act(action, label) {
+        if (action === 'complete' && availability && !availability.producible
+            && !confirm('일부 부품이 부족합니다. 그래도 완료를 시도하시겠습니까? (재고 부족 시 실패합니다)')) return;
+        if (!confirm(`이 생산지시를 ${label}하시겠습니까?`)) return;
+        try {
+            await ERP.api(`/api/production-orders/${ID}/${action}`, {method: 'POST'});
+            ERP.flash(`${label} 완료`, 'success');
+            load();
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', load);
+</script>
+</div>
+</body>
+</html>

@@ -31,6 +31,11 @@ public class Item extends BaseEntityWithCode {
     @Column(name = "category", nullable = false, length = 20)
     private ItemCategory category;
 
+    /** 완제품/부품 구분 (Phase 8 PP). 신규 품목 기본값 FINISHED, 부품은 시드로 COMPONENT 지정. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "item_type", nullable = false, length = 16)
+    private ItemType itemType = ItemType.FINISHED;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "unit", nullable = false, length = 10)
     private ItemUnit unit;

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('계정과목 작성', 'account', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1 id="title">신규 계정</h1>
+            <div class="crumb">회계 (FI) · Account</div>
+        </div>
+        <a href="/fi/accounts" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <form id="form">
+        <div class="card form-card mb-3"><div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">코드 <span class="text-danger">*</span></label>
+                    <input type="text" id="code" class="form-control" required placeholder="1100">
+                    <div class="form-text">계정 코드. 생성 후 변경 불가.</div>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">이름 <span class="text-danger">*</span></label>
+                    <input type="text" id="name" class="form-control" required placeholder="현금및현금성자산">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">유형 <span class="text-danger">*</span></label>
+                    <select id="type" class="form-select" required>
+                        <option value="ASSET">자산</option>
+                        <option value="LIABILITY">부채</option>
+                        <option value="EQUITY">자본</option>
+                        <option value="REVENUE">수익</option>
+                        <option value="EXPENSE">비용</option>
+                    </select>
+                    <div class="form-text">생성 후 변경 불가. 정상방향은 유형에서 자동 결정.</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">상위 계정 코드 <span class="text-muted small">(선택)</span></label>
+                    <input type="text" id="parentCode" class="form-control" placeholder="비우면 루트 계정">
+                </div>
+                <div class="col-md-8 d-flex align-items-end">
+                    <div class="form-check">
+                        <input type="checkbox" id="postable" class="form-check-input" checked>
+                        <label for="postable" class="form-check-label">전기 가능 계정 (직접 분개 가능). 헤더(집계) 계정이면 해제.</label>
+                    </div>
+                </div>
+            </div>
+        </div></div>
+
+        <div class="form-actions">
+            <a href="/fi/accounts" class="btn btn-outline-secondary">취소</a>
+            <button type="submit" class="btn btn-primary" id="submitBtn">저장</button>
+        </div>
+    </form>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const isEdit = ID != null;
+
+    async function submit(e) {
+        e.preventDefault();
+        const name = document.getElementById('name').value.trim();
+        const parentCode = document.getElementById('parentCode').value.trim() || null;
+        const postable = document.getElementById('postable').checked;
+        try {
+            let saved;
+            if (isEdit) {
+                saved = await ERP.api('/api/accounts/' + ID, {method: 'PUT', body: {name, parentCode, postable}});
+            } else {
+                const code = document.getElementById('code').value.trim();
+                const type = document.getElementById('type').value;
+                saved = await ERP.api('/api/accounts', {method: 'POST', body: {code, name, type, parentCode, postable}});
+            }
+            location.href = '/fi/accounts/' + saved.id;
+        } catch (err) {
+            ERP.flashError(err);
+        }
+    }
+
+    async function init() {
+        if (isEdit) {
+            document.getElementById('title').textContent = '계정 수정';
+            try {
+                const a = await ERP.api('/api/accounts/' + ID);
+                const code = document.getElementById('code');
+                code.value = a.code; code.disabled = true; // 코드는 수정 불가
+                const type = document.getElementById('type');
+                type.value = a.type; type.disabled = true; // 유형도 수정 불가
+                document.getElementById('name').value = a.name ?? '';
+                document.getElementById('parentCode').value = a.parentCode ?? '';
+                document.getElementById('postable').checked = !!a.postable;
+            } catch (err) {
+                ERP.flashError(err);
+            }
+        }
+        document.getElementById('form').addEventListener('submit', submit);
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+</script>
+</div>
+</body>
+</html>

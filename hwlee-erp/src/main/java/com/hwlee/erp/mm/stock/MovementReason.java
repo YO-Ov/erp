@@ -13,7 +13,12 @@ public enum MovementReason {
     ADJUSTMENT_PLUS(true),
     ADJUSTMENT_MINUS(false),
     /** 폐기 */
-    SCRAP(false);
+    SCRAP(false),
+
+    /** 생산 투입 — 부품 소모 (Phase 8 PP). qty_delta < 0 */
+    PRODUCTION_OUT(false),
+    /** 생산 산출 — 완제품 입고 (Phase 8 PP). qty_delta > 0 */
+    PRODUCTION_IN(true);
 
     private final boolean positive;
 

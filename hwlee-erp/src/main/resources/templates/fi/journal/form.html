@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('전표 작성', 'journal', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>신규 전표</h1>
+            <div class="crumb">회계 (FI) · Journal Entry · 수동</div>
+        </div>
+        <a href="/fi/journal-entries" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <form id="form">
+        <div class="card form-card mb-3"><div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">전표일 <span class="text-danger">*</span></label>
+                    <input type="date" id="entryDate" class="form-control" required>
+                </div>
+                <div class="col-md-9">
+                    <label class="form-label">적요 <span class="text-danger">*</span></label>
+                    <input type="text" id="description" class="form-control" required placeholder="예: 은행 이자 수익 인식">
+                </div>
+            </div>
+        </div></div>
+
+        <div class="card mb-3">
+            <div class="card-header">분개 라인 <span class="text-danger">*</span>
+                <span class="text-muted small ms-2">각 라인은 차변 또는 대변 중 한 쪽만 입력. 차변합계 = 대변합계 여야 저장됩니다.</span>
+            </div>
+            <div class="card-body">
+                <table class="table line-table align-middle mb-0">
+                    <thead>
+                    <tr>
+                        <th>계정</th>
+                        <th style="width:180px;" class="text-end">차변</th>
+                        <th style="width:180px;" class="text-end">대변</th>
+                        <th style="width:50px;"></th>
+                    </tr>
+                    </thead>
+                    <tbody id="lines"></tbody>
+                    <tfoot>
+                    <tr>
+                        <td class="text-end fw-bold">합계</td>
+                        <td class="text-end fw-bold" id="totDebit">₩0</td>
+                        <td class="text-end fw-bold" id="totCredit">₩0</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td class="text-end">대차 균형</td>
+                        <td colspan="3" id="balanceMsg" class="small text-muted">라인을 입력하세요.</td>
+                    </tr>
+                    </tfoot>
+                </table>
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-3" onclick="addLine()">＋ 라인 추가</button>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="/fi/journal-entries" class="btn btn-outline-secondary">취소</a>
+            <button type="submit" class="btn btn-primary" id="submitBtn">저장(전기)</button>
+        </div>
+    </form>
+
+<script>
+    let accounts = []; // 전기 가능 계정만
+
+    async function loadAccounts() {
+        const all = await ERP.api('/api/accounts');
+        accounts = (all || []).filter(a => a.postable && a.status === 'ACTIVE');
+    }
+
+    function accountOptions(selectedCode) {
+        return ['<option value="">계정 선택…</option>']
+            .concat(accounts.map(a =>
+                `<option value="${ERP.esc(a.code)}" ${selectedCode === a.code ? 'selected' : ''}>${ERP.esc(a.name)} (${ERP.esc(a.code)})</option>`))
+            .join('');
+    }
+
+    function addLine(line) {
+        const tbody = document.getElementById('lines');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><select class="form-select form-select-sm line-acct">${accountOptions(line?.accountCode)}</select></td>
+            <td><input type="number" step="any" min="0" class="form-control form-control-sm text-end line-debit"
+                       value="${line?.debit ?? ''}" oninput="onAmount(this,'debit')"></td>
+            <td><input type="number" step="any" min="0" class="form-control form-control-sm text-end line-credit"
+                       value="${line?.credit ?? ''}" oninput="onAmount(this,'credit')"></td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger"
+                        onclick="this.closest('tr').remove();recalc()">✕</button></td>`;
+        tbody.appendChild(tr);
+        recalc();
+    }
+
+    // 한 라인에서 차변을 입력하면 대변을 비우고(반대도) — 한쪽만 유효.
+    function onAmount(input, side) {
+        const tr = input.closest('tr');
+        if (input.value) {
+            const other = tr.querySelector(side === 'debit' ? '.line-credit' : '.line-debit');
+            other.value = '';
+        }
+        recalc();
+    }
+
+    function recalc() {
+        let td = 0, tc = 0;
+        document.querySelectorAll('#lines tr').forEach(tr => {
+            td += parseFloat(tr.querySelector('.line-debit').value) || 0;
+            tc += parseFloat(tr.querySelector('.line-credit').value) || 0;
+        });
+        document.getElementById('totDebit').textContent = ERP.won(td);
+        document.getElementById('totCredit').textContent = ERP.won(tc);
+        const msg = document.getElementById('balanceMsg');
+        if (td === 0 && tc === 0) {
+            msg.textContent = '라인을 입력하세요.'; msg.className = 'small text-muted';
+        } else if (td === tc) {
+            msg.textContent = `균형 ✓ (차변 = 대변 = ${ERP.won(td)})`; msg.className = 'small text-success fw-bold';
+        } else {
+            msg.textContent = `불균형 — 차이 ${ERP.won(Math.abs(td - tc))}`; msg.className = 'small text-danger fw-bold';
+        }
+    }
+
+    function collectLines() {
+        const lines = [];
+        document.querySelectorAll('#lines tr').forEach(tr => {
+            const accountCode = tr.querySelector('.line-acct').value;
+            const debit = parseFloat(tr.querySelector('.line-debit').value) || 0;
+            const credit = parseFloat(tr.querySelector('.line-credit').value) || 0;
+            if (accountCode && (debit > 0 || credit > 0)) lines.push({accountCode, debit, credit});
+        });
+        return lines;
+    }
+
+    async function submit(e) {
+        e.preventDefault();
+        const lines = collectLines();
+        if (lines.length < 2) { ERP.flash('분개 라인을 최소 2개(차변·대변) 입력하세요.', 'warning'); return; }
+        const td = lines.reduce((s, l) => s + l.debit, 0);
+        const tc = lines.reduce((s, l) => s + l.credit, 0);
+        if (td !== tc) { ERP.flash(`차변합계(${ERP.won(td)})와 대변합계(${ERP.won(tc)})가 일치해야 합니다.`, 'warning'); return; }
+
+        const body = {
+            entryDate: document.getElementById('entryDate').value,
+            description: document.getElementById('description').value.trim(),
+            lines,
+        };
+        try {
+            const saved = await ERP.api('/api/journal-entries', {method: 'POST', body});
+            location.href = '/fi/journal-entries/' + saved.id;
+        } catch (err) {
+            ERP.flashError(err);
+        }
+    }
+
+    async function init() {
+        try {
+            await loadAccounts();
+            addLine(); addLine(); // 차변·대변 기본 2줄
+        } catch (err) {
+            ERP.flashError(err);
+        }
+        document.getElementById('form').addEventListener('submit', submit);
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+</script>
+</div>
+</body>
+</html>

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('직원 상세', 'employee', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>직원 상세 <span id="h-code" class="text-muted fs-6 fw-normal"></span></h1>
+            <div class="crumb">인사 (HR) · Employee</div>
+        </div>
+        <a href="/hr/employees" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <!-- 기본 정보 -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-2">코드</dt>
+                <dd class="col-sm-4" id="d-code">-</dd>
+                <dt class="col-sm-2">상태</dt>
+                <dd class="col-sm-4" id="d-status">-</dd>
+
+                <dt class="col-sm-2">이름</dt>
+                <dd class="col-sm-4" id="d-name">-</dd>
+                <dt class="col-sm-2">부서</dt>
+                <dd class="col-sm-4" id="d-dept">-</dd>
+
+                <dt class="col-sm-2">이메일</dt>
+                <dd class="col-sm-4" id="d-email">-</dd>
+                <dt class="col-sm-2">입사일</dt>
+                <dd class="col-sm-4" id="d-hire">-</dd>
+            </dl>
+        </div>
+    </div>
+
+    <!-- 급여계약 -->
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>급여계약</span>
+            <button class="btn btn-sm btn-outline-primary" type="button" onclick="toggle('contractForm')">＋ 신규 계약</button>
+        </div>
+        <div class="card-body">
+            <form id="contractForm" class="row g-2 mb-3" style="display:none">
+                <div class="col-md-2">
+                    <label class="form-label">직급 <span class="text-danger">*</span></label>
+                    <select id="c-position" class="form-select form-select-sm">
+                        <option value="STAFF">사원</option>
+                        <option value="SENIOR">선임</option>
+                        <option value="MANAGER">책임/과장</option>
+                        <option value="DIRECTOR">임원/이사</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">기본급(월) <span class="text-danger">*</span></label>
+                    <input type="number" step="any" min="0" id="c-base" class="form-control form-control-sm text-end" placeholder="3000000">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">계약시간(월) <span class="text-danger">*</span></label>
+                    <input type="number" min="1" id="c-hours" class="form-control form-control-sm text-end" value="209">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">발효일 <span class="text-danger">*</span></label>
+                    <input type="date" id="c-from" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-sm btn-primary">계약 등록</button>
+                    <span class="form-text ms-2">새 계약 등록 시 기존 ACTIVE 계약은 자동 종료됩니다.</span>
+                </div>
+            </form>
+
+            <table class="table line-table align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>직급</th><th class="text-end">기본급</th><th class="text-end">계약시간</th><th class="text-end">시급</th>
+                    <th>발효~종료</th><th>상태</th><th style="width:80px;"></th>
+                </tr>
+                </thead>
+                <tbody id="contractRows"><tr><td colspan="7" class="text-center text-muted py-3">불러오는 중…</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 근태 (이번 달) -->
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>근태 <span id="att-period" class="text-muted small"></span></span>
+            <button class="btn btn-sm btn-outline-primary" type="button" onclick="toggle('attForm')">＋ 근태 등록</button>
+        </div>
+        <div class="card-body">
+            <form id="attForm" class="row g-2 mb-3" style="display:none">
+                <div class="col-md-3">
+                    <label class="form-label">근무일 <span class="text-danger">*</span></label>
+                    <input type="date" id="a-date" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">출근 <span class="text-danger">*</span></label>
+                    <input type="time" id="a-in" class="form-control form-control-sm" value="09:00">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">퇴근 <span class="text-danger">*</span></label>
+                    <input type="time" id="a-out" class="form-control form-control-sm" value="18:00">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-sm btn-primary">근태 등록</button>
+                </div>
+            </form>
+
+            <table class="table line-table align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>근무일</th><th>출근</th><th>퇴근</th><th class="text-end">근무</th><th class="text-end">연장</th>
+                </tr>
+                </thead>
+                <tbody id="attRows"><tr><td colspan="5" class="text-center text-muted py-3">불러오는 중…</td></tr></tbody>
+                <tfoot>
+                <tr><td colspan="4" class="text-end fw-bold">연장 합계</td>
+                    <td class="text-end fw-bold" id="att-ot">-</td></tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const MSTATUS = {
+        ACTIVE:   {label: '재직', color: 'success'},
+        INACTIVE: {label: '휴직', color: 'secondary'},
+        BLOCKED:  {label: '퇴직', color: 'danger'},
+    };
+    const POSITION = {STAFF: '사원', SENIOR: '선임', MANAGER: '책임/과장', DIRECTOR: '임원/이사'};
+    const CSTATUS = {
+        ACTIVE:   {label: '유효', color: 'success'},
+        INACTIVE: {label: '종료', color: 'secondary'},
+    };
+
+    function toggle(id) {
+        const el = document.getElementById(id);
+        el.style.display = el.style.display === 'none' ? '' : 'none';
+    }
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function hm(min) { return `${Math.floor(min / 60)}시간 ${min % 60}분`; }
+
+    // 이번 달 1일~말일 (브라우저 로컬 기준)
+    function monthRange() {
+        const now = new Date();
+        const y = now.getFullYear(), m = now.getMonth();
+        const first = `${y}-${pad(m + 1)}-01`;
+        const last = new Date(y, m + 1, 0);
+        const lastStr = `${last.getFullYear()}-${pad(last.getMonth() + 1)}-${pad(last.getDate())}`;
+        return {first, lastStr, label: `${y}-${pad(m + 1)}`};
+    }
+
+    async function loadEmployee() {
+        const e = await ERP.api('/api/employees/' + ID);
+        const s = MSTATUS[e.status] || {label: e.status, color: 'secondary'};
+        document.getElementById('h-code').textContent = e.code;
+        document.getElementById('d-code').textContent = e.code;
+        document.getElementById('d-status').innerHTML = ERP.badge(s.label, s.color);
+        document.getElementById('d-name').textContent = e.name;
+        document.getElementById('d-dept').textContent = `${e.departmentName ?? '-'} (${e.departmentCode ?? '-'})`;
+        document.getElementById('d-email').textContent = e.email || '-';
+        document.getElementById('d-hire').textContent = e.hireDate || '-';
+    }
+
+    async function loadContracts() {
+        const tbody = document.getElementById('contractRows');
+        try {
+            const list = await ERP.api('/api/employment-contracts' + ERP.query({employeeId: ID}));
+            tbody.innerHTML = (list.length === 0)
+                ? '<tr><td colspan="7" class="text-center text-muted py-3">급여계약이 없습니다.</td></tr>'
+                : list.map(c => {
+                    const s = CSTATUS[c.status] || {label: c.status, color: 'secondary'};
+                    const term = c.status === 'ACTIVE'
+                        ? `<button class="btn btn-sm btn-outline-danger" onclick="terminate(${c.id})">종료</button>` : '';
+                    return `<tr>
+                        <td>${POSITION[c.position] || c.position}</td>
+                        <td class="text-end">${ERP.won(c.baseSalary)}</td>
+                        <td class="text-end">${c.contractedHours}h</td>
+                        <td class="text-end">${ERP.won(c.hourlyWage)}</td>
+                        <td>${c.effectiveFrom} ~ ${c.effectiveTo ?? '<span class="text-muted">진행중</span>'}</td>
+                        <td>${ERP.badge(s.label, s.color)}</td>
+                        <td>${term}</td></tr>`;
+                }).join('');
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-3">불러오기 실패</td></tr>';
+            ERP.flashError(e);
+        }
+    }
+
+    async function loadAttendance() {
+        const tbody = document.getElementById('attRows');
+        const r = monthRange();
+        document.getElementById('att-period').textContent = `(${r.label})`;
+        try {
+            const list = await ERP.api('/api/attendances' + ERP.query({employeeId: ID, from: r.first, to: r.lastStr}));
+            let ot = 0;
+            tbody.innerHTML = (list.length === 0)
+                ? '<tr><td colspan="5" class="text-center text-muted py-3">이번 달 근태가 없습니다.</td></tr>'
+                : list.map(a => {
+                    ot += a.overtimeMinutes || 0;
+                    return `<tr>
+                        <td>${a.workDate}</td>
+                        <td>${(a.clockIn ?? '').slice(0, 5)}</td>
+                        <td>${(a.clockOut ?? '').slice(0, 5)}</td>
+                        <td class="text-end">${hm(a.workedMinutes)}</td>
+                        <td class="text-end ${a.overtimeMinutes > 0 ? 'text-danger fw-bold' : 'text-muted'}">${hm(a.overtimeMinutes)}</td></tr>`;
+                }).join('');
+            document.getElementById('att-ot').textContent = hm(ot);
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-3">불러오기 실패</td></tr>';
+            ERP.flashError(e);
+        }
+    }
+
+    async function submitContract(e) {
+        e.preventDefault();
+        const body = {
+            employeeId: ID,
+            position: document.getElementById('c-position').value,
+            baseSalary: document.getElementById('c-base').value,
+            contractedHours: Number(document.getElementById('c-hours').value),
+            effectiveFrom: document.getElementById('c-from').value,
+        };
+        if (!body.baseSalary || !body.effectiveFrom) { ERP.flash('기본급과 발효일을 입력하세요.', 'warning'); return; }
+        try {
+            await ERP.api('/api/employment-contracts', {method: 'POST', body});
+            ERP.flash('급여계약을 등록했습니다.', 'success');
+            document.getElementById('contractForm').reset();
+            toggle('contractForm');
+            loadContracts();
+        } catch (err) { ERP.flashError(err); }
+    }
+
+    async function terminate(contractId) {
+        const to = prompt('계약 종료일(YYYY-MM-DD)을 입력하세요.');
+        if (!to) return;
+        try {
+            await ERP.api(`/api/employment-contracts/${contractId}/terminate` + ERP.query({effectiveTo: to}), {method: 'POST'});
+            ERP.flash('계약을 종료했습니다.', 'success');
+            loadContracts();
+        } catch (err) { ERP.flashError(err); }
+    }
+
+    async function submitAttendance(e) {
+        e.preventDefault();
+        const body = {
+            employeeId: ID,
+            workDate: document.getElementById('a-date').value,
+            clockIn: document.getElementById('a-in').value,
+            clockOut: document.getElementById('a-out').value,
+        };
+        if (!body.workDate) { ERP.flash('근무일을 입력하세요.', 'warning'); return; }
+        try {
+            await ERP.api('/api/attendances', {method: 'POST', body});
+            ERP.flash('근태를 등록했습니다.', 'success');
+            document.getElementById('attForm').reset();
+            document.getElementById('a-in').value = '09:00';
+            document.getElementById('a-out').value = '18:00';
+            toggle('attForm');
+            loadAttendance();
+        } catch (err) { ERP.flashError(err); }
+    }
+
+    async function init() {
+        try {
+            await Promise.all([loadEmployee(), loadContracts(), loadAttendance()]);
+        } catch (e) { ERP.flashError(e); }
+        document.getElementById('contractForm').addEventListener('submit', submitContract);
+        document.getElementById('attForm').addEventListener('submit', submitAttendance);
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+</script>
+</div>
+</body>
+</html>

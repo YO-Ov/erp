@@ -1,5 +1,5 @@
 /*
- * 현우-ERP 공통 프론트 헬퍼.
+ * HYUNWOO ERP 공통 프론트 헬퍼.
  *
  * 화면(Thymeleaf)은 껍데기만 그리고, 실제 데이터는 이 헬퍼로 REST API를 호출해 채운다.
  * 인증 토큰은 HttpOnly 쿠키(ACCESS_TOKEN)에 있어 fetch 가 자동으로 첨부하므로

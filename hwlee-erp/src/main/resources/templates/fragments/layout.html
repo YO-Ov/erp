@@ -13,7 +13,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title th:text="'현우ERP · ' + ${title}">현우ERP</title>
+    <title th:text="'HYUNWOO ERP · ' + ${title}">HYUNWOO ERP</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="/css/app.css">
@@ -27,7 +27,7 @@
     <aside class="app-sidebar">
         <a class="sidebar-brand" href="/">
             <span class="brand-mark"><i class="bi bi-box-seam"></i></span>
-            현우<span class="brand-erp">ERP</span>
+            HYUNWOO <span class="brand-erp">ERP</span>
         </a>
         <nav class="sidebar-nav">
             <a class="nav-link" th:classappend="${active == 'dashboard'} ? 'active'" href="/">
@@ -63,6 +63,39 @@
                 </a>
                 <a class="nav-link" th:classappend="${active == 'warehouse'} ? 'active'" href="/mm/warehouses">
                     <i class="bi bi-building"></i> 창고
+                </a>
+            </div>
+
+            <div sec:authorize="hasAnyRole('PRODUCTION','ADMIN')">
+                <div class="nav-section">생산 (PP)</div>
+                <a class="nav-link" th:classappend="${active == 'production'} ? 'active'" href="/pp/production-orders">
+                    <i class="bi bi-gear-wide-connected"></i> 생산지시
+                </a>
+                <a class="nav-link" th:classappend="${active == 'bom'} ? 'active'" href="/pp/boms">
+                    <i class="bi bi-diagram-2"></i> BOM
+                </a>
+            </div>
+
+            <div sec:authorize="hasAnyRole('FINANCE','ADMIN')">
+                <div class="nav-section">회계 (FI)</div>
+                <a class="nav-link" th:classappend="${active == 'journal'} ? 'active'" href="/fi/journal-entries">
+                    <i class="bi bi-journal-text"></i> 전표
+                </a>
+                <a class="nav-link" th:classappend="${active == 'account'} ? 'active'" href="/fi/accounts">
+                    <i class="bi bi-diagram-3"></i> 계정과목
+                </a>
+                <a class="nav-link" th:classappend="${active == 'payment'} ? 'active'" href="/fi/payments">
+                    <i class="bi bi-cash-stack"></i> 입출금
+                </a>
+            </div>
+
+            <div sec:authorize="hasAnyRole('HR','ADMIN')">
+                <div class="nav-section">인사 (HR)</div>
+                <a class="nav-link" th:classappend="${active == 'employee'} ? 'active'" href="/hr/employees">
+                    <i class="bi bi-person-badge"></i> 직원
+                </a>
+                <a class="nav-link" th:classappend="${active == 'payroll'} ? 'active'" href="/hr/payroll-runs">
+                    <i class="bi bi-wallet2"></i> 급여대장
                 </a>
             </div>
 

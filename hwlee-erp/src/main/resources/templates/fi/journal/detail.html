@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('전표 상세', 'journal', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>전표 상세 <span id="h-number" class="text-muted fs-6 fw-normal"></span></h1>
+            <div class="crumb">회계 (FI) · Journal Entry</div>
+        </div>
+        <a href="/fi/journal-entries" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-2">상태</dt>
+                <dd class="col-sm-4" id="d-status">-</dd>
+                <dt class="col-sm-2">전표일</dt>
+                <dd class="col-sm-4" id="d-date">-</dd>
+
+                <dt class="col-sm-2">출처</dt>
+                <dd class="col-sm-4" id="d-source">-</dd>
+                <dt class="col-sm-2">전기 일시</dt>
+                <dd class="col-sm-4" id="d-posted">-</dd>
+
+                <dt class="col-sm-2">적요</dt>
+                <dd class="col-sm-10" id="d-desc">-</dd>
+
+                <dt class="col-sm-2">등록</dt>
+                <dd class="col-sm-10 small text-muted" id="d-audit">-</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="mb-3" id="actions"></div>
+
+    <div class="card mb-3">
+        <div class="card-header">분개 라인</div>
+        <div class="card-body">
+            <table class="table line-table align-middle mb-0">
+                <thead>
+                <tr>
+                    <th style="width:60px;">#</th><th>계정</th>
+                    <th class="text-end">차변</th><th class="text-end">대변</th>
+                </tr>
+                </thead>
+                <tbody id="lines"></tbody>
+                <tfoot>
+                <tr><td colspan="2" class="text-end fw-bold">합계</td>
+                    <td class="text-end fw-bold" id="totDebit">₩0</td>
+                    <td class="text-end fw-bold" id="totCredit">₩0</td></tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const STATUS = {
+        DRAFT:     {label: '초안',   color: 'secondary'},
+        POSTED:    {label: '전기됨', color: 'success'},
+        CANCELLED: {label: '취소됨', color: 'dark'},
+    };
+    const SOURCE = {
+        MANUAL:  {label: '수동',     color: 'primary'},
+        INV:     {label: '매출',     color: 'success'},
+        GI:      {label: '매출원가', color: 'warning'},
+        GR:      {label: '매입',     color: 'info'},
+        PAY:     {label: '입출금',   color: 'secondary'},
+        PAYROLL: {label: '급여',     color: 'dark'},
+    };
+
+    async function load() {
+        try {
+            render(await ERP.api('/api/journal-entries/' + ID));
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    function render(j) {
+        const s = STATUS[j.status] || {label: j.status, color: 'secondary'};
+        const src = SOURCE[j.sourceType] || {label: j.sourceType, color: 'secondary'};
+        document.getElementById('h-number').textContent = j.number;
+        document.getElementById('d-status').innerHTML = ERP.badge(s.label, s.color);
+        document.getElementById('d-date').textContent = j.entryDate ?? '-';
+        document.getElementById('d-source').innerHTML = ERP.badge(src.label, src.color)
+            + (j.sourceId ? ` <span class="text-muted small">#${j.sourceId}</span>` : '');
+        document.getElementById('d-posted').textContent =
+            j.postedAt ? j.postedAt.replace('T', ' ').slice(0, 16) : '-';
+        document.getElementById('d-desc').textContent = j.description ?? '-';
+        document.getElementById('d-audit').textContent =
+            `${j.createdBy ?? '?'} · ${(j.createdAt ?? '').replace('T', ' ').slice(0, 16)}`;
+
+        document.getElementById('lines').innerHTML = (j.lines || []).map(l => `
+            <tr>
+                <td>${l.lineNo}</td>
+                <td>${ERP.esc(l.accountName)} <span class="text-muted small">${ERP.esc(l.accountCode)}</span></td>
+                <td class="text-end">${Number(l.debit) > 0 ? ERP.won(l.debit) : '<span class="text-muted">-</span>'}</td>
+                <td class="text-end">${Number(l.credit) > 0 ? ERP.won(l.credit) : '<span class="text-muted">-</span>'}</td></tr>`).join('');
+        document.getElementById('totDebit').textContent = ERP.won(j.totalDebit);
+        document.getElementById('totCredit').textContent = ERP.won(j.totalCredit);
+
+        renderActions(j.status);
+    }
+
+    // POSTED 만 취소(역분개) 가능. 그 외(취소됨)는 읽기 전용.
+    function renderActions(status) {
+        const box = document.getElementById('actions');
+        if (status === 'POSTED') {
+            box.innerHTML = `<button class="btn btn-sm btn-outline-danger" onclick="cancel()">전표 취소</button>
+                <span class="text-muted small ms-2">취소 시 상태가 '취소됨'으로 바뀝니다.</span>`;
+        } else {
+            box.innerHTML = '<span class="text-muted small">최종 상태입니다(읽기 전용).</span>';
+        }
+    }
+
+    async function cancel() {
+        if (!confirm('이 전표를 취소하시겠습니까?')) return;
+        try {
+            render(await ERP.api(`/api/journal-entries/${ID}/cancel`, {method: 'POST'}));
+            ERP.flash('전표를 취소했습니다.', 'success');
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', load);
+</script>
+</div>
+</body>
+</html>

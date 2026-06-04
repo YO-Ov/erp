@@ -32,7 +32,7 @@ class AuthControllerTest {
     @Test
     void login_success_returns_token_and_roles() throws Exception {
         String body = objectMapper.writeValueAsString(
-                new LoginRequest("kim@hwlee-erp.example", "pass1234"));
+                new LoginRequest("kim@hyunwoo.com", "pass1234"));
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -46,7 +46,7 @@ class AuthControllerTest {
     @Test
     void login_with_wrong_password_returns_401() throws Exception {
         String body = objectMapper.writeValueAsString(
-                new LoginRequest("kim@hwlee-erp.example", "wrong-password"));
+                new LoginRequest("kim@hyunwoo.com", "wrong-password"));
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

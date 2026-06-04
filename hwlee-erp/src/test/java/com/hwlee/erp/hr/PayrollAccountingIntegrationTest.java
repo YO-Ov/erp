@@ -144,7 +144,7 @@ class PayrollAccountingIntegrationTest {
     private EmployeeResponse createEmployee() {
         long n = SEQ.incrementAndGet();
         return employeeService.create(new EmployeeCreateRequest(
-                "근로자-" + n, "worker" + n + "@hwlee-erp.example", "DEPT-HR", LocalDate.of(2025, 1, 1)));
+                "근로자-" + n, "worker" + n + "@hyunwoo.com", "DEPT-HR", LocalDate.of(2025, 1, 1)));
     }
 
     private static BigDecimal sumOf(List<PayslipResponse> slips,

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('급여대장 상세', 'payroll', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>급여대장 <span id="h-number" class="text-muted fs-6 fw-normal"></span></h1>
+            <div class="crumb">인사 (HR) · Payroll Run</div>
+        </div>
+        <a href="/hr/payroll-runs" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-2">대상월</dt>
+                <dd class="col-sm-4" id="d-period">-</dd>
+                <dt class="col-sm-2">상태</dt>
+                <dd class="col-sm-4" id="d-status">-</dd>
+
+                <dt class="col-sm-2">총지급</dt>
+                <dd class="col-sm-4" id="d-gross">-</dd>
+                <dt class="col-sm-2">총공제</dt>
+                <dd class="col-sm-4" id="d-deduction">-</dd>
+
+                <dt class="col-sm-2">실수령 합계</dt>
+                <dd class="col-sm-4 fs-5 fw-bold" id="d-net">-</dd>
+                <dt class="col-sm-2">지급일</dt>
+                <dd class="col-sm-4" id="d-rundate">-</dd>
+
+                <dt class="col-sm-2">확정 일시</dt>
+                <dd class="col-sm-4" id="d-confirmed">-</dd>
+                <dt class="col-sm-2">지급 일시</dt>
+                <dd class="col-sm-4" id="d-paid">-</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="mb-3" id="actions"></div>
+
+    <div class="card mb-3">
+        <div class="card-header">명세서</div>
+        <div class="card-body">
+            <table class="table line-table align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>직원</th>
+                    <th class="text-end">기본급</th><th class="text-end">연장수당</th><th class="text-end">총지급</th>
+                    <th class="text-end">소득세</th><th class="text-end">보험(직원)</th>
+                    <th class="text-end">공제계</th><th class="text-end">실수령</th>
+                </tr>
+                </thead>
+                <tbody id="lines"></tbody>
+                <tfoot>
+                <tr>
+                    <td class="text-end fw-bold">합계</td>
+                    <td class="text-end" id="t-base">-</td>
+                    <td class="text-end" id="t-ot">-</td>
+                    <td class="text-end fw-bold" id="t-gross">-</td>
+                    <td class="text-end" id="t-tax">-</td>
+                    <td class="text-end" id="t-ins">-</td>
+                    <td class="text-end" id="t-ded">-</td>
+                    <td class="text-end fw-bold" id="t-net">-</td>
+                </tr>
+                </tfoot>
+            </table>
+            <p class="text-muted small mt-2 mb-0">※ 회사부담 4대보험(법정복리비)은 공제가 아니라 회사 추가비용으로, 확정 전표에 별도 반영됩니다.</p>
+        </div>
+    </div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const STATUS = {
+        DRAFT:     {label: '초안',   color: 'secondary'},
+        CONFIRMED: {label: '확정됨', color: 'primary'},
+        PAID:      {label: '지급됨', color: 'success'},
+    };
+
+    async function load() {
+        try {
+            render(await ERP.api('/api/payroll-runs/' + ID));
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    function render(r) {
+        const s = STATUS[r.status] || {label: r.status, color: 'secondary'};
+        document.getElementById('h-number').textContent = r.number;
+        document.getElementById('d-period').textContent = r.period;
+        document.getElementById('d-status').innerHTML = ERP.badge(s.label, s.color);
+        document.getElementById('d-gross').textContent = ERP.won(r.totalGross);
+        document.getElementById('d-deduction').textContent = ERP.won(r.totalDeduction);
+        document.getElementById('d-net').textContent = ERP.won(r.totalNet);
+        document.getElementById('d-rundate').textContent = r.runDate ?? '-';
+        document.getElementById('d-confirmed').textContent =
+            r.confirmedAt ? r.confirmedAt.replace('T', ' ').slice(0, 16) : '-';
+        document.getElementById('d-paid').textContent =
+            r.paidAt ? r.paidAt.replace('T', ' ').slice(0, 16) : '-';
+
+        const ps = r.payslips || [];
+        let base = 0, ot = 0, gross = 0, tax = 0, ins = 0, ded = 0, net = 0;
+        document.getElementById('lines').innerHTML = ps.map(p => {
+            base += +p.basePay || 0; ot += +p.overtimePay || 0; gross += +p.grossPay || 0;
+            tax += +p.incomeTax || 0; ins += +p.insuranceEmployee || 0;
+            ded += +p.totalDeduction || 0; net += +p.netPay || 0;
+            return `<tr>
+                <td>${ERP.esc(p.employeeName)} <span class="text-muted small">${ERP.esc(p.employeeCode)}</span></td>
+                <td class="text-end">${ERP.won(p.basePay)}</td>
+                <td class="text-end">${ERP.won(p.overtimePay)}</td>
+                <td class="text-end">${ERP.won(p.grossPay)}</td>
+                <td class="text-end text-danger">${ERP.won(p.incomeTax)}</td>
+                <td class="text-end text-danger">${ERP.won(p.insuranceEmployee)}</td>
+                <td class="text-end text-danger">${ERP.won(p.totalDeduction)}</td>
+                <td class="text-end fw-bold">${ERP.won(p.netPay)}</td></tr>`;
+        }).join('');
+        document.getElementById('t-base').textContent = ERP.won(base);
+        document.getElementById('t-ot').textContent = ERP.won(ot);
+        document.getElementById('t-gross').textContent = ERP.won(gross);
+        document.getElementById('t-tax').textContent = ERP.won(tax);
+        document.getElementById('t-ins').textContent = ERP.won(ins);
+        document.getElementById('t-ded').textContent = ERP.won(ded);
+        document.getElementById('t-net').textContent = ERP.won(net);
+
+        renderActions(r.status);
+    }
+
+    // 상태머신: DRAFT→확정(인건비 전표), CONFIRMED→지급(지급 전표), PAID→읽기전용
+    function renderActions(status) {
+        const box = document.getElementById('actions');
+        if (status === 'DRAFT') {
+            box.innerHTML = `<button class="btn btn-sm btn-primary" onclick="act('confirm','확정')">확정 (인건비 전표 생성)</button>
+                <span class="text-muted small ms-2">확정 시 비용이 인식되고 FI 인건비 전표가 자동 생성됩니다.</span>`;
+        } else if (status === 'CONFIRMED') {
+            box.innerHTML = `<button class="btn btn-sm btn-success" onclick="act('pay','지급')">지급 (지급 전표 생성)</button>
+                <span class="text-muted small ms-2">지급 시 미지급급여→현금 전표가 자동 생성됩니다.</span>`;
+        } else {
+            box.innerHTML = '<span class="text-muted small">지급 완료된 급여대장입니다(읽기 전용).</span>';
+        }
+    }
+
+    async function act(action, label) {
+        if (!confirm(`이 급여대장을 ${label}하시겠습니까?`)) return;
+        try {
+            render(await ERP.api(`/api/payroll-runs/${ID}/${action}`, {method: 'POST'}));
+            ERP.flash(`${label} 완료`, 'success');
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', load);
+</script>
+</div>
+</body>
+</html>

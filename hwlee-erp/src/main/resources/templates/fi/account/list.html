@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('계정과목 목록', 'account', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>계정과목</h1>
+            <div class="crumb">회계 (FI) · Account</div>
+        </div>
+        <a href="/fi/accounts/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 신규 계정</a>
+    </div>
+
+    <form id="searchForm" class="filter-bar">
+        <div class="filter-field ff-wide">
+            <label>코드·이름</label>
+            <input type="text" id="f-keyword" class="form-control form-control-sm" placeholder="코드 또는 이름 검색">
+        </div>
+        <div class="filter-field ff-narrow">
+            <label>유형</label>
+            <select id="f-type" class="form-select form-select-sm">
+                <option value="">전체</option>
+                <option value="ASSET">자산</option>
+                <option value="LIABILITY">부채</option>
+                <option value="EQUITY">자본</option>
+                <option value="REVENUE">수익</option>
+                <option value="EXPENSE">비용</option>
+            </select>
+        </div>
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> 검색</button>
+            <button type="button" id="btn-reset" class="btn btn-sm btn-outline-secondary btn-icon" title="초기화"><i class="bi bi-arrow-counterclockwise"></i></button>
+        </div>
+    </form>
+
+    <div class="table-wrap">
+    <table class="table table-hover align-middle mb-0">
+        <thead>
+        <tr>
+            <th>코드</th><th>이름</th><th>유형</th><th>정상방향</th><th>전기가능</th><th>상태</th><th style="width:80px;"></th>
+        </tr>
+        </thead>
+        <tbody id="rows"><tr><td colspan="7" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
+    </table>
+    </div>
+
+<script>
+    const TYPE = {
+        ASSET:     {label: '자산', color: 'primary'},
+        LIABILITY: {label: '부채', color: 'warning'},
+        EQUITY:    {label: '자본', color: 'info'},
+        REVENUE:   {label: '수익', color: 'success'},
+        EXPENSE:   {label: '비용', color: 'danger'},
+    };
+    const SIDE = {DEBIT: '차변', CREDIT: '대변'};
+    const MSTATUS = {
+        ACTIVE:   {label: '활성', color: 'success'},
+        INACTIVE: {label: '휴면', color: 'secondary'},
+        BLOCKED:  {label: '정지', color: 'danger'},
+    };
+
+    let all = []; // /api/accounts 는 페이징 없이 전체 List 반환 → 클라이언트 필터
+
+    async function load() {
+        const tbody = document.getElementById('rows');
+        try {
+            all = await ERP.api('/api/accounts');
+            render();
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            ERP.flashError(e);
+        }
+    }
+
+    function render() {
+        const kw = document.getElementById('f-keyword').value.trim().toLowerCase();
+        const type = document.getElementById('f-type').value;
+        const list = all.filter(a =>
+            (!type || a.type === type) &&
+            (!kw || (a.code || '').toLowerCase().includes(kw) || (a.name || '').toLowerCase().includes(kw)));
+
+        const tbody = document.getElementById('rows');
+        tbody.innerHTML = list.length === 0
+            ? '<tr><td colspan="7" class="text-center text-muted py-4">계정이 없습니다.</td></tr>'
+            : list.map(a => {
+                const t = TYPE[a.type] || {label: a.type, color: 'secondary'};
+                const s = MSTATUS[a.status] || {label: a.status, color: 'secondary'};
+                return `<tr style="cursor:pointer" onclick="location.href='/fi/accounts/${a.id}'">
+                    <td>${ERP.esc(a.code)}</td>
+                    <td>${ERP.esc(a.name)}</td>
+                    <td>${ERP.badge(t.label, t.color)}</td>
+                    <td class="text-muted">${SIDE[a.normalSide] || a.normalSide}</td>
+                    <td>${a.postable
+                        ? '<span class="text-success"><i class="bi bi-check-lg"></i></span>'
+                        : '<span class="text-muted small">헤더</span>'}</td>
+                    <td>${ERP.badge(s.label, s.color)}</td>
+                    <td><a class="btn btn-sm btn-outline-secondary" href="/fi/accounts/${a.id}"
+                           onclick="event.stopPropagation()">상세</a></td></tr>`;
+            }).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        load();
+        document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); render(); });
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            document.getElementById('searchForm').reset(); render();
+        });
+    });
+</script>
+</div>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('급여대장 목록', 'payroll', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>급여대장</h1>
+            <div class="crumb">인사 (HR) · Payroll Run</div>
+        </div>
+        <a href="/hr/payroll-runs/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 급여 계산</a>
+    </div>
+
+    <div class="table-wrap">
+    <table class="table table-hover align-middle mb-0">
+        <thead>
+        <tr>
+            <th>번호</th><th>대상월</th><th>지급일</th>
+            <th class="text-end">총지급</th><th class="text-end">총공제</th><th class="text-end">실수령</th><th>상태</th><th style="width:80px;"></th>
+        </tr>
+        </thead>
+        <tbody id="rows"><tr><td colspan="8" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
+    </table>
+    </div>
+    <nav class="mt-3"><ul class="pagination pagination-sm" id="pager"></ul></nav>
+
+<script>
+    const STATUS = {
+        DRAFT:     {label: '초안',   color: 'secondary'},
+        CONFIRMED: {label: '확정됨', color: 'primary'},
+        PAID:      {label: '지급됨', color: 'success'},
+    };
+    let page = 0;
+    const SIZE = 10;
+
+    async function load() {
+        const tbody = document.getElementById('rows');
+        try {
+            const data = await ERP.api('/api/payroll-runs' + ERP.query({page, size: SIZE, sort: 'id,desc'}));
+            const list = data.content || [];
+            tbody.innerHTML = list.length === 0
+                ? '<tr><td colspan="8" class="text-center text-muted py-4">급여대장이 없습니다. “급여 계산”으로 만들어 보세요.</td></tr>'
+                : list.map(r => {
+                    const s = STATUS[r.status] || {label: r.status, color: 'secondary'};
+                    return `<tr style="cursor:pointer" onclick="location.href='/hr/payroll-runs/${r.id}'">
+                        <td>${ERP.esc(r.number)}</td>
+                        <td>${ERP.esc(r.period)}</td>
+                        <td>${r.runDate ?? ''}</td>
+                        <td class="text-end">${ERP.won(r.totalGross)}</td>
+                        <td class="text-end">${ERP.won(r.totalDeduction)}</td>
+                        <td class="text-end fw-bold">${ERP.won(r.totalNet)}</td>
+                        <td>${ERP.badge(s.label, s.color)}</td>
+                        <td><a class="btn btn-sm btn-outline-secondary" href="/hr/payroll-runs/${r.id}"
+                               onclick="event.stopPropagation()">상세</a></td></tr>`;
+                }).join('');
+            renderPager(data.totalPages || 0, data.number || 0);
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            ERP.flashError(e);
+        }
+    }
+
+    function renderPager(totalPages, current) {
+        const pager = document.getElementById('pager');
+        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+        let html = '';
+        for (let i = 0; i < totalPages; i++)
+            html += `<li class="page-item ${i === current ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="goto(${i});return false;">${i + 1}</a></li>`;
+        pager.innerHTML = html;
+    }
+    function goto(p) { page = p; load(); }
+
+    document.addEventListener('DOMContentLoaded', load);
+</script>
+</div>
+</body>
+</html>

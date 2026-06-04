@@ -28,13 +28,13 @@ class AuditorAwareTest {
     private CustomerRepository customerRepository;
 
     @Test
-    @WithMockUser(username = "kim@hwlee-erp.example", roles = "ADMIN")
+    @WithMockUser(username = "kim@hyunwoo.com", roles = "ADMIN")
     void created_by_is_authenticated_user() {
         Customer c = Customer.create("CUST-AUD-2", "감사자테스트", "111-00-22200",
                 "서울", new BigDecimal("100000"), PaymentTerms.NET30);
         Customer saved = customerRepository.saveAndFlush(c);
 
-        assertThat(saved.getCreatedBy()).isEqualTo("kim@hwlee-erp.example");
-        assertThat(saved.getUpdatedBy()).isEqualTo("kim@hwlee-erp.example");
+        assertThat(saved.getCreatedBy()).isEqualTo("kim@hyunwoo.com");
+        assertThat(saved.getUpdatedBy()).isEqualTo("kim@hyunwoo.com");
     }
 }

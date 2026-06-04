@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('입출금 상세', 'payment', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>입출금 상세 <span id="h-number" class="text-muted fs-6 fw-normal"></span></h1>
+            <div class="crumb">회계 (FI) · Payment</div>
+        </div>
+        <a href="/fi/payments" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-2">구분</dt>
+                <dd class="col-sm-4" id="d-type">-</dd>
+                <dt class="col-sm-2">상태</dt>
+                <dd class="col-sm-4" id="d-status">-</dd>
+
+                <dt class="col-sm-2">금액</dt>
+                <dd class="col-sm-4 fs-5 fw-bold" id="d-amount">-</dd>
+                <dt class="col-sm-2">거래일</dt>
+                <dd class="col-sm-4" id="d-date">-</dd>
+
+                <dt class="col-sm-2">거래상대</dt>
+                <dd class="col-sm-4" id="d-party">-</dd>
+                <dt class="col-sm-2">전기 일시</dt>
+                <dd class="col-sm-4" id="d-posted">-</dd>
+
+                <dt class="col-sm-2">적요</dt>
+                <dd class="col-sm-10" id="d-desc">-</dd>
+
+                <dt class="col-sm-2">등록</dt>
+                <dd class="col-sm-10 small text-muted" id="d-audit">-</dd>
+            </dl>
+        </div>
+    </div>
+
+    <p class="text-muted small">입출금은 등록 시 즉시 전기되며, 화면에서 수정·취소할 수 없습니다(회계 무결성).</p>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const TYPE = {
+        RECEIPT:      {label: '입금 (고객 수금)',  color: 'success'},
+        DISBURSEMENT: {label: '출금 (거래처 지급)', color: 'danger'},
+    };
+    const STATUS = {
+        DRAFT:  {label: '초안',   color: 'secondary'},
+        POSTED: {label: '전기됨', color: 'success'},
+    };
+
+    async function load() {
+        try {
+            render(await ERP.api('/api/payments/' + ID));
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    function render(p) {
+        const t = TYPE[p.type] || {label: p.type, color: 'secondary'};
+        const s = STATUS[p.status] || {label: p.status, color: 'secondary'};
+        document.getElementById('h-number').textContent = p.number;
+        document.getElementById('d-type').innerHTML = ERP.badge(t.label, t.color);
+        document.getElementById('d-status').innerHTML = ERP.badge(s.label, s.color);
+        document.getElementById('d-amount').textContent = ERP.won(p.amount);
+        document.getElementById('d-date').textContent = p.paymentDate ?? '-';
+        document.getElementById('d-party').textContent = p.type === 'RECEIPT'
+            ? `고객 ${p.customerCode ?? '-'}`
+            : `거래처 ${p.vendorCode ?? '-'}`;
+        document.getElementById('d-posted').textContent =
+            p.postedAt ? p.postedAt.replace('T', ' ').slice(0, 16) : '-';
+        document.getElementById('d-desc').textContent = p.description || '-';
+        document.getElementById('d-audit').textContent =
+            `${p.createdBy ?? '?'} · ${(p.createdAt ?? '').replace('T', ' ').slice(0, 16)}`;
+    }
+
+    document.addEventListener('DOMContentLoaded', load);
+</script>
+</div>
+</body>
+</html>

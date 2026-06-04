@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('생산지시 작성', 'production', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>신규 생산지시</h1>
+            <div class="crumb">생산 (PP) · Production Order</div>
+        </div>
+        <a href="/pp/production-orders" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <form id="form">
+        <div class="card form-card mb-3"><div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label class="form-label">완제품 <span class="text-danger">*</span></label>
+                    <select id="product" class="form-select" required><option value="">선택…</option></select>
+                    <div class="form-text">BOM 이 등록된 완제품만 생산할 수 있습니다.</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">생산 수량 <span class="text-danger">*</span></label>
+                    <input type="number" step="any" min="1" id="quantity" class="form-control text-end" required placeholder="100">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">창고 <span class="text-danger">*</span></label>
+                    <select id="warehouse" class="form-select" required><option value="">선택…</option></select>
+                    <div class="form-text">부품 출고·완제품 입고가 일어나는 창고.</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">지시일 <span class="text-danger">*</span></label>
+                    <input type="date" id="orderDate" class="form-control" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">완료 예정일 <span class="text-muted small">(선택)</span></label>
+                    <input type="date" id="dueDate" class="form-control">
+                </div>
+            </div>
+            <div class="alert alert-info mt-3 mb-0 small">
+                <i class="bi bi-info-circle"></i>
+                생성 시 BOM × 수량으로 <strong>소요 자재가 자동 산출</strong>됩니다(상태 = 계획). 이후
+                <strong>착수 → 완료</strong> 시점에 부품이 출고되고 완제품이 입고됩니다.
+            </div>
+        </div></div>
+
+        <div class="form-actions">
+            <a href="/pp/production-orders" class="btn btn-outline-secondary">취소</a>
+            <button type="submit" class="btn btn-primary" id="submitBtn">생산지시 생성</button>
+        </div>
+    </form>
+
+<script>
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    async function loadProducts() {
+        const data = await ERP.api('/api/items' + ERP.query({status: 'ACTIVE', size: 500}));
+        const sel = document.getElementById('product');
+        (data.content || []).filter(i => i.itemType === 'FINISHED').forEach(i => {
+            const o = document.createElement('option');
+            o.value = i.id; o.textContent = `${i.name} (${i.code})`;
+            sel.appendChild(o);
+        });
+    }
+    async function loadWarehouses() {
+        const data = await ERP.api('/api/warehouses' + ERP.query({status: 'ACTIVE', size: 200}));
+        const sel = document.getElementById('warehouse');
+        (data.content || []).forEach(w => {
+            const o = document.createElement('option');
+            o.value = w.id; o.textContent = `${w.name} (${w.code})`;
+            sel.appendChild(o);
+        });
+    }
+
+    async function submit(e) {
+        e.preventDefault();
+        const body = {
+            productItemId: Number(document.getElementById('product').value),
+            warehouseId: Number(document.getElementById('warehouse').value),
+            quantity: document.getElementById('quantity').value,
+            orderDate: document.getElementById('orderDate').value,
+            dueDate: document.getElementById('dueDate').value || null,
+        };
+        try {
+            const saved = await ERP.api('/api/production-orders', {method: 'POST', body});
+            location.href = '/pp/production-orders/' + saved.id;
+        } catch (err) { ERP.flashError(err); }
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        try { await Promise.all([loadProducts(), loadWarehouses()]); } catch (e) { ERP.flashError(e); }
+        const now = new Date();
+        document.getElementById('orderDate').value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+        document.getElementById('form').addEventListener('submit', submit);
+    });
+</script>
+</div>
+</body>
+</html>

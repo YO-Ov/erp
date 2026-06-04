@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('전표 목록', 'journal', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>전표</h1>
+            <div class="crumb">회계 (FI) · Journal Entry</div>
+        </div>
+        <a href="/fi/journal-entries/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 신규 전표</a>
+    </div>
+
+    <form id="searchForm" class="filter-bar">
+        <div class="filter-field ff-narrow">
+            <label>출처</label>
+            <select id="f-source" class="form-select form-select-sm">
+                <option value="">전체</option>
+                <option value="MANUAL">수동</option>
+                <option value="INV">매출</option>
+                <option value="GI">매출원가</option>
+                <option value="GR">매입</option>
+                <option value="PAY">입출금</option>
+                <option value="PAYROLL">급여</option>
+            </select>
+        </div>
+        <div class="filter-field ff-narrow">
+            <label>상태</label>
+            <select id="f-status" class="form-select form-select-sm">
+                <option value="">전체</option>
+                <option value="DRAFT">초안</option>
+                <option value="POSTED">전기됨</option>
+                <option value="CANCELLED">취소됨</option>
+            </select>
+        </div>
+        <div class="filter-field ff-range">
+            <label>전표일</label>
+            <div class="date-range">
+                <input type="date" id="f-from" class="form-control form-control-sm">
+                <span class="tilde">~</span>
+                <input type="date" id="f-to" class="form-control form-control-sm">
+            </div>
+        </div>
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> 검색</button>
+            <button type="button" id="btn-reset" class="btn btn-sm btn-outline-secondary btn-icon" title="초기화"><i class="bi bi-arrow-counterclockwise"></i></button>
+        </div>
+    </form>
+
+    <div class="table-wrap">
+    <table class="table table-hover align-middle mb-0">
+        <thead>
+        <tr>
+            <th>번호</th><th>전표일</th><th>적요</th><th>출처</th>
+            <th class="text-end">차변</th><th class="text-end">대변</th><th>상태</th><th style="width:80px;"></th>
+        </tr>
+        </thead>
+        <tbody id="rows"><tr><td colspan="8" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
+    </table>
+    </div>
+    <nav class="mt-3"><ul class="pagination pagination-sm" id="pager"></ul></nav>
+
+<script>
+    const STATUS = {
+        DRAFT:     {label: '초안',   color: 'secondary'},
+        POSTED:    {label: '전기됨', color: 'success'},
+        CANCELLED: {label: '취소됨', color: 'dark'},
+    };
+    const SOURCE = {
+        MANUAL:  {label: '수동',     color: 'primary'},
+        INV:     {label: '매출',     color: 'success'},
+        GI:      {label: '매출원가', color: 'warning'},
+        GR:      {label: '매입',     color: 'info'},
+        PAY:     {label: '입출금',   color: 'secondary'},
+        PAYROLL: {label: '급여',     color: 'dark'},
+    };
+    let page = 0;
+    const SIZE = 10;
+
+    function filters() {
+        return {
+            sourceType: document.getElementById('f-source').value,
+            status: document.getElementById('f-status').value,
+            dateFrom: document.getElementById('f-from').value,
+            dateTo: document.getElementById('f-to').value,
+        };
+    }
+
+    async function load() {
+        const tbody = document.getElementById('rows');
+        try {
+            const data = await ERP.api('/api/journal-entries' + ERP.query({...filters(), page, size: SIZE, sort: 'id,desc'}));
+            const list = data.content || [];
+            tbody.innerHTML = list.length === 0
+                ? '<tr><td colspan="8" class="text-center text-muted py-4">전표가 없습니다.</td></tr>'
+                : list.map(j => {
+                    const s = STATUS[j.status] || {label: j.status, color: 'secondary'};
+                    const src = SOURCE[j.sourceType] || {label: j.sourceType, color: 'secondary'};
+                    return `<tr style="cursor:pointer" onclick="location.href='/fi/journal-entries/${j.id}'">
+                        <td>${ERP.esc(j.number)}</td>
+                        <td>${j.entryDate ?? ''}</td>
+                        <td>${ERP.esc(j.description)}</td>
+                        <td>${ERP.badge(src.label, src.color)}</td>
+                        <td class="text-end">${ERP.won(j.totalDebit)}</td>
+                        <td class="text-end">${ERP.won(j.totalCredit)}</td>
+                        <td>${ERP.badge(s.label, s.color)}</td>
+                        <td><a class="btn btn-sm btn-outline-secondary" href="/fi/journal-entries/${j.id}"
+                               onclick="event.stopPropagation()">상세</a></td></tr>`;
+                }).join('');
+            renderPager(data.totalPages || 0, data.number || 0);
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            ERP.flashError(e);
+        }
+    }
+
+    function renderPager(totalPages, current) {
+        const pager = document.getElementById('pager');
+        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+        let html = '';
+        for (let i = 0; i < totalPages; i++)
+            html += `<li class="page-item ${i === current ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="goto(${i});return false;">${i + 1}</a></li>`;
+        pager.innerHTML = html;
+    }
+    function goto(p) { page = p; load(); }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        load();
+        document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); page = 0; load(); });
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            document.getElementById('searchForm').reset(); page = 0; load();
+        });
+    });
+</script>
+</div>
+</body>
+</html>

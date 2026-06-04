@@ -25,7 +25,7 @@ import java.math.BigDecimal;
  */
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
-@WithMockUser(username = "tester@hwlee-erp.example", roles = "ADMIN")
+@WithMockUser(username = "tester@hyunwoo.com", roles = "ADMIN")
 class AuditLogTest {
 
     @Autowired
@@ -59,7 +59,7 @@ class AuditLogTest {
         assertThat(logs).anyMatch(l -> l.getAction() == AuditAction.INSERT);
         assertThat(logs).anyMatch(l -> l.getAction() == AuditAction.UPDATE);
         // 변경자가 인증 사용자로 기록됐는지 (system 이 아님)
-        assertThat(logs).allMatch(l -> l.getChangedBy().equals("tester@hwlee-erp.example"));
+        assertThat(logs).allMatch(l -> l.getChangedBy().equals("tester@hyunwoo.com"));
         // 스냅샷에 변경된 신용한도가 담겼는지
         assertThat(logs).anyMatch(l -> l.getChanges() != null && l.getChanges().contains("5000000"));
     }

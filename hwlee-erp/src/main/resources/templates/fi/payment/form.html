@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('입출금 작성', 'payment', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>신규 입출금</h1>
+            <div class="crumb">회계 (FI) · Payment</div>
+        </div>
+        <a href="/fi/payments" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <form id="form">
+        <div class="card form-card mb-3"><div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">구분 <span class="text-danger">*</span></label>
+                    <select id="type" class="form-select" required>
+                        <option value="RECEIPT">입금 (고객 수금)</option>
+                        <option value="DISBURSEMENT">출금 (거래처 지급)</option>
+                    </select>
+                </div>
+                <div class="col-md-5" id="partyWrap">
+                    <label class="form-label" id="partyLabel">고객 <span class="text-danger">*</span></label>
+                    <select id="party" class="form-select" required><option value="">선택…</option></select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">금액 <span class="text-danger">*</span></label>
+                    <input type="number" step="any" min="0" id="amount" class="form-control text-end" required placeholder="0">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">거래일 <span class="text-danger">*</span></label>
+                    <input type="date" id="paymentDate" class="form-control" required>
+                </div>
+                <div class="col-md-9">
+                    <label class="form-label">적요 <span class="text-muted small">(선택)</span></label>
+                    <input type="text" id="description" class="form-control" placeholder="예: 3월 외상대금 회수">
+                </div>
+            </div>
+            <div class="form-text mt-2" id="hint">입금: 차)현금 / 대)매출채권 — 고객이 외상값을 갚는 거래입니다.</div>
+        </div></div>
+
+        <div class="form-actions">
+            <a href="/fi/payments" class="btn btn-outline-secondary">취소</a>
+            <button type="submit" class="btn btn-primary" id="submitBtn">저장(전기)</button>
+        </div>
+    </form>
+
+<script>
+    let customers = [], vendors = [];
+
+    async function loadParties() {
+        const [c, v] = await Promise.all([
+            ERP.api('/api/customers' + ERP.query({status: 'ACTIVE', size: 500})),
+            ERP.api('/api/vendors' + ERP.query({status: 'ACTIVE', size: 500})),
+        ]);
+        customers = c.content || [];
+        vendors = v.content || [];
+        syncParty();
+    }
+
+    // 구분에 따라 거래상대 드롭다운(고객/거래처)·라벨·힌트 전환
+    function syncParty() {
+        const type = document.getElementById('type').value;
+        const isReceipt = type === 'RECEIPT';
+        const list = isReceipt ? customers : vendors;
+        document.getElementById('partyLabel').innerHTML =
+            (isReceipt ? '고객' : '거래처') + ' <span class="text-danger">*</span>';
+        const sel = document.getElementById('party');
+        sel.innerHTML = ['<option value="">선택…</option>']
+            .concat(list.map(o => `<option value="${o.id}">${ERP.esc(o.name)} (${ERP.esc(o.code)})</option>`))
+            .join('');
+        document.getElementById('hint').textContent = isReceipt
+            ? '입금: 차)현금 / 대)매출채권 — 고객이 외상값을 갚는 거래입니다.'
+            : '출금: 차)매입채무 / 대)현금 — 거래처에 외상대금을 지급하는 거래입니다.';
+    }
+
+    async function submit(e) {
+        e.preventDefault();
+        const type = document.getElementById('type').value;
+        const partyId = Number(document.getElementById('party').value);
+        if (!partyId) { ERP.flash('거래상대를 선택하세요.', 'warning'); return; }
+        const body = {
+            type,
+            customerId: type === 'RECEIPT' ? partyId : null,
+            vendorId: type === 'DISBURSEMENT' ? partyId : null,
+            amount: document.getElementById('amount').value,
+            paymentDate: document.getElementById('paymentDate').value,
+            description: document.getElementById('description').value.trim() || null,
+        };
+        try {
+            const saved = await ERP.api('/api/payments', {method: 'POST', body});
+            location.href = '/fi/payments/' + saved.id;
+        } catch (err) {
+            ERP.flashError(err);
+        }
+    }
+
+    async function init() {
+        try {
+            await loadParties();
+        } catch (err) {
+            ERP.flashError(err);
+        }
+        document.getElementById('type').addEventListener('change', syncParty);
+        document.getElementById('form').addEventListener('submit', submit);
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+</script>
+</div>
+</body>
+</html>

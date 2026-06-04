@@ -84,6 +84,12 @@ public class PayrollService {
                 .orElseThrow(() -> new EntityNotFoundException("PayrollRun not found: id=" + id)));
     }
 
+    /** 급여대장 목록(페이지). 명세 라인은 클래스 단위 readOnly 트랜잭션 안에서 지연 로딩된다. */
+    public org.springframework.data.domain.Page<PayrollRunResponse> search(
+            org.springframework.data.domain.Pageable pageable) {
+        return repository.findAll(pageable).map(mapper::toResponse);
+    }
+
     /**
      * 급여 확정 — 비용 인식 단계. 확정 사건을 발행해 FI 가 인건비 전표를 만든다(같은 트랜잭션).
      * 분개 실패(차/대 불일치 등)면 확정 자체가 롤백.

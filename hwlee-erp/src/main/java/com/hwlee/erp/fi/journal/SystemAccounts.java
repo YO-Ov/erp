@@ -13,7 +13,9 @@ public final class SystemAccounts {
 
     public static final String CASH = "1100";          // 현금
     public static final String AR = "1200";            // 매출채권 (Account Receivable)
-    public static final String INVENTORY = "1400";     // 재고자산
+    public static final String INVENTORY = "1400";     // 재고자산 — Phase 8 부터 '제품'(완제품) 의미로 사용
+    public static final String RAW_MATERIAL = "1410";  // 원재료 (Phase 8 — 부품/원재료 재고)
+    public static final String RETAINED_EARNINGS = "3100"; // 이익잉여금 (Phase 8 — 기초재고 이월 상계)
     public static final String AP = "2100";            // 매입채무 (Account Payable)
     public static final String VAT_PAYABLE = "2200";   // 부가세예수금 (매출 시)
     public static final String SALES = "4100";         // 매출

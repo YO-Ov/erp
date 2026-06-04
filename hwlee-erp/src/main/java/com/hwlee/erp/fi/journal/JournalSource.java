@@ -14,5 +14,6 @@ public enum JournalSource {
     GR,      // GoodsReceipt — 매입 전표
     PAY,     // Payment — 입금/출금 전표
     PAYROLL, // PayrollRun — 급여 확정(인건비)·급여 지급 전표 (Phase 7)
+    PROD,    // ProductionOrder — 생산 완료 전표 (Phase 8): 차)제품/대)원재료
     MANUAL   // 사람이 직접 입력한 수동 전표
 }

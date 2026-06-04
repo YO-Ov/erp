@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('계정과목 상세', 'account', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>계정과목 상세 <span id="h-code" class="text-muted fs-6 fw-normal"></span></h1>
+            <div class="crumb">회계 (FI) · Account</div>
+        </div>
+        <a href="/fi/accounts" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-2">코드</dt>
+                <dd class="col-sm-4" id="d-code">-</dd>
+                <dt class="col-sm-2">상태</dt>
+                <dd class="col-sm-4" id="d-status">-</dd>
+
+                <dt class="col-sm-2">이름</dt>
+                <dd class="col-sm-4" id="d-name">-</dd>
+                <dt class="col-sm-2">유형</dt>
+                <dd class="col-sm-4" id="d-type">-</dd>
+
+                <dt class="col-sm-2">정상방향</dt>
+                <dd class="col-sm-4" id="d-side">-</dd>
+                <dt class="col-sm-2">전기가능</dt>
+                <dd class="col-sm-4" id="d-postable">-</dd>
+
+                <dt class="col-sm-2">상위 계정</dt>
+                <dd class="col-sm-4" id="d-parent">-</dd>
+                <dt class="col-sm-2"></dt>
+                <dd class="col-sm-4"></dd>
+
+                <dt class="col-sm-2">등록</dt>
+                <dd class="col-sm-4 small text-muted" id="d-created">-</dd>
+                <dt class="col-sm-2">수정</dt>
+                <dd class="col-sm-4 small text-muted" id="d-updated">-</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="mb-3" id="actions"></div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const TYPE = {
+        ASSET:     {label: '자산', color: 'primary'},
+        LIABILITY: {label: '부채', color: 'warning'},
+        EQUITY:    {label: '자본', color: 'info'},
+        REVENUE:   {label: '수익', color: 'success'},
+        EXPENSE:   {label: '비용', color: 'danger'},
+    };
+    const SIDE = {DEBIT: '차변', CREDIT: '대변'};
+    const MSTATUS = {
+        ACTIVE:   {label: '활성', color: 'success'},
+        INACTIVE: {label: '휴면', color: 'secondary'},
+        BLOCKED:  {label: '정지', color: 'danger'},
+    };
+
+    async function load() {
+        try {
+            render(await ERP.api('/api/accounts/' + ID));
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    function render(a) {
+        const t = TYPE[a.type] || {label: a.type, color: 'secondary'};
+        const s = MSTATUS[a.status] || {label: a.status, color: 'secondary'};
+        document.getElementById('h-code').textContent = a.code;
+        document.getElementById('d-code').textContent = a.code;
+        document.getElementById('d-status').innerHTML = ERP.badge(s.label, s.color);
+        document.getElementById('d-name').textContent = a.name;
+        document.getElementById('d-type').innerHTML = ERP.badge(t.label, t.color);
+        document.getElementById('d-side').textContent = SIDE[a.normalSide] || a.normalSide;
+        document.getElementById('d-postable').textContent = a.postable ? '전기 계정 (직접 분개 가능)' : '헤더 계정 (집계용)';
+        document.getElementById('d-parent').textContent = a.parentCode || '-';
+        document.getElementById('d-created').textContent =
+            `${a.createdBy ?? '?'} · ${(a.createdAt ?? '').replace('T', ' ').slice(0, 16)}`;
+        document.getElementById('d-updated').textContent =
+            `${a.updatedBy ?? '?'} · ${(a.updatedAt ?? '').replace('T', ' ').slice(0, 16)}`;
+
+        document.getElementById('actions').innerHTML =
+            `<a href="/fi/accounts/${ID}/edit" class="btn btn-sm btn-outline-primary">수정</a>
+             <button class="btn btn-sm btn-outline-danger" onclick="del()">삭제</button>`;
+    }
+
+    async function del() {
+        if (!confirm('이 계정을 삭제하시겠습니까?')) return;
+        try {
+            await ERP.api('/api/accounts/' + ID, {method: 'DELETE'});
+            location.href = '/fi/accounts';
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', load);
+</script>
+</div>
+</body>
+</html>

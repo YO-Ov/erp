@@ -11,8 +11,11 @@ import com.hwlee.erp.mm.stock.StockMovement;
 import com.hwlee.erp.mm.stock.StockMovementRepository;
 import com.hwlee.erp.hr.payroll.event.PayrollConfirmedEvent;
 import com.hwlee.erp.hr.payroll.event.PayrollPaidEvent;
+import com.hwlee.erp.master.item.ItemRepository;
+import com.hwlee.erp.master.item.ItemType;
 import com.hwlee.erp.sd.delivery.event.DeliveryShippedEvent;
 import com.hwlee.erp.sd.invoice.event.InvoiceIssuedEvent;
+import java.time.LocalDate;
 import jakarta.persistence.EntityNotFoundException;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -42,6 +45,7 @@ public class AutoJournalService {
     private final AccountService accountService;
     private final GoodsIssueRepository goodsIssueRepository;
     private final StockMovementRepository stockMovementRepository;
+    private final ItemRepository itemRepository;
     private final TransactionNumberGenerator numberGenerator;
     private final Clock clock;
 
@@ -120,18 +124,30 @@ public class AutoJournalService {
     }
 
     /**
-     * 매입 분개 — 입고 확정 사건으로부터.
+     * 매입 분개 — 입고 확정 사건으로부터. (Phase 8 — 품목 유형별 재고 계정 분기)
      * <pre>
-     *   차) 재고자산 totalCost
-     *   대) 매입채무 totalCost
+     *   차) 제품(재고자산)  Σ(FINISHED 라인)
+     *   차) 원재료          Σ(COMPONENT 라인)
+     *           대) 매입채무 totalCost
      * </pre>
      * 매입 부가세는 학습 1차 범위에서 분리하지 않는다 (단가에 포함 가정).
      */
     @Transactional
     public JournalEntry createPurchaseEntry(GoodsReceiptPostedEvent event) {
-        BigDecimal totalCost = event.lines().stream()
-                .map(l -> l.unitCost().multiply(l.quantity()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal finishedTotal = BigDecimal.ZERO; // FINISHED → 제품(1400)
+        BigDecimal rawTotal = BigDecimal.ZERO;      // COMPONENT → 원재료(1410)
+        for (GoodsReceiptPostedEvent.Line l : event.lines()) {
+            BigDecimal lineCost = l.unitCost().multiply(l.quantity());
+            ItemType type = itemRepository.findById(l.itemId())
+                    .map(com.hwlee.erp.master.item.Item::getItemType)
+                    .orElse(ItemType.FINISHED);
+            if (type == ItemType.COMPONENT) {
+                rawTotal = rawTotal.add(lineCost);
+            } else {
+                finishedTotal = finishedTotal.add(lineCost);
+            }
+        }
+        BigDecimal totalCost = finishedTotal.add(rawTotal);
 
         if (totalCost.signum() == 0) {
             log.warn("매입 0 — 전표 생략. grId={}", event.goodsReceiptId());
@@ -144,12 +160,48 @@ public class AutoJournalService {
                 "매입 " + event.number(),
                 JournalSource.GR, event.goodsReceiptId());
 
-        entry.addDebit(account(SystemAccounts.INVENTORY), totalCost);
-        entry.addCredit(account(SystemAccounts.AP),       totalCost);
+        if (finishedTotal.signum() > 0) {
+            entry.addDebit(account(SystemAccounts.INVENTORY), finishedTotal);
+        }
+        if (rawTotal.signum() > 0) {
+            entry.addDebit(account(SystemAccounts.RAW_MATERIAL), rawTotal);
+        }
+        entry.addCredit(account(SystemAccounts.AP), totalCost);
 
         entry.post(LocalDateTime.now(clock));
-        log.info("매입 자동 전표 생성: {} (grId={}, totalCost={})",
-                number, event.goodsReceiptId(), totalCost);
+        log.info("매입 자동 전표 생성: {} (grId={}, 제품={}, 원재료={})",
+                number, event.goodsReceiptId(), finishedTotal, rawTotal);
+        return journalRepository.save(entry);
+    }
+
+    /**
+     * 생산 완료 분개 (Phase 8) — 직접재료비만(재공품 WIP·노무비·제조간접비 생략).
+     * <pre>
+     *   차) 제품(재고자산) materialCost
+     *           대) 원재료  materialCost
+     * </pre>
+     * 투입 부품의 실제(이동평균) 원가 합이 완제품 원가로 이동 — 원가 보존. 가공원가는 0(간이).
+     * {@code ProductionService} 가 완료 시 직접 호출(이벤트 아님 — 완제품 원가가 부품 출고원가에 순차 의존).
+     */
+    @Transactional
+    public JournalEntry createProductionEntry(Long productionOrderId, String orderNumber,
+                                              LocalDate completedDate, BigDecimal materialCost) {
+        if (materialCost == null || materialCost.signum() == 0) {
+            log.warn("생산 직접재료비 0 — 전표 생략. poId={}", productionOrderId);
+            return null;
+        }
+        String number = numberGenerator.nextJournalEntryNumber(completedDate);
+        JournalEntry entry = JournalEntry.draft(
+                number, completedDate,
+                "생산완료 " + orderNumber,
+                JournalSource.PROD, productionOrderId);
+
+        entry.addDebit(account(SystemAccounts.INVENTORY),     materialCost);  // 제품 ↑
+        entry.addCredit(account(SystemAccounts.RAW_MATERIAL), materialCost);  // 원재료 ↓
+
+        entry.post(LocalDateTime.now(clock));
+        log.info("생산 완료 자동 전표 생성: {} (poId={}, materialCost={})",
+                number, productionOrderId, materialCost);
         return journalRepository.save(entry);
     }
 

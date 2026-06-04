@@ -13,17 +13,31 @@
 
 ## 현재 위치
 
-- **Phase**: 7 — HR 간이 모듈 (인사/급여) ✅ **전체 완료** (7단계 사이클 끝)
-- **단계**: 5~7 모두 완료 (구현 + 워크스루 6편 + 시연 가이드)
-- **다음 할 일**: ⛔ **먼저 아래 "미해결 버그"부터 고칠 것** (모든 화면 공통, 진행보다 우선).
-  - ⭐ **화면 트랙(활성)**: 프론트엔드 백필 — SD·MM 화면 작성됨, 단 **공통 렌더 버그로 JS 미동작**(아래 참조). 버그 수정 후 → FI(회계) 화면.
-  - **도메인 트랙**: Phase 8 — PP(생산) BOM/생산지시 (도메인 브리핑부터). `ERP-STUDY-PLAN.md` 참조.
-- **마지막 갱신**: 2026-06-01 (⛔ 전 화면 공통 JS 미실행 버그 발견 — 수정 전 중단)
+- **Phase**: **8 — PP(생산) BOM/생산지시** 🔵 **단계 5(구현) 완료·검증** → 단계 6(워크스루)·7(시연) 남음.
+- **단계**: 1~5 완료. 문서 `doc/09-phase-8-PP-생산/`(1-도메인-브리핑, 2-설계-제안). **다음 = 단계 6 코드 워크스루 / 7 시연·회고** (사용자가 원하면).
+  - **단계 4 승인 결과**: ①FI 전표 = **현실형 간이 포함**(원재료/제품 계정 분리) ②화면 = **포함**.
+  - **단계 5 구현 요약**:
+    - 마스터: `Item.itemType`(FINISHED/COMPONENT, 기본 FINISHED) + `ItemType` enum + `ItemCategory.PART`. ItemResponse에 itemType 노출.
+    - PP 도메인: `pp/bom`(Bom+CRUD), `pp/order`(ProductionOrder↔Line, 상태머신 PLANNED→RELEASED→COMPLETED→CANCELLED, ProductionService). 생성 시 BOM×수량 전개(MRP), 완료 시 **부품 stock.issue + 완제품 stock.receive 직접 오케스트레이션**(GoodsReceipt/GoodsIssue 헤더 미사용 — vendor 강제·매입전표 오트리거 회피). 완제품 단가=투입 부품 실제원가 합÷수량(원가보존). `MovementReason.PRODUCTION_IN/OUT`, refType="PROD"(ref_type VARCHAR(10) 제약).
+    - **회계(현실형 간이)**: `재고자산(1400)`→의미 '제품', **원재료(1410)·자본(3000)·이익잉여금(3100)** 신설. `AutoJournalService.createPurchaseEntry`가 itemType별 분기(부품→원재료, 완제품→제품), 신규 `createProductionEntry`(차)제품/대)원재료=직접재료비). COGS/매출 리스너 무변경. `JournalSource.PROD`. **재공품(WIP)·노무비·간접비는 범위 밖**(완제품원가=직접재료비만).
+    - 인가: `PRODUCTION` 역할 신설, 생산팀(park@hyunwoo.com) 매핑 = **Phase 6 park 복선 회수**. ItemController/WarehouseController 읽기에 PRODUCTION 추가.
+    - 화면: `pp/web/PpViewController` + 4화면(BOM 관리, 생산지시 목록/상세/생성) + 사이드바 **생산(PP) 그룹**(생산지시/BOM).
+    - 마이그레이션 **V33**(스키마: item.item_type/bom/production_order/_line)·**V34**(계정)·**V35**(부품5+노트북BOM+기초재고500+개시분개 차)원재료/대)이익잉여금 3.15억)·**V36**(PRODUCTION 역할+park). ⚠️ V33 최초 `ALTER ... AFTER ... COMMENT` 순서 오류로 1회 실패 → COMMENT를 AFTER 앞으로 수정 + flyway_schema_history 실패행 삭제 후 재적용.
+    - **검증(end-to-end, 컴파일 그린)**: park(PRODUCTION) 로그인→PP 4화면 200. 노트북×10 생산지시 생성(MRP: 메모리20 등)→착수→완료: 부품 정확 차감(메모리480 등)·완제품+10·생산전표 `JE-...005 차)제품6,800,000/대)원재료6,800,000`·출고단가 기록. 가용성 API 정상. 통합테스트 `ProductionScenarioTest`(2케이스, Docker 필요라 이 PC 미실행·컴파일 그린).
+    - ⚠️ 검증용 테스트 데이터: 생산지시 PO-20260604-001(완료)+1건(계획), 부품 재고 일부 소모.
+- **(이전) 화면 트랙 ✅ 전체 완료**: 프론트엔드 백필 SD·MM·FI·HR. (남은 다듬기 선택: 대시보드 통계 연동.)
+- **⚠️ 리브랜딩(2026-06-04)**: 회사명 현우→**hyunwoo**, 이메일 도메인 **@hyunwoo.com**. **로그인 계정이 바뀜** — 시연 계정: `admin@hyunwoo.com` / `kim@hyunwoo.com`(SALES) / `lee@hyunwoo.com`(FINANCE) / `park@hyunwoo.com`(역할없음) / `jung@hyunwoo.com`(HR), 비번 공통 `pass1234`. 브랜드 표기 `HYUNWOO ERP`. 적용 방식 = 전진 마이그레이션 **V32**(기존 V8/V28/V31 시드는 Flyway 체크섬 보존 위해 미수정; V32가 employee/app_user/department/item 일괄 UPDATE). 테스트 5종 이메일 도메인도 동기화. (구 이메일 `@hwlee-erp.example`은 더 이상 로그인 불가.)
+- **마지막 갱신**: 2026-06-04 (🛑 **오늘 세션 종료**). 오늘 한 일: ① 전 화면 공통 JS 누락 버그 수정 ② FI(회계) 화면 9종 ③ HR(인사/급여) 화면 5종 ④ 리브랜딩(현우→hyunwoo, @hyunwoo.com, V32) ⑤ **Phase 8(PP 생산) 단계 1~5 완료**(BOM·생산지시·MRP·현실형 회계·화면, V33~V36, end-to-end 검증).
+- **▶ 다음 세션 시작점**: **Phase 8 단계 6(코드 워크스루) / 7(시연·회고)** 부터. (원하면 건너뛰고 Phase 9 배치로 가도 됨.) 앱 재기동 필요 시 `SPRING_PROFILES_ACTIVE=local ./gradlew bootRun`(MySQL 3307). 로그인 `admin@hyunwoo.com`/`park@hyunwoo.com` 등 `pass1234`. **커밋·푸시는 hwlee님이 직접** — 오늘 변경분(미커밋) 푸시해야 다른 PC에서 이어감.
 
 ---
 
-## ⛔ 미해결 버그 — 전 화면 페이지 `<script>`가 렌더에서 누락 (최우선)
+## ✅ 해결됨 — 전 화면 페이지 `<script>`가 렌더에서 누락 (2026-06-04 수정·검증 완료)
 
+- **수정 내역**(2026-06-04): SD 12 + MM 11 = **23개 템플릿** 전부에서 `<script>` 바로 앞의 조기 종료 `</div>` 한 줄을 제거 → 스크립트가 `th:fragment="content"` 안에 포함됨. div 균형 23/23 정상.
+- **렌더 검증 완료**(HTTP 200 너머): 앱 재기동(local, MySQL 3307) 후 admin 로그인하여 `/sd/quotations`·`/mm/stocks`·`/mm/goods-receipts` 응답에 `<script>`(3개)·`function load`·`addEventListener`가 **실제로 포함**됨을 grep 확인(수정 전엔 0건). REST API(`/api/quotations` 2건, `/api/stocks` 2건, `/api/customers` 2건)도 200+데이터 응답 → 표 렌더 흐름 정상.
+- ⚠️ **Thymeleaf 캐시 기본값(cache=true)** 이라, 템플릿을 고친 뒤엔 반드시 **앱 재기동** 후 브라우저 **강력 새로고침(⌘+Shift+R)** 으로 확인할 것.
+- 아래는 당시 진단 기록(참고용 보존):
 - **증상**(사용자가 브라우저에서 확인): 목록이 "불러오는 중…"에서 안 바뀜(=`load()` 미실행), 검색 누르면 선택한 날짜 등 입력값이 사라짐(=JS 핸들러 미부착 → 네이티브 폼 전송으로 페이지 새로고침). 입고 화면에서 첫 확인, **SD도 동일**.
 - **근본 원인**(렌더된 실제 HTML로 확정): 각 템플릿의 페이지 `<script>`가 `th:fragment="content"` div **바깥(형제 위치)** 에 있음. 레이아웃이 `~{::content}`로 그 fragment만 가져오므로 **스크립트가 최종 페이지에서 통째로 누락**됨. `curl`로 `/sd/sales-orders` 받아 `grep "searchForm').addEventListener"` → **0건**(스크립트 부재) 확인.
 - **범위**: 레이아웃 데코레이터를 쓰는 **모든 페이지** — SD 14 + MM 11 + 대시보드/관리자 등. **git HEAD부터 있던 선재(先在) 버그**(MM 신규 작성분이 SD 패턴을 그대로 복사해 전파). 기존/금번 "검증"이 **HTTP 200(껍데기)만 보고 실제 브라우저 렌더를 안 봐서** 못 잡음.
@@ -50,7 +64,17 @@
     3. `layout.html` 사이드바에 **MM 메뉴 그룹 추가**(재고/입고/출고/창고) + 각 `active` 키. (현재 사이드바엔 영업 SD·관리자만 있음.)
     4. MM REST API: `/api/stocks`(재고현황·이동), `/api/goods-receipts`(입고: vendorId·warehouseId·receiptDate·lines[itemId,quantity,unitCost], 생성후 `/{id}/post` 전기), `/api/goods-issues`(출고), `/api/warehouses`(창고 CRUD). 상태머신/DTO는 각 컨트롤러·dto 패키지 확인 후 진행.
     5. 다 만들면 앱 띄워(`SPRING_PROFILES_ACTIVE=local ./gradlew bootRun`, MySQL 3307 필요) 페이지 HTTP 200·렌더 검증.
-  - **화면 백필 순서**: SD(작성됨·⛔버그) → MM(작성됨·⛔버그) → **공통 버그 수정 → FI(전표/계정/입출금)** → HR(계약/근태/급여).
+  - **화면 백필 순서**: SD ✅ → MM ✅ → 공통 버그 수정 ✅ → FI ✅ → **HR ✅ (전체 완료)**.
+  - **✅ HR(인사/급여) 화면 완료**(2026-06-04): `hr/web/HrViewController`(@PreAuthorize HR/ADMIN) + 5개 화면. 사이드바에 **인사(HR) 그룹**(직원/급여대장) 추가. ⚠️ HR API는 **전역 목록이 없어**(계약·근태는 employeeId로만, 급여대장은 /{id}로만) **직원 중심**으로 구성.
+    - **백엔드 보강 2건**(화면 동작에 필수): ① `EmployeeController` 읽기 권한에 `HR` 역할 추가(`hasAnyRole('SALES','PURCHASING','FINANCE','HR','ADMIN')`) — HR 사용자가 직원 조회 가능하도록. ② `PayrollController`에 목록 엔드포인트 `GET /api/payroll-runs`(Page) + `PayrollService.search(Pageable)` 추가(기존엔 POST·GET/{id}·confirm·pay만 있었음).
+    - **직원(Employee)**: 목록(`/api/employees` List → 클라이언트 필터) + 상세. 상세 한 화면에 **기본정보 + 급여계약(인라인 신규계약/종료) + 이번달 근태(인라인 등록)** 통합. 계약 시급은 서버가 기본급÷계약시간으로 자동 계산.
+    - **급여대장(PayrollRun)**: 목록(새 list API)/생성(대상월 YYYY-MM `input[type=month]`만 → 자동 계산)/상세(명세서 표 + 상태머신 DRAFT→확정→지급). 확정=인건비 전표, 지급=지급 전표가 FI 이벤트로 자동 생성.
+    - **검증(end-to-end 완료)**: HR 사용자(jung, role HR)로 로그인 → 5개 화면 200·스크립트 포함 + 직원 API 접근(권한 보강 동작) 확인. **급여 흐름 스모크**: `PR-202605-001` 계산(명세 4건, 총지급 1,380만) → 확정(인건비 전표 `JE-...003` 차 1,442만) → 지급(지급 전표 `JE-...004` 차 1,235만), PAYROLL 자동분개 2건 생성 확인. 근태 등록(연장 180분 자동계산)·계약 등록(시급 자동)·계약 종료 모두 201/200. ⚠️ 테스트 데이터 생성됨(급여대장1+전표2, 직원1 근태1건, 직원4 계약1건[종료됨]) — 불필요하면 삭제 가능.
+  - **✅ FI(회계) 화면 완료**(2026-06-04): `fi/web/FinanceViewController`(@PreAuthorize FINANCE/ADMIN) + 9개 화면. 사이드바에 **회계(FI) 그룹**(전표/계정과목/입출금) 추가. MM 패턴(filter-bar·table-wrap·카드폼·line-table·form-actions) 그대로 복붙.
+    - **계정과목(Account)**: 목록(클라이언트 필터 — `/api/accounts`는 페이징 없이 List 반환)/상세/생성·수정/삭제. 유형 5종(자산/부채/자본/수익/비용)·정상방향·전기가능 표시. 코드·유형은 생성 후 잠금.
+    - **전표(JournalEntry)**: 목록(`/api/journal-entries` Page, 출처/상태/전표일 필터)/상세(분개라인+차대합계, POSTED→취소)/생성(수동 전표: 전표일·적요·라인[계정code·차변·대변], 실시간 대차균형 검증). **수동 전표는 생성 즉시 전기(POSTED)** — `createManual`이 내부에서 `post()` 호출. 수정 없음.
+    - **입출금(Payment)**: 목록(`/api/payments` Page, 구분/거래일 필터)/상세(읽기전용)/생성(구분 RECEIPT↔DISBURSEMENT 토글로 고객/거래처 선택 전환, 금액·거래일·적요). 생성 즉시 전기, 수정·취소 없음.
+    - **검증(end-to-end 완료)**: 앱 재기동 후 admin 로그인 → 9개 화면 HTTP 200·페이지 스크립트 포함 확인 + REST API(계정17·전표3·입출금0) 응답 확인 + **생성 스모크 테스트**: 수동전표 `JE-20260604-001`(차/대 5만 균형, POSTED), 입출금 `PAY-20260604-001`(입금 3만, 고객연결, 자동분개 동반) 둘 다 201 생성됨. ⚠️ 이 2건은 테스트 데이터 — 불필요하면 삭제 가능.
   - **MM(자재) 화면 작성됨**(2026-06-01, ⛔ 위 "미해결 버그"로 현재 화면 미동작 — 코드/구조는 완성): `mm/web/MaterialsViewController`(@PreAuthorize PURCHASING/ADMIN) + 11개 화면. 사이드바에 **자재(MM) 그룹**(재고/입고/출고/창고) 추가. 모두 직전 개선한 새 디자인(인라인 `filter-bar`·`table-wrap`·카드 폼·`line-table`·`form-actions`)으로 구축.
     - **재고(Stock)**: 목록(검색 품목/창고/재고>0) + 상세(재고현황+평가액 / `/api/stock-movements` 이동이력). 조회 전용.
     - **입고(GoodsReceipt)**: 목록/상세/생성·수정. 생성=vendor/warehouse/receiptDate+lines[itemId,qty,unitCost](품목 선택 시 표준원가 자동). 상세 액션: DRAFT→전기(post), POSTED→취소(cancel). 합계 자동계산.
@@ -114,7 +138,7 @@
 | 5 | FI(회계) / 자동 분개 ⭐ | ✅ 완료 |
 | 6 | 인증/인가 + 감사 로그 | ✅ 완료 |
 | 7 | HR 간이 모듈 | ✅ 완료 |
-| **8** | **PP(생산) — BOM/생산지시** | ⬜ **다음 차례** |
+| **8** | **PP(생산) — BOM/생산지시** | 🔵 **구현 완료·검증** (워크스루/시연 남음) |
 | 9 | 배치 처리 — 야간 마감 ⭐ | ⬜ 예정 |
 | 10 | 리포트와 대시보드 | ⬜ 예정 (← ERP 단일 시스템 학습 종료) |
 | 11 | MES 프로젝트 셋업 + 연계 인프라 | ⬜ 예정 |

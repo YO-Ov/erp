@@ -33,6 +33,12 @@ public class PayrollController {
         return ResponseEntity.created(URI.create("/api/payroll-runs/" + created.id())).body(created);
     }
 
+    @GetMapping
+    public org.springframework.data.domain.Page<PayrollRunResponse> search(
+            org.springframework.data.domain.Pageable pageable) {
+        return service.search(pageable);
+    }
+
     @GetMapping("/{id}")
     public PayrollRunResponse findById(@PathVariable Long id) {
         return service.findById(id);

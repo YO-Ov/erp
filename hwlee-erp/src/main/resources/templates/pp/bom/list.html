@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('BOM', 'bom', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>BOM</h1>
+            <div class="crumb">생산 (PP) · Bill of Materials</div>
+        </div>
+    </div>
+
+    <form id="searchForm" class="filter-bar">
+        <div class="filter-field ff-wide">
+            <label>완제품</label>
+            <select id="f-product" class="form-select form-select-sm"><option value="">완제품 선택…</option></select>
+        </div>
+    </form>
+
+    <div class="card mb-3" id="bomCard" style="display:none">
+        <div class="card-header">부품 구성 <span id="prodName" class="text-muted small"></span></div>
+        <div class="card-body">
+            <table class="table line-table align-middle mb-0">
+                <thead>
+                <tr><th>부품 코드</th><th>부품명</th><th class="text-end">소요량(완제품 1개당)</th><th style="width:60px;"></th></tr>
+                </thead>
+                <tbody id="rows"><tr><td colspan="4" class="text-center text-muted py-3">완제품을 선택하세요.</td></tr></tbody>
+            </table>
+
+            <form id="addForm" class="row g-2 mt-3">
+                <div class="col-md-5">
+                    <label class="form-label">부품 추가</label>
+                    <select id="a-component" class="form-select form-select-sm"><option value="">부품 선택…</option></select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">소요량</label>
+                    <input type="number" step="any" min="0" id="a-qty" class="form-control form-control-sm text-end" placeholder="1">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-sm btn-primary">＋ 부품 추가</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+<script>
+    let finished = [], components = [];
+
+    async function loadItems() {
+        const data = await ERP.api('/api/items' + ERP.query({status: 'ACTIVE', size: 500}));
+        const list = data.content || [];
+        finished = list.filter(i => i.itemType === 'FINISHED');
+        components = list.filter(i => i.itemType === 'COMPONENT');
+        fill('f-product', finished, '완제품 선택…');
+        fill('a-component', components, '부품 선택…');
+    }
+    function fill(id, items, placeholder) {
+        const sel = document.getElementById(id);
+        sel.innerHTML = [`<option value="">${placeholder}</option>`]
+            .concat(items.map(i => `<option value="${i.id}">${ERP.esc(i.name)} (${ERP.esc(i.code)})</option>`)).join('');
+    }
+
+    function currentProductId() { return document.getElementById('f-product').value; }
+
+    async function loadBom() {
+        const pid = currentProductId();
+        const card = document.getElementById('bomCard');
+        if (!pid) { card.style.display = 'none'; return; }
+        card.style.display = '';
+        const p = finished.find(f => String(f.id) === String(pid));
+        document.getElementById('prodName').textContent = p ? `— ${p.name} (${p.code})` : '';
+        const tbody = document.getElementById('rows');
+        try {
+            const list = await ERP.api('/api/boms' + ERP.query({productItemId: pid}));
+            tbody.innerHTML = list.length === 0
+                ? '<tr><td colspan="4" class="text-center text-muted py-3">등록된 부품이 없습니다. 아래에서 추가하세요.</td></tr>'
+                : list.map(b => `<tr>
+                    <td>${ERP.esc(b.componentCode)}</td>
+                    <td>${ERP.esc(b.componentName)}</td>
+                    <td class="text-end">${ERP.num(b.quantity)}</td>
+                    <td><button class="btn btn-sm btn-outline-danger" onclick="del(${b.id})">✕</button></td></tr>`).join('');
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-3">불러오기 실패</td></tr>';
+            ERP.flashError(e);
+        }
+    }
+
+    async function addBom(e) {
+        e.preventDefault();
+        const pid = currentProductId();
+        const cid = document.getElementById('a-component').value;
+        const qty = document.getElementById('a-qty').value;
+        if (!pid) { ERP.flash('완제품을 먼저 선택하세요.', 'warning'); return; }
+        if (!cid || !qty) { ERP.flash('부품과 소요량을 입력하세요.', 'warning'); return; }
+        try {
+            await ERP.api('/api/boms', {method: 'POST',
+                body: {productItemId: Number(pid), componentItemId: Number(cid), quantity: qty}});
+            document.getElementById('a-component').value = '';
+            document.getElementById('a-qty').value = '';
+            loadBom();
+        } catch (err) { ERP.flashError(err); }
+    }
+
+    async function del(id) {
+        if (!confirm('이 부품을 BOM에서 삭제하시겠습니까?')) return;
+        try { await ERP.api('/api/boms/' + id, {method: 'DELETE'}); loadBom(); }
+        catch (e) { ERP.flashError(e); }
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        try { await loadItems(); } catch (e) { ERP.flashError(e); }
+        document.getElementById('f-product').addEventListener('change', loadBom);
+        document.getElementById('addForm').addEventListener('submit', addBom);
+    });
+</script>
+</div>
+</body>
+</html>

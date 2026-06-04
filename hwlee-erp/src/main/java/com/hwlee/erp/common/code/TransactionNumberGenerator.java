@@ -27,6 +27,7 @@ public class TransactionNumberGenerator {
     static final String PREFIX_JOURNAL_ENTRY = "JE";
     static final String PREFIX_PAYMENT = "PAY";
     static final String PREFIX_PAYROLL_RUN = "PR";
+    static final String PREFIX_PRODUCTION_ORDER = "PO";
 
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter MONTH_FORMAT = DateTimeFormatter.ofPattern("yyyyMM");
@@ -63,6 +64,11 @@ public class TransactionNumberGenerator {
 
     public String nextPaymentNumber(LocalDate paymentDate) {
         return codeGenerator.nextTransactionCode(PREFIX_PAYMENT, periodKey(paymentDate));
+    }
+
+    /** 생산지시 번호 — 일 단위. 예: {@code PO-20260604-001}. */
+    public String nextProductionOrderNumber(LocalDate orderDate) {
+        return codeGenerator.nextTransactionCode(PREFIX_PRODUCTION_ORDER, periodKey(orderDate));
     }
 
     /**

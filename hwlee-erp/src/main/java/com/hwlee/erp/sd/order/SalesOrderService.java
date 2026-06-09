@@ -8,13 +8,16 @@ import com.hwlee.erp.master.item.Item;
 import com.hwlee.erp.master.item.ItemRepository;
 import com.hwlee.erp.common.code.TransactionNumberGenerator;
 import com.hwlee.erp.sd.order.creditcheck.CreditLimitChecker;
+import com.hwlee.erp.sd.order.dto.CreditStatusResponse;
 import com.hwlee.erp.sd.order.dto.SalesOrderCreateRequest;
 import com.hwlee.erp.sd.order.dto.SalesOrderLineRequest;
 import com.hwlee.erp.sd.order.dto.SalesOrderResponse;
 import com.hwlee.erp.sd.order.dto.SalesOrderUpdateRequest;
 import com.hwlee.erp.sd.quotation.Quotation;
 import com.hwlee.erp.sd.quotation.QuotationRepository;
+import com.hwlee.erp.sd.quotation.QuotationStatus;
 import jakarta.persistence.EntityNotFoundException;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -46,6 +49,10 @@ public class SalesOrderService {
                 .orElseThrow(() -> new EntityNotFoundException("Customer not found: id=" + req.customerId()));
         Employee salesperson = resolveSalesperson(req.salespersonId());
         Quotation quotation = resolveQuotation(req.quotationId());
+        if (quotation != null) {
+            // 견적당 수주 1건 — ACCEPTED → CONVERTED. 이미 전환된 견적이면 markConverted 가 거부한다.
+            quotation.markConverted();
+        }
         String number = numberGenerator.nextSalesOrderNumber(req.orderDate());
         SalesOrder order = SalesOrder.draft(number, customer, salesperson, quotation, req.orderDate());
         addLines(order, req.lines());
@@ -54,6 +61,19 @@ public class SalesOrderService {
 
     public SalesOrderResponse findById(Long id) {
         return mapper.toResponse(getOrThrow(id));
+    }
+
+    /**
+     * 고객 신용한도 현황 — 수주 화면이 확정 전에 "남은 한도" 를 미리 보여주기 위해 호출한다.
+     * 검증({@link CreditLimitChecker})과 같은 산식(creditLimit - 활성 수주 합계)을 조회용으로 노출한다.
+     */
+    public CreditStatusResponse creditStatus(Long customerId) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new EntityNotFoundException("Customer not found: id=" + customerId));
+        BigDecimal used = repository.sumActiveOrderAmountByCustomer(customerId, null);
+        if (used == null) used = BigDecimal.ZERO;
+        BigDecimal remaining = customer.getCreditLimit().subtract(used);
+        return new CreditStatusResponse(customerId, customer.getCreditLimit(), used, remaining);
     }
 
     public Page<SalesOrderResponse> search(Specification<SalesOrder> spec, Pageable pageable) {
@@ -82,6 +102,11 @@ public class SalesOrderService {
     public SalesOrderResponse cancel(Long id) {
         SalesOrder order = getOrThrow(id);
         order.cancel();
+        // 견적으로 만든 수주가 취소되면 그 견적을 ACCEPTED 로 되살려 재사용 가능하게 한다.
+        Quotation quotation = order.getQuotation();
+        if (quotation != null && quotation.getStatus() == QuotationStatus.CONVERTED) {
+            quotation.revertConversion();
+        }
         return mapper.toResponse(order);
     }
 

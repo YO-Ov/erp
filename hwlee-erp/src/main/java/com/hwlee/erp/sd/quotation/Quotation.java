@@ -110,6 +110,27 @@ public class Quotation extends BaseEntity {
         this.status = QuotationStatus.ACCEPTED;
     }
 
+    /**
+     * 수주로 전환 — ACCEPTED → CONVERTED. 견적당 수주 1건만 허용한다.
+     * 이미 CONVERTED 면 같은 견적으로 중복 수주를 시도한 것이므로 거부한다.
+     */
+    public void markConverted() {
+        if (status != QuotationStatus.ACCEPTED)
+            throw new IllegalStateException(
+                    "수락된(ACCEPTED) 견적만 수주로 전환할 수 있습니다. 현재: " + status
+                            + " — 이미 수주로 전환된 견적은 재사용할 수 없습니다(분할 수주는 견적 없이 진행).");
+        this.status = QuotationStatus.CONVERTED;
+    }
+
+    /**
+     * 전환 취소 — CONVERTED → ACCEPTED. 전환된 수주가 취소되면 견적을 되살려 재사용 가능하게 한다.
+     */
+    public void revertConversion() {
+        if (status != QuotationStatus.CONVERTED)
+            throw new IllegalStateException("CONVERTED 견적만 전환 취소할 수 있습니다. 현재: " + status);
+        this.status = QuotationStatus.ACCEPTED;
+    }
+
     public void expire() {
         if (status != QuotationStatus.SENT)
             throw new IllegalStateException("SENT 견적만 만료 처리할 수 있습니다. 현재: " + status);

@@ -7,6 +7,7 @@ import static com.hwlee.erp.sd.order.SalesOrderSpecifications.salespersonIdEqual
 import static com.hwlee.erp.sd.order.SalesOrderSpecifications.statusEquals;
 import static org.springframework.data.jpa.domain.Specification.where;
 
+import com.hwlee.erp.sd.order.dto.CreditStatusResponse;
 import com.hwlee.erp.sd.order.dto.SalesOrderCreateRequest;
 import com.hwlee.erp.sd.order.dto.SalesOrderResponse;
 import com.hwlee.erp.sd.order.dto.SalesOrderUpdateRequest;
@@ -44,6 +45,12 @@ public class SalesOrderController {
     @GetMapping("/{id}")
     public SalesOrderResponse findById(@PathVariable Long id) {
         return service.findById(id);
+    }
+
+    /** 고객 신용한도 현황 — 수주 화면이 확정 전 "남은 한도" 를 미리 보여주기 위해 호출. */
+    @GetMapping("/credit-status")
+    public CreditStatusResponse creditStatus(@RequestParam Long customerId) {
+        return service.creditStatus(customerId);
     }
 
     @GetMapping

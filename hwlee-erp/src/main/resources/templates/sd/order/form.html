@@ -35,6 +35,7 @@
                     <input type="date" id="orderDate" class="form-control" required>
                 </div>
             </div>
+            <div id="credit-info" class="alert alert-light border mt-3 mb-0 py-2 px-3 small" style="display:none;"></div>
         </div></div>
 
         <div class="card mb-3">
@@ -71,6 +72,7 @@
     const isEdit = ID != null;
     let items = [];
     let pickedQuotationId = null; // 견적에서 불러온 경우 그 견적 id 를 수주에 링크
+    let creditCache = null;       // 선택된 고객의 신용한도 현황 캐시(라인 변경 시 재계산만)
 
     async function loadItems() {
         const data = await ERP.api('/api/items' + ERP.query({status: 'ACTIVE', size: 500}));
@@ -130,6 +132,38 @@
             grand += qty * price;
         });
         document.getElementById('grandTotal').textContent = ERP.won(grand);
+        renderFormCredit(grand);
+    }
+
+    // 고객 선택 시 신용한도 현황을 조회해 캐시. (API 호출은 고객이 바뀔 때만)
+    async function loadFormCredit() {
+        const cid = document.getElementById('customer').value;
+        const box = document.getElementById('credit-info');
+        if (!cid) { creditCache = null; box.style.display = 'none'; return; }
+        try {
+            creditCache = await ERP.api('/api/sales-orders/credit-status?customerId=' + cid);
+            box.style.display = '';
+            renderFormCredit();
+        } catch (e) { creditCache = null; box.style.display = 'none'; }
+    }
+
+    // 캐시된 한도 + 현재 입력한 주문 합계로 "이 주문 포함 시 남은 한도" 를 그린다.
+    function renderFormCredit(grand) {
+        if (!creditCache) return;
+        if (grand == null) {
+            grand = 0;
+            document.querySelectorAll('#lines tr').forEach(tr => {
+                grand += (parseFloat(tr.querySelector('.line-qty').value) || 0)
+                    * (parseFloat(tr.querySelector('.line-price').value) || 0);
+            });
+        }
+        const after = Number(creditCache.remaining) - grand;
+        document.getElementById('credit-info').innerHTML =
+            `신용한도 ${ERP.won(creditCache.creditLimit)} · 사용중 ${ERP.won(creditCache.used)}`
+            + ` · 남은 <strong>${ERP.won(creditCache.remaining)}</strong>`
+            + ` → 이 주문(${ERP.won(grand)}) 포함 시 남은 `
+            + `<strong class="${after < 0 ? 'text-danger' : 'text-success'}">${ERP.won(after)}</strong>`
+            + (after < 0 ? ' <span class="badge bg-danger">한도 초과 — 확정 불가</span>' : '');
     }
     function collectLines() {
         const lines = [];
@@ -154,6 +188,7 @@
             pickedQuotationId = q.id;
             const csel = document.getElementById('customer');
             csel.value = q.customerId;
+            await loadFormCredit();   // 견적으로 고객이 정해지면 신용한도도 갱신
             (q.lines || []).forEach(l => addLine({itemId: l.itemId, orderQty: l.quantity, unitPrice: l.unitPrice}));
             recalc();
         } catch (e) { ERP.flashError(e); }
@@ -194,9 +229,11 @@
                 if (o.salespersonId) document.getElementById('salesperson').value = o.salespersonId;
                 document.getElementById('orderDate').value = o.orderDate ?? '';
                 (o.lines || []).forEach(addLine);
+                await loadFormCredit();   // 수정 모드: 고객이 정해져 있으니 바로 한도 표시
             } else {
                 await loadAcceptedQuotations();
                 document.getElementById('quotation').addEventListener('change', onQuotationChange);
+                document.getElementById('customer').addEventListener('change', loadFormCredit);
                 addLine();
             }
             recalc();

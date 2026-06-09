@@ -20,8 +20,15 @@
 ## 현재 위치
 
 - **🎉 Phase 0~16 전체 구현 완료·검증.** 이제 **학습 페이즈(도메인 브리핑/코드 워크스루) 진행 중**.
-- **▶ 다음 학습 = `05 FI`(복식부기·자동분개) ⭐추천** 또는 `08 PP`(생산·원가). 각 주제 **①도메인 → ②구현** 2단계.
+- **▶ 다음 학습 = `01 마스터` 부터 순서대로**(hwlee님 요청 2026-06-09). 04·05는 이미 완료 → **01 마스터 → 02 SD → 03 MM** 채운 뒤 06~16 진행. 각 주제 **①도메인 → ②구현** 2단계.
+- **화면 방식**(hwlee님 선택 2026-06-09): **글+코드로 인용**. 앱 안 띄움. 구현 단계에서 화면 템플릿/REST 흐름을 글에 인용. (이 환경은 헤드리스 브라우저 없어 직접 렌더 불가.)
   - 🖥️ 실행/종료: 루트 `실행방법.md` (ERP 8080 / MES 8082 / docker). Zipkin 9411.
+
+### 🔧 학습 중 발견한 SD 갭 2건 수정 (2026-06-09, hwlee님이 화면 돌려보다 발견)
+
+- **① 견적 1회 소비**: 한 견적으로 수주 만들면 그 견적 재사용 불가(분할 수주는 견적 없이). `QuotationStatus.CONVERTED` 추가, `Quotation.markConverted()`(ACCEPTED→CONVERTED, 중복 시 거부)/`revertConversion()`(수주 취소 시 복원). `SalesOrderService.create`가 견적 있으면 markConverted 호출, `cancel`이 revertConversion. 화면: 견적 list/detail STATUS에 CONVERTED('수주전환') 추가 → form의 ACCEPTED-only 드롭다운에서 소비된 견적 자동 제외. (enum 문자열 저장이라 마이그레이션 불필요.)
+- **② 신용한도 수주 화면 노출**: `CreditStatusResponse`(limit/used/remaining) + `SalesOrderService.creditStatus` + `GET /api/sales-orders/credit-status?customerId=`. 수주 detail(확정 전 DRAFT면 "확정 시 남은 한도" 예고+초과 경고)·form(고객/견적 선택 시 표시, 라인 합계 반영 "이 주문 포함 시 남은 한도").
+- **검증**: `compileJava` 그린. ⚠️ 앱 재기동+강력새로고침으로 실제 렌더는 hwlee님 육안 확인 필요(헤드리스 없음). **미커밋**.
 
 ### 📚 학습 페이즈 진행 (2026-06-09 시작)
 
@@ -30,8 +37,13 @@
   - `doc/00-전체-조감도.md` — 전체 숲(ERP 5모듈·OTC/제조 흐름·ERP↔MES 동기REST/비동기Kafka). 끝에 01~16 주제 목록표.
   - `doc/04-모듈연계/1-도메인.md` — 한 거래가 여러 모듈 자동 갱신(출하→재고·매출원가 등), 원자성+느슨한결합.
   - `doc/04-모듈연계/2-구현.md` — Spring Events: `DeliveryShippedEvent` 발행 → MM/FI `@TransactionalEventListener(BEFORE_COMMIT)` 구독, `@Order(10/20)` 순서, REQUIRED 합류로 롤백.
-- **▶ 다음 후보**: **05 FI**(전표·차변=대변·자동분개 — 04에서 본 전표의 정체) ⭐ / 08 PP(BOM·생산·원가) / 조감도 표의 다른 주제.
-- ⚠️ 01·02·03(마스터/SD/MM)은 "예전에 본 내용"이라 건너뛰고 04부터 시작함. 배경은 글에서 짧게 보충 중.
+  - `doc/05-FI-회계/1-도메인.md` — 복식부기(차변=대변): 회계등식(자산=부채+자본+수익·비용), 차/대 정상방향 5계정, 황금률, 실제 분개 3예(발행/출하/입고, 실제 계정코드 1200·4100·2200·5100·1400·2100), 자동분개 개념, 전표 작성→전기(POSTED).
+  - `doc/05-FI-회계/2-구현.md` — JournalEntry(헤더)+JournalLine(한 라인 한 방향, 생성자+DB CHECK)·`post()`가 차대검증(compareTo, UnbalancedJournalException)·`AutoJournalService` 8개 사건별 메서드(addDebit/addCredit)·04 리스너(`fi/integration/sd` BEFORE_COMMIT→createSalesEntry, 롤백)·매출원가 @Order(10→20)로 출고단가 전달·급여분개가 수학적으로 균형(net=gross−tax−ins).
+  - `doc/01-마스터데이터/1-도메인.md` — 마스터(명사) vs 트랜잭션(동사), 단일 정의·모든 거래가 참조, 우리 마스터 6종(고객·거래처·품목·창고·부서·직원, master 패키지), 고객/거래처=돈 방향(매출1200/매입2100), 공통 성질(식별코드·거래 분기 속성[품목유형·신용한도]·삭제 대신 비활성).
+  - `doc/01-마스터데이터/2-구현.md` — BaseEntityWithCode(code unique·updatable=false + status MasterStatus + deletedAt)·CodeGenerator(REQUIRES_NEW+SELECT FOR UPDATE, 마스터 연4자리/트랜잭션 일3자리)·Customer(creditLimit→02 수주, businessNo 수정불가)·Item(itemType→05 분기)·static create 팩토리 검증·CRUD(중복 이중방지·DTO·Specification 페이징)·**Soft Delete**(@SQLDelete→deleted_at UPDATE + @SQLRestriction 조회 자동제외) vs status 구분·Auditable.
+  - `doc/02-SD-영업/1-도메인.md` — OTC(견적Quotation→수주SalesOrder→출하Delivery→세금계산서Invoice→입금), 4단계로 쪼개는 이유(되돌릴 수 없는 선), 각 상태머신(견적 DRAFT→SENT→ACCEPTED/EXPIRED, 수주 DRAFT→CONFIRMED→SHIPPING↔SHIPPED→INVOICING↔INVOICED→CLOSED, 출하/계산서 DRAFT→SHIPPED/ISSUED), **신용한도**(수주 확정 시점 미수금+주문액>creditLimit 거부), SD가 04·05의 출발점.
+- **▶ 다음 후보**: **02 SD ②구현**(엔티티·상태전이 메서드·CreditLimitChecker·출하/발행 이벤트 발행) ⭐ → 03 MM → 06~16.
+- ⚠️ (정정 2026-06-09) 01·02·03(마스터/SD/MM)도 **순서대로 학습**하기로 함. 04·05 먼저 한 뒤 01부터 채우는 중.
 - 참고: 예전 학습 문서·통합 아키텍처(`doc/10`,`doc/11` 등)는 **`doc_bak/`** 으로 이동됨.
 
 ### Phase 16 구현 요약 (2026-06-09) — 통합·운영

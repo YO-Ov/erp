@@ -23,6 +23,7 @@
             <dt class="col-sm-2">확정일시</dt><dd class="col-sm-4" id="d-confirmed">-</dd>
             <dt class="col-sm-2">합계 금액</dt><dd class="col-sm-4 fw-bold" id="d-total">-</dd>
             <dt class="col-sm-2">등록</dt><dd class="col-sm-4 small text-muted" id="d-audit">-</dd>
+            <dt class="col-sm-2">신용한도</dt><dd class="col-sm-10" id="d-credit"><span class="text-muted">조회 중…</span></dd>
         </dl>
     </div></div>
 
@@ -86,6 +87,28 @@
             </tr>`).join('');
 
         renderActions(o.status);
+        loadCreditStatus(o.customerId, o.totalAmount, o.status);
+    }
+
+    // 고객 신용한도 현황 표시. DRAFT 수주면 "확정 시 남은 한도" 까지 미리 보여준다.
+    async function loadCreditStatus(customerId, orderTotal, status) {
+        const el = document.getElementById('d-credit');
+        try {
+            const c = await ERP.api('/api/sales-orders/credit-status?customerId=' + customerId);
+            const overNow = Number(c.remaining) < 0;
+            let html = `한도 ${ERP.won(c.creditLimit)}`
+                + ` · 사용중 ${ERP.won(c.used)}`
+                + ` · 남은 <strong class="${overNow ? 'text-danger' : 'text-success'}">${ERP.won(c.remaining)}</strong>`;
+            if (status === 'DRAFT') {
+                const after = Number(c.remaining) - Number(orderTotal);   // 이 수주는 아직 used 에 미포함
+                html += ` <span class="small">→ 이 수주(${ERP.won(orderTotal)}) 확정 시 남은 `
+                    + `<strong class="${after < 0 ? 'text-danger' : 'text-success'}">${ERP.won(after)}</strong>`
+                    + (after < 0 ? ' <span class="badge bg-danger">한도 초과</span>' : '') + '</span>';
+            }
+            el.innerHTML = html;
+        } catch (e) {
+            el.innerHTML = '<span class="text-muted">신용한도 조회 불가</span>';
+        }
     }
 
     // DRAFT(수정/확정/취소), CONFIRMED(취소). 출하/청구 진행 중엔 헤더 액션 없음.

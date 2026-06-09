@@ -18,8 +18,66 @@ spring:
     baseline-on-migrate: false
     locations: classpath:db/migration
 
+  # Phase 9 — 배치. 메타테이블은 Flyway(V37)가 생성하므로 자동 초기화 끔.
+  #           기동 시 자동 잡 실행 금지(수동 REST/스케줄러로만 트리거).
+  batch:
+    jdbc:
+      initialize-schema: never
+    job:
+      enabled: false
+
+  # Phase 11 — MES 연계 (실제 토픽/리스너는 Phase 14)
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: erp
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
 server:
   port: 8080
+
+# Phase 11 — 분산 추적 (Zipkin) + 운영 엔드포인트
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# Phase 12 — MES 연계 (ERP→MES 작업지시 전송)
+mes:
+  base-url: ${MES_BASE_URL:http://localhost:8082}
+
+# Phase 12 — 회복성: MES 호출 재시도 + 서킷브레이커
+resilience4j:
+  retry:
+    instances:
+      mes:
+        max-attempts: 3
+        wait-duration: 500ms
+        retry-exceptions:
+          - org.springframework.web.client.RestClientException
+  circuitbreaker:
+    instances:
+      mes:
+        sliding-window-size: 5
+        minimum-number-of-calls: 3
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 2
 
 # Phase 6 — JWT 설정 (운영에선 환경변수 JWT_SECRET 로 주입)
 erp:

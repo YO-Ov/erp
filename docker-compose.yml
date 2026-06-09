@@ -1,4 +1,5 @@
 services:
+  # ── ERP 전용 DB ──────────────────────────────────────────────
   mysql:
     image: mysql:8.0
     container_name: hwlee-erp-mysql
@@ -23,5 +24,80 @@ services:
       timeout: 5s
       retries: 10
 
+  # ── MES 전용 DB (시스템 간 DB 분리를 물리적으로 강제) ──────────
+  mes-mysql:
+    image: mysql:8.0
+    container_name: hwlee-mes-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: mes_db
+      MYSQL_USER: mes
+      MYSQL_PASSWORD: mes
+      TZ: Asia/Seoul
+    ports:
+      - "3308:3306"
+    volumes:
+      - hwlee-mes-mysql-data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+09:00
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-umes", "-pmes"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Kafka 코디네이션 ────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: hwlee-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      TZ: Asia/Seoul
+    ports:
+      - "2181:2181"
+
+  # ── Kafka 단일 브로커 (MES→ERP 비동기 메시지 버스) ──────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: hwlee-kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"   # 호스트(앱)에서 접속
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # 컨테이너 내부(PLAINTEXT)와 호스트(PLAINTEXT_HOST) 리스너 분리.
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      TZ: Asia/Seoul
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  # ── 분산 추적 수집/시각화 (두 시스템에 걸친 요청 추적) ──────────
+  zipkin:
+    image: openzipkin/zipkin:3
+    container_name: hwlee-zipkin
+    restart: unless-stopped
+    ports:
+      - "9411:9411"
+    environment:
+      TZ: Asia/Seoul
+
 volumes:
   hwlee-erp-mysql-data:
+  hwlee-mes-mysql-data:

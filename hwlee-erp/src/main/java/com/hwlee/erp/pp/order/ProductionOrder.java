@@ -66,6 +66,13 @@ public class ProductionOrder extends BaseEntity {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    /** MES 작업지시 전송 추적 (Phase 12). 전송 전이면 null. */
+    @Column(name = "mes_work_order_no", length = 30)
+    private String mesWorkOrderNo;
+
+    @Column(name = "mes_dispatched_at")
+    private LocalDateTime mesDispatchedAt;
+
     @OneToMany(mappedBy = "productionOrder", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("lineNo ASC")
     private List<ProductionOrderLine> lines = new ArrayList<>();
@@ -118,6 +125,12 @@ public class ProductionOrder extends BaseEntity {
         if (status == ProductionOrderStatus.COMPLETED || status == ProductionOrderStatus.CANCELLED)
             throw new IllegalStateException("이미 종료된 생산지시는 취소할 수 없습니다. 현재: " + status);
         this.status = ProductionOrderStatus.CANCELLED;
+    }
+
+    /** MES 작업지시 전송 결과 기록 (Phase 12). 멱등 재전송 시 같은 값으로 덮어써도 무방. */
+    public void markDispatched(String mesWorkOrderNo, LocalDateTime now) {
+        this.mesWorkOrderNo = mesWorkOrderNo;
+        this.mesDispatchedAt = now;
     }
 
     public List<ProductionOrderLine> getLines() {

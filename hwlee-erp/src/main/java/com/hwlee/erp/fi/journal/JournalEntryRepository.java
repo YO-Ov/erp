@@ -34,4 +34,20 @@ public interface JournalEntryRepository
             + "WHERE a.code = :accountCode "
             + "AND l.journalEntry.status = com.hwlee.erp.fi.journal.JournalEntryStatus.POSTED")
     List<JournalLine> findPostedLinesByAccountCode(@Param("accountCode") String accountCode);
+
+    /**
+     * Phase 10 — 손익계산서: 기간 내 POSTED 전표의 수익/비용 계정별 차·대 합.
+     * 자산/부채/자본은 손익 대상이 아니므로 제외.
+     */
+    @Query("select new com.hwlee.erp.report.dto.AccountAmount("
+            + "  a.code, a.name, a.type, sum(l.debit), sum(l.credit)) "
+            + "from JournalLine l join l.account a join l.journalEntry je "
+            + "where je.status = com.hwlee.erp.fi.journal.JournalEntryStatus.POSTED "
+            + "and je.entryDate between :from and :to "
+            + "and a.type in (com.hwlee.erp.fi.account.AccountType.REVENUE, "
+            + "               com.hwlee.erp.fi.account.AccountType.EXPENSE) "
+            + "group by a.code, a.name, a.type "
+            + "order by a.code asc")
+    List<com.hwlee.erp.report.dto.AccountAmount> incomeStatementSums(
+            @Param("from") java.time.LocalDate from, @Param("to") java.time.LocalDate to);
 }

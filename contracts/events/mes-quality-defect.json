@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MesQualityDefect",
+  "description": "MES → ERP 불량 발생 이벤트 (Kafka). 토픽: mes.quality.defect. ERP 는 통계 기록만(재고/회계 영향 없음). eventId 로 멱등.",
+  "type": "object",
+  "required": ["eventId", "workOrderNo", "erpOrderNo", "productCode", "defectQty", "inspectedAt"],
+  "properties": {
+    "eventId": { "type": "string", "description": "멱등 키 (QI-{inspectionId})", "example": "QI-1" },
+    "workOrderNo": { "type": "string", "example": "WO-20260609-002" },
+    "erpOrderNo": { "type": "string", "example": "PO-20260609-002" },
+    "productCode": { "type": "string", "example": "ITEM-2026-0001" },
+    "defectQty": { "type": "number", "example": 1 },
+    "defectReasonCode": { "type": "string", "example": "DEF-02" },
+    "defectReasonName": { "type": "string", "example": "기능 불량(동작 이상)" },
+    "inspectedAt": { "type": "string", "format": "date-time" }
+  }
+}

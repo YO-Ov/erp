@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MesProductionPerformance",
+  "description": "MES → ERP 생산 실적 이벤트 (Kafka). 토픽: mes.production.performance. 키: workOrderNo. eventId 로 멱등 처리.",
+  "type": "object",
+  "required": ["eventId", "erpOrderNo", "workOrderNo", "seq", "goodQty", "consumptions", "reportedAt"],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "description": "멱등 키 (workOrderNo#seq). 수신측이 중복을 한 번만 반영.",
+      "example": "WO-20260609-001#1"
+    },
+    "erpOrderNo": { "type": "string", "example": "PO-20260609-001" },
+    "workOrderNo": { "type": "string", "example": "WO-20260609-001" },
+    "seq": { "type": "integer", "description": "작업지시 내 실적 순번", "example": 1 },
+    "goodQty": { "type": "number", "description": "양품 수량 (완제품 입고분)", "example": 3 },
+    "defectQty": { "type": "number", "description": "불량 수량", "example": 0 },
+    "consumptions": {
+      "type": "array",
+      "description": "이번 실적의 자재 투입(부품 차감 근거)",
+      "items": {
+        "type": "object",
+        "required": ["componentCode", "consumedQty"],
+        "properties": {
+          "componentCode": { "type": "string", "example": "ITEM-2026-0005" },
+          "componentName": { "type": "string", "example": "16GB 메모리" },
+          "consumedQty": { "type": "number", "example": 6 }
+        }
+      }
+    },
+    "reportedAt": { "type": "string", "format": "date-time" }
+  }
+}

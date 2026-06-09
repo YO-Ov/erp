@@ -1,5 +1,7 @@
 package com.hwlee.erp.pp.order;
 
+import com.hwlee.erp.pp.integration.mes.DispatchResult;
+import com.hwlee.erp.pp.integration.mes.MesDispatchService;
 import com.hwlee.erp.pp.order.dto.MaterialAvailabilityResponse;
 import com.hwlee.erp.pp.order.dto.ProductionOrderCreateRequest;
 import com.hwlee.erp.pp.order.dto.ProductionOrderResponse;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProductionController {
 
     private final ProductionService service;
+    private final MesDispatchService mesDispatchService;
 
     @PostMapping
     public ResponseEntity<ProductionOrderResponse> create(@Valid @RequestBody ProductionOrderCreateRequest req) {
@@ -68,5 +71,11 @@ public class ProductionController {
     @PostMapping("/{id}/cancel")
     public ProductionOrderResponse cancel(@PathVariable Long id) {
         return service.cancel(id);
+    }
+
+    /** Phase 12 — 착수된 생산지시를 MES로 작업지시 전송(동기 REST, 멱등). */
+    @PostMapping("/{id}/dispatch")
+    public DispatchResult dispatch(@PathVariable Long id) {
+        return mesDispatchService.dispatch(id);
     }
 }

@@ -5,16 +5,134 @@
 
 ## 운영 규칙 (AI가 지킬 것)
 
-1. **"다음 진도 실행" 요청 시** → 저장소 전체를 훑지 말고 **이 파일을 먼저 읽어** 현재 위치를 파악한 뒤, `git log -3` 으로만 가볍게 대조하고 바로 다음 단계로 진행한다.
-2. **하나의 진행(7단계 사이클의 한 단계)이 끝날 때마다** → 아래 "현재 위치"와 "Phase 상태표"를 **갱신한다**. (커밋·푸시는 사용자가 직접 한다. 다른 PC에서 이어가려면 사용자가 작업 후 커밋+푸시해야 최신 상태가 공유된다.)
-3. **전체 학습이 끝나면**(Phase 16 또는 사용자가 정한 종료 지점 완료) → 사용자에게 **"학습 진행이 모두 끝났으니 이 PROGRESS.md 파일을 삭제하시겠어요?"** 라고 안내한다.
+> **⚡ 운영 방식 변경 (2026-06-09) — "구현 먼저, 학습 나중"**
+> 사용자(hwlee)가 회사 업무로 스터디 시간이 부족 → 7단계 사이클을 매 Phase마다 다 밟지 않는다.
+> - **개발 페이즈**: 각 Phase에서 **단계 5(구현)만 쭉** 진행한다. Phase들을 구현 위주로 빠르게 전진.
+> - **설계(단계 3·4)는 AI가 합리적 기본값으로 결정·진행**하고, 되돌리기 어려운 큰 갈림길만 한 줄로 통보(원하면 그때 수정). 사용자가 설계를 직접 고민하지 않게 한다.
+> - **학습 파트(단계 1·2 도메인 브리핑·Q&A, 단계 6 코드 워크스루, 단계 7 시연)는 전부 개발 완료 후로 미룬다.** 기능이 일단락되면 그때 몰아서 진행한다. `doc/` 학습 문서도 그때 작성.
+
+1. **"다음 진도 실행" 요청 시** → 저장소 전체를 훑지 말고 **이 파일을 먼저 읽어** 현재 위치를 파악한 뒤, `git log -3` 으로만 가볍게 대조하고 바로 **다음 구현**으로 진행한다. (학습 단계는 건너뛴다.)
+2. **하나의 구현이 끝날 때마다** → 아래 "현재 위치"와 "Phase 상태표"를 **갱신한다**. (커밋·푸시는 사용자가 직접 한다. 다른 PC에서 이어가려면 사용자가 작업 후 커밋+푸시해야 최신 상태가 공유된다.)
+3. **전체 구현이 끝나면** → 사용자에게 미뤄둔 **학습 페이즈(도메인 브리핑·코드 워크스루·시연)** 진행 여부를 안내하고, 그것까지 끝나면 PROGRESS.md 삭제를 안내한다.
 
 ---
 
 ## 현재 위치
 
-- **Phase**: **8 — PP(생산) BOM/생산지시** 🔵 **단계 5(구현) 완료·검증** → 단계 6(워크스루)·7(시연) 남음.
-- **단계**: 1~5 완료. 문서 `doc/09-phase-8-PP-생산/`(1-도메인-브리핑, 2-설계-제안). **다음 = 단계 6 코드 워크스루 / 7 시연·회고** (사용자가 원하면).
+- **🎉 Phase 0~16 전체 구현 완료·검증.** 이제 **학습 페이즈(도메인 브리핑/코드 워크스루) 진행 중**.
+- **▶ 다음 학습 = `05 FI`(복식부기·자동분개) ⭐추천** 또는 `08 PP`(생산·원가). 각 주제 **①도메인 → ②구현** 2단계.
+  - 🖥️ 실행/종료: 루트 `실행방법.md` (ERP 8080 / MES 8082 / docker). Zipkin 9411.
+
+### 📚 학습 페이즈 진행 (2026-06-09 시작)
+
+- **운영 방식**(메모리 [[feedback-dev-first-study-later]]): 기존 doc/ → **`doc_bak/`** 백업, 새 **`doc/`** 에 작성. **채팅(터미널) + 문서(.md) 둘 다** 작성. 주제마다 **① 도메인(업무) 설명 → ② 구현(개발) 설명** 2단계. ②는 코드 조각을 글에 인용해 자립적으로.
+- **완료한 글**:
+  - `doc/00-전체-조감도.md` — 전체 숲(ERP 5모듈·OTC/제조 흐름·ERP↔MES 동기REST/비동기Kafka). 끝에 01~16 주제 목록표.
+  - `doc/04-모듈연계/1-도메인.md` — 한 거래가 여러 모듈 자동 갱신(출하→재고·매출원가 등), 원자성+느슨한결합.
+  - `doc/04-모듈연계/2-구현.md` — Spring Events: `DeliveryShippedEvent` 발행 → MM/FI `@TransactionalEventListener(BEFORE_COMMIT)` 구독, `@Order(10/20)` 순서, REQUIRED 합류로 롤백.
+- **▶ 다음 후보**: **05 FI**(전표·차변=대변·자동분개 — 04에서 본 전표의 정체) ⭐ / 08 PP(BOM·생산·원가) / 조감도 표의 다른 주제.
+- ⚠️ 01·02·03(마스터/SD/MM)은 "예전에 본 내용"이라 건너뛰고 04부터 시작함. 배경은 글에서 짧게 보충 중.
+- 참고: 예전 학습 문서·통합 아키텍처(`doc/10`,`doc/11` 등)는 **`doc_bak/`** 으로 이동됨.
+
+### Phase 16 구현 요약 (2026-06-09) — 통합·운영
+
+- **정합성 검증**(`pp.integration.mes`): `MesClient.fetchWorkOrders`(GET, CB) + `ReconciliationService`(dispatched 생산지시 ↔ MES 작업지시 대조: MISSING_IN_MES / QTY_MISMATCH) + `GET /api/integration/reconciliation`(@PreAuthorize PRODUCTION/ADMIN). `ProductionOrderRepository.findByMesWorkOrderNoIsNotNull`.
+- **통합 문서**: `doc/11-phase-16-통합-운영/1-통합-아키텍처와-E2E.md`(최종 아키텍처 다이어그램·E2E 8단계·운영 3대장치[회복성/정합성/추적]). 루트 `README.md` 전면 갱신(두 시스템·실행법·포트·완료 현황).
+- **검증(E2E)**: 정합성 정상 시 `consistent:true`(2건), ERP 수량 변조 주입 시 `QTY_MISMATCH`(ERP=4/MES=3) 탐지→원복. (Phase 12~15 단계별 흐름은 각 Phase에서 이미 E2E 검증.)
+- ⚠️ 백그라운드 기동: ERP(8080)·MES(8082)·docker. **전체 미커밋** — 커밋·푸시는 hwlee님이 직접.
+
+### Phase 15 구현 요약 (2026-06-09) — 품질 + 설비
+
+- **품질**(`com.hwlee.mes.quality`): `DefectReason` 마스터(V5, DEF-01~03 시드) + `QualityInspection`(검사/합격/불량/사유/판정 PASS·FAIL). `QualityService.inspect`: 불량 시 사유 필수 + **Outbox 에 QUALITY_DEFECT 이벤트 적재**. API `GET /api/defect-reasons`, `POST|GET /api/work-orders/{id}/inspections`.
+- **불량 통보(Kafka 2번째 흐름)**: `integration.event.QualityDefectEvent`. **OutboxPublisher 를 eventType→토픽 매핑으로 일반화**(PRODUCTION_PERFORMANCE→mes.production.performance, QUALITY_DEFECT→**mes.quality.defect**). ERP `pp.integration.mes`: `QualityDefectListener`(@KafkaListener) → `quality_defect_log`(V41, event_id UNIQUE 멱등) **기록만**(재고/회계 영향 없음 — 품질 상세는 MES 소유, ERP엔 요약만).
+- **설비 상태**(`master.equipment`): `EquipmentStatus`(RUNNING/IDLE/DOWN/MAINTENANCE) + Equipment.status + `EquipmentStatusLog`(구간 이력, V6). `EquipmentStatusService.changeStatus`(진행구간 닫고 새 구간) + `utilization`(RUNNING 시간/전체 = 가동률, OEE 가용성 미니). API `POST /api/equipments/{id}/status`, `GET /api/equipments/{id}/utilization`.
+- **계약**: `contracts/events/mes-quality-defect.json`.
+- **검증(E2E)**: 품질검사(검사3·합격2·불량1·DEF-02)→FAIL→Outbox QI-1→Kafka→ERP `quality_defect_log` 기록 확인. 설비1 RUNNING(3s)→IDLE(2s)→RUNNING → 가동률 **60.0%**(running3/total5) 정확.
+- ⚠️ **검증 데이터**: MES QI-1(불량1)·설비1 상태이력3. ERP quality_defect_log QI-1.
+- ⚠️ 백그라운드 기동: ERP(8080)·MES(8082)·docker. 미커밋.
+
+### Phase 14 구현 요약 (2026-06-09) — Outbox + Kafka ⭐
+
+- **MES(Producer)**: **Transactional Outbox** — `integration.outbox`(OutboxEvent/Status/Repository, V4 outbox_event 테이블). `PerformanceService.report()`가 실적 저장과 **같은 트랜잭션**에서 이벤트 JSON을 outbox에 적재(원자성). `integration.event.ProductionPerformanceEvent`(eventId=workOrderNo#seq, erpOrderNo, goodQty/defectQty, consumptions[], reportedAt). `OutboxPublisher`(@Scheduled fixedDelay 2s, @EnableScheduling): PENDING 폴링→`KafkaTemplate.send(topic).get()`(브로커 ACK 확인)→SENT. 토픽 `mes.production.performance`.
+- **ERP(Consumer)**: `pp.integration.mes` — `ProductionPerformanceListener`(@KafkaListener, group erp, ObjectMapper 역직렬화)→`ProductionPerformanceHandler`(@Transactional). **멱등**: `processed_event`(V40, event_id UNIQUE) existsByEventId→중복 skip. 처리: `findByNumber`로 PO 조회→부품 `stock.issue`(비관락)+StockMovement(PRODUCTION_OUT)+원가합→완제품 `stock.receive`+StockMovement(PRODUCTION_IN)+`AutoJournalService.createProductionEntry`(차)제품/대)원재료). Phase 8 생산완료 로직 재사용.
+- **계약**: `contracts/events/mes-production-performance.json`(JSON Schema).
+- **검증(E2E)**: MES WO-002 start→실적(양품3)→outbox PENDING→Publisher 발행(SENT)→ERP 수신. ERP 노트북 50→**53**(+3), 부품 BOM 비례 차감(메모리 -6 등), 생산분개 **차)1400 / 대)1410 = 2,040,000**(자재원가 합 정확), processed_event 1건. **멱등**: outbox를 PENDING으로 되돌려 재발행→ERP "이미 처리됨" skip→재고·전표 불변.
+- ⚠️ **검증 데이터**: MES WO-20260609-002(IN_PROGRESS, 실적1·outbox1 SENT). ERP 노트북+3·부품 일부 차감·PROD 전표 JE-20260609-001·processed_event 1.
+- ⚠️ 백그라운드 기동: ERP(8080)·MES(8082)·docker. 미커밋.
+
+### Phase 13 화면 추가 (2026-06-09) — MES 첫 Thymeleaf 화면
+
+- MES에 **thymeleaf 의존성** + 단건 조회 `GET /api/work-orders/{id}`(WorkOrderService.findById).
+- **화면 토대**: `templates/fragments/layout.html`(MES 셸 — 데코레이터 document(title,content), 상단바, 인증 없음), `static/css/mes.css`, `static/js/mes.js`(MES.api/num/esc/badge/statusColor/flash).
+- **화면 2종** + `web/MesViewController`(`/`→`/work-orders`, `/work-orders`, `/work-orders/{id}`):
+  - `workorder/list.html`: 작업지시 목록(진행률 프로그레스바·상태 뱃지).
+  - `workorder/detail.html`: 정보 + **상태별 액션**(RECEIVED=설비·작업자 선택+시작 / IN_PROGRESS=일시정지·완료+실적등록폼 / PAUSED=재개) + 실적 이력·자재투입 표. JS는 `th:inline`로 id 주입, /api/* 호출.
+- **검증**: MES 재기동, `/`·`/work-orders`·`/work-orders/{id}` HTTP 200·페이지 스크립트 fragment 내 포함·브랜드 노출. 새 작업지시 WO-20260609-002(RECEIVED) 생성해 목록 표시 확인.
+- ⚠️ 헤드리스 브라우저 없어 실제 클릭 렌더는 사용자 육안 권장(API 자체는 Phase 13 백엔드에서 검증됨).
+
+### Phase 13 구현 요약 (2026-06-09) — MES 백엔드
+
+- **작업지시 상태전이 확장**(`workorder`): WorkOrderStatus에 PAUSED 추가(RECEIVED→IN_PROGRESS↔PAUSED→COMPLETED). WorkOrder에 배정설비/작업자(ManyToOne)·producedQty·defectQty·startedAt·finishedAt + 도메인 메서드 start(설비·작업자 배정)/pause/resume/addProduction(누적)/complete.
+- **생산 실적**(`performance`): `ProductionResult`(부분 실적 — 작업지시당 여러 건, seq·양품·불량·reportedAt·note) + `MaterialConsumption`(자재 투입). `PerformanceService`: report() 시 **BOM 단위소요(라인소요÷지시수량) × 양품수량**으로 자재 투입 자동 기록 + producedQty 누적. `PerformanceController`(`POST /api/work-orders/{id}/start|pause|resume|complete`, `POST|GET /{id}/results`).
+- **Flyway V3**(mes_db): work_order 실행 컬럼 추가 + production_result·material_consumption.
+- **검증(end-to-end)**: WO-20260609-001 start(EQ-001/OP-001)→실적1차(양품3)→2차(양품2·불량1)→complete. producedQty=5·defectQty=1, 자재투입 BOM 비례 정확(메모리 양품당 2개 등), 상태전이 정상.
+- **미구현**: 실적 입력 **화면**(MES는 아직 화면 0개 — Thymeleaf 의존성·layout 토대부터 필요). STUDY-PLAN의 "현장 작업자 시뮬레이션 화면". ERP로의 실적 전송은 Phase 14(Kafka).
+- ⚠️ **검증용 데이터**: MES WO-20260609-001(COMPLETED, 실적2·자재투입10행). ERP PO-20260609-001(RELEASED). 백그라운드 기동: ERP(8080)·MES(8082)·docker.
+
+### Phase 12 구현 요약 (2026-06-09)
+
+- **MES 도메인**(`com.hwlee.mes`): 공통 `BaseEntity`(+`JpaAuditingConfig`, created/updated_at). 마스터 `master.equipment`(Equipment)·`master.operator`(Operator) + 조회 API(`/api/equipments`,`/api/operators`). `workorder`: WorkOrder+WorkOrderLine(상태 RECEIVED→IN_PROGRESS→COMPLETED→CANCELLED, Phase 12는 RECEIVED), **멱등 수신**(`erp_order_no` UNIQUE → 기존 있으면 그대로 반환). 수신 API `POST /api/work-orders`(**201=신규, 200=멱등 중복**)·`GET /api/work-orders`. work_order_no = PO번호 → WO번호 치환. **Flyway V2**(equipment/operator/work_order/work_order_line + 설비2·작업자2 시드).
+- **ERP 연계**(`pp.integration.mes`): `MesClient`(Spring **RestClient**, connect 2s/read 3s 타임아웃, **@Retry(max 3)** + **@CircuitBreaker** name=mes, 실패 시 `MesUnavailableException`→503). `MesDispatchService.dispatch(id)`: RELEASED/COMPLETED 생산지시를 MES로 전송(BOM 라인 포함), 응답의 WO번호를 `ProductionOrder.markDispatched`로 저장. `POST /api/production-orders/{id}/dispatch`(ProductionController). ProductionOrder에 `mes_work_order_no`/`mes_dispatched_at` 컬럼(**V39**). application.yml에 `mes.base-url`(8082)·resilience4j(retry·circuitbreaker mes) 설정.
+- **계약**: `contracts/openapi/erp-to-mes-workorder.yaml`(OpenAPI 3, 멱등 201/200 명세).
+- **검증(end-to-end)**: 양앱 컴파일·기동(MES V2/ERP V39 적용). MES 마스터 조회 OK. 생산지시 생성(노트북5)→release→**dispatch**: ERP `PO-20260609-001`→MES `WO-20260609-001`(RECEIVED), BOM 5라인 정확 전개. **멱등성**: dispatch 3회 호출에도 MES work_order 1건·라인 5건. **Circuit Breaker**: MES 강제종료 시 dispatch 503 빠른실패(0.01~0.03s), MES 복구 후 dispatch 200(회로 닫힘).
+- ⚠️ **검증용 데이터**: ERP 생산지시 `PO-20260609-001`(RELEASED, MES전송됨), MES 작업지시 `WO-20260609-001`. 부품 재고는 미차감(완료 안 함). 불필요하면 삭제 가능.
+- ⚠️ **포트**: MES는 **8082**(8081은 사용자 ddakplay RN Metro 점유).
+- **미구현(선택)**: PP 생산지시 상세 화면에 "MES 전송" 버튼/상태 표시(현재 REST로만). MES 화면 일체 없음(Phase 13 실적 화면에서).
+- ⚠️ 현재 백그라운드 기동: ERP(8080), MES(8082), docker 인프라.
+
+### Phase 11 구현 요약 (2026-06-09) — Part 2 시작
+
+- **새 프로젝트 `hwlee-mes`** (모노레포 디렉토리, 독립 Gradle 프로젝트, `rootProject.name=mes`). gradle wrapper는 hwlee-erp에서 복사(8.14.4). Spring Boot 3.5.14 / Java 21. 패키지 `com.hwlee.mes`.
+  - 의존성: web, data-jpa, validation, actuator, spring-kafka, micrometer-tracing-bridge-brave + zipkin-reporter-brave, flyway, mysql, springdoc, lombok.
+  - `MesApplication` + `application.yml`(**포트 8082** — ⚠️ 8081은 사용자 다른 프로젝트 ddakplay RN Metro가 점유 → 8082로 변경), mes_db(3308), kafka(9092), zipkin(9411), tracing sampling 1.0. `PingController`(GET /api/ping). Flyway `V1__init.sql`(베이스라인, MES 도메인 테이블은 Phase 12+).
+- **docker-compose 확장**: 기존 `mysql`(erp_db 3307)에 더해 **`mes-mysql`(mes_db 3308)**, **`zookeeper`(2181)**, **`kafka`(confluentinc cp-kafka 7.6.1, 9092)**, **`zipkin`(openzipkin/zipkin:3, 9411)** 추가. 볼륨 분리.
+- **ERP 연계 의존성/설정**: hwlee-erp build에 actuator·spring-kafka·resilience4j-spring-boot3·micrometer-tracing-brave·zipkin-reporter 추가. application.yml에 kafka(group erp)·management.tracing/zipkin 추가. `SecurityConfig` PUBLIC_PATHS에 `/actuator/health`,`/actuator/info` 공개. ⚠️ **실제 RestClient bean·Circuit Breaker 인스턴스·Kafka 토픽/리스너는 미구현(Phase 12·14에서 실호출과 함께)** — Phase 11은 의존성/통로 토대까지.
+- **`contracts/`** 골격: `openapi/`, `events/`(.gitkeep) + `contracts/README.md`(계약 관리 규칙). 실제 스펙은 Phase 12·14·15.
+- **검증(end-to-end)**: docker 5개 컨테이너 healthy. 두 앱 컴파일 그린·기동. MES `/api/ping` UP·`/actuator/health` UP(mes_db 연결)·flyway V1 적용. ERP 재기동 후 `/actuator/health` 인증없이 200 UP. Zipkin UP.
+- ⚠️ 현재 백그라운드 기동 상태: ERP(8080), MES(8082). docker compose 인프라 가동 중.
+
+### Phase 10 구현 요약 (2026-06-09)
+
+- **리포트 3종**(JPQL/자바 집계, QueryDSL 미도입 — 기존 Specification 일관성·집계 단순성 이유). 패키지 `com.hwlee.erp.report`(+dto, +web).
+  - **매출 리포트**(`GET /api/reports/sales?from&to&unit=DAY|MONTH`): 기간 ISSUED 인보이스를 **서비스에서 자바 그룹핑**(일=yyyy-MM-dd, 월=yyyy-MM) + 합계행. ⚠️ 최초 `function('date_format',...)` JPQL이 Hibernate 생성자 매핑 실패("Missing constructor") → 자바 그룹핑으로 전환.
+  - **재고 현황 리포트**(`GET /api/reports/inventory?itemId&warehouseId`): 보유>0 (품목,창고)별 평가액(`StockRepository.inventoryReport` JPQL 생성자표현식) + 총평가액.
+  - **손익계산서 미니**(`GET /api/reports/income-statement?from&to`): POSTED 전표의 수익/비용 계정 집계(`JournalEntryRepository.incomeStatementSums`) → 매출/매출원가/매출총이익/판관비/영업이익/당기순이익 + 계정 명세. `AccountAmount.normalAmount`로 부호 정리(수익=대−차, 비용=차−대).
+  - 컨트롤러 `ReportController`(@PreAuthorize FINANCE/ADMIN).
+- **화면 3종**(`templates/report/sales|inventory|income-statement.html`) + `ReportViewController`(/reports/*) + **사이드바 "리포트" 그룹**(layout.html, FINANCE/ADMIN). **대시보드 통계 카드 실연동**(dashboard.html: 이번달매출/당기순이익/재고평가액/재고품목수 — 리포트 API 호출, 권한 없으면 조용히 '—' 유지).
+- 조회 메서드 보강: `InvoiceRepository.findIssuedBetween`.
+- **검증(end-to-end)**: 컴파일 그린·앱 기동. 매출 2026-05 월별=2건·13,200,000 / 재고 6품목·365,000,000 / 손익(검증 전표 2건 생성 후)=매출100만·매출원가60만·당기순이익40만·명세 정확. 4개 화면(+대시보드) HTTP 200·페이지 스크립트 포함·사이드바 리포트 메뉴 노출.
+- ⚠️ **검증용 테스트 데이터 추가**: 손익 검증 위해 수동 전표 2건(`[검증]매출 인식` 차)1200/대)4100 100만, `[검증]매출원가` 차)5100/대)1400 60만, 2026-06-01, POSTED) 생성됨. 불필요하면 삭제 가능.
+- ⚠️ 앱은 현재 백그라운드 기동 상태(8080, MySQL 3307).
+
+### Phase 9 구현 요약 (2026-06-09)
+
+- **Spring Batch 5 정식 도입**(`spring-boot-starter-batch`). 메타테이블은 자동초기화 끄고(`spring.batch.jdbc.initialize-schema=never`, `spring.batch.job.enabled=false`) **Flyway V37**로 직접 생성(BATCH_* 9개). `@EnableScheduling`(메인 클래스).
+- **배치 결과 테이블 V38**: `daily_sales_closing`(일자 UNIQUE), `inventory_valuation`(평가일+품목+창고 UNIQUE), `ar_aging`(노령화일+고객 UNIQUE). 엔티티/리포지토리 `com.hwlee.erp.batch.closing`.
+- **잡 2개** `com.hwlee.erp.batch.job`:
+  - **일일 매출 마감**(`dailySalesClosingJob`): 단일 Tasklet. 기준일 ISSUED 인보이스 합산 → 1행 저장. 삭제후재삽입으로 멱등.
+  - **월말 결산**(`monthEndClosingJob`): 3스텝 = purge(Tasklet, 두 스냅샷 삭제) → 재고평가(**chunk** JpaPagingItemReader<Stock>+processor+JpaItemWriter, 보유0 스킵) → 채권노령화(Tasklet, **FIFO** 입금 차감 후 경과일 버킷팅 `ArAgingBuckets`).
+- **멱등/재실행**: JobParameters = 기준일(식별) + `run.id`=epochMillis(매 실행 고유 → "이미 완료" 예외 없이 같은 날짜 재집계). 결과 멱등성은 스냅샷 "삭제 후 재삽입"으로 보장.
+- **트리거** `com.hwlee.erp.batch.run`: `ClosingBatchService`(JobLauncher 동기) + REST `ClosingBatchController`(`POST /api/batch/daily-sales-closing?date=`, `/month-end-closing?date=`, `@PreAuthorize FINANCE/ADMIN`, date 생략 시 어제/전월말일) + `ClosingBatchScheduler`(`@Scheduled` 매일 02:30 일일, 매월1일 03:00 월말).
+- 조회 메서드 보강: `InvoiceRepository.findIssuedByInvoiceDate/findIssuedUpToWithCustomer`, `PaymentRepository.findPostedReceiptsUpTo`.
+- **검증(end-to-end, 컴파일 그린·앱 기동)**: V37/V38 적용 성공, 테이블 12개 생성. admin 로그인 후 배치 실행 둘 다 `COMPLETED`. ① 일일마감 2026-05-27 = 2건·13,200,000원(created_by=admin@hyunwoo.com) ② 재고평가 2026-05-31 = 6행·합계 365,000,000 ③ 채권노령화 = 고객1 0~30일 버킷 13,200,000(입금0·경과4일). **멱등 재실행** 후에도 행수 동일(1/6/1, 중복 없음), BATCH_JOB_INSTANCE 4건.
+- ⚠️ **검증용 테스트 데이터 생성됨**: daily_sales_closing 1·inventory_valuation 6·ar_aging 1행 + BATCH_* 메타. 불필요하면 삭제 가능.
+- **미구현(선택)**: 배치 결과 조회 REST/화면, 사이드바 "마감(배치)" 그룹. (현재는 DB/실행 응답으로만 확인.)
+- ⚠️ 앱 검증 위해 기존 실행 앱을 종료 후 재기동했음(현재 백그라운드 기동 상태, MySQL 3307).
+
+### (보류된 학습) Phase 8 PP — 구현 완료·검증
+
+- **Phase**: 8 — PP(생산) BOM/생산지시. **단계 5(구현) 완료·검증.** 단계 6(워크스루)·7(시연)은 학습 페이즈로 보류.
+- **단계**: 1~5 완료. 문서 `doc/09-phase-8-PP-생산/`(1-도메인-브리핑, 2-설계-제안).
   - **단계 4 승인 결과**: ①FI 전표 = **현실형 간이 포함**(원재료/제품 계정 분리) ②화면 = **포함**.
   - **단계 5 구현 요약**:
     - 마스터: `Item.itemType`(FINISHED/COMPONENT, 기본 FINISHED) + `ItemType` enum + `ItemCategory.PART`. ItemResponse에 itemType 노출.
@@ -138,14 +256,16 @@
 | 5 | FI(회계) / 자동 분개 ⭐ | ✅ 완료 |
 | 6 | 인증/인가 + 감사 로그 | ✅ 완료 |
 | 7 | HR 간이 모듈 | ✅ 완료 |
-| **8** | **PP(생산) — BOM/생산지시** | 🔵 **구현 완료·검증** (워크스루/시연 남음) |
-| 9 | 배치 처리 — 야간 마감 ⭐ | ⬜ 예정 |
-| 10 | 리포트와 대시보드 | ⬜ 예정 (← ERP 단일 시스템 학습 종료) |
-| 11 | MES 프로젝트 셋업 + 연계 인프라 | ⬜ 예정 |
-| 12 | MES 마스터 + 작업지시 수신 (ERP→MES) | ⬜ 예정 |
-| 13 | MES 생산 실적 등록 | ⬜ 예정 |
-| 14 | MES→ERP 실적 전송 (Kafka) ⭐ | ⬜ 예정 |
-| 15 | MES 품질 검사 + 설비 상태 | ⬜ 예정 |
-| 16 | 통합 시나리오 + 운영 관점 (← 전체 종료) | ⬜ 예정 |
+| 8 | PP(생산) — BOM/생산지시 | ✅ 구현 완료·검증 (학습 보류) |
+| 9 | 배치 처리 — 야간 마감 ⭐ | ✅ 구현 완료·검증 (학습 보류) |
+| 10 | 리포트와 대시보드 | ✅ 구현 완료·검증 (← ERP 단일 시스템 학습 종료) |
+| 11 | MES 프로젝트 셋업 + 연계 인프라 | ✅ 구현 완료·검증 (Part 2 시작) |
+| 12 | MES 마스터 + 작업지시 수신 (ERP→MES) | ✅ 구현 완료·검증 |
+| 13 | MES 생산 실적 등록 (+ 현장 화면) | ✅ 구현 완료·검증 |
+| 14 | MES→ERP 실적 전송 (Kafka) ⭐ | ✅ 구현 완료·검증 (Outbox+멱등) |
+| 15 | MES 품질 검사 + 설비 상태 | ✅ 구현 완료·검증 |
+| 16 | 통합 시나리오 + 운영 관점 (← 전체 종료) | ✅ 구현 완료·검증 |
+
+> 🎉 **Phase 0~16 전체 구현 완료** (2026-06-09).
 
 > 상세 커리큘럼은 [`ERP-STUDY-PLAN.md`](./ERP-STUDY-PLAN.md), Phase별 산출물 인덱스는 [`doc/README.md`](./doc/README.md).

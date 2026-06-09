@@ -21,4 +21,18 @@ public interface StockRepository
     @Query("select s from Stock s where s.item.id = :itemId and s.warehouse.id = :warehouseId")
     Optional<Stock> findForUpdate(@Param("itemId") Long itemId,
                                   @Param("warehouseId") Long warehouseId);
+
+    /**
+     * Phase 10 — 재고 현황 리포트: 보유>0 인 (품목, 창고)별 평가액.
+     * itemId/warehouseId 는 null 이면 전체(다중 선택 필터).
+     */
+    @Query("select new com.hwlee.erp.report.dto.InventoryReportRow("
+            + "  i.code, i.name, w.name, s.qtyOnHand, s.averageCost, s.qtyOnHand * s.averageCost) "
+            + "from Stock s join s.item i join s.warehouse w "
+            + "where s.qtyOnHand > 0 "
+            + "and (:itemId is null or i.id = :itemId) "
+            + "and (:warehouseId is null or w.id = :warehouseId) "
+            + "order by i.code asc, w.name asc")
+    java.util.List<com.hwlee.erp.report.dto.InventoryReportRow> inventoryReport(
+            @Param("itemId") Long itemId, @Param("warehouseId") Long warehouseId);
 }

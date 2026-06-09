@@ -12,30 +12,30 @@
         </div>
     </div>
 
-    <!-- 통계 카드 (데이터 연동 예정 — 현재는 플레이스홀더) -->
+    <!-- 통계 카드 — 리포트 API 연동 (FINANCE/ADMIN 만 수치 표시, 그 외 권한은 '—' 유지) -->
     <div class="row g-3 mb-4">
         <div class="col-sm-6 col-xl-3">
             <div class="card"><div class="card-body stat-card">
-                <div class="stat-icon" style="background:#2563eb"><i class="bi bi-cart-check"></i></div>
-                <div><div class="stat-label">이번 달 수주</div><div class="stat-value">—</div></div>
-            </div></div>
-        </div>
-        <div class="col-sm-6 col-xl-3">
-            <div class="card"><div class="card-body stat-card">
-                <div class="stat-icon" style="background:#0ea5e9"><i class="bi bi-truck"></i></div>
-                <div><div class="stat-label">출하 대기</div><div class="stat-value">—</div></div>
-            </div></div>
-        </div>
-        <div class="col-sm-6 col-xl-3">
-            <div class="card"><div class="card-body stat-card">
                 <div class="stat-icon" style="background:#22c55e"><i class="bi bi-receipt"></i></div>
-                <div><div class="stat-label">이번 달 매출</div><div class="stat-value">—</div></div>
+                <div><div class="stat-label">이번 달 매출</div><div class="stat-value" id="stat-sales">—</div></div>
+            </div></div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="card"><div class="card-body stat-card">
+                <div class="stat-icon" style="background:#2563eb"><i class="bi bi-graph-up"></i></div>
+                <div><div class="stat-label">당기순이익 (올해)</div><div class="stat-value" id="stat-net">—</div></div>
             </div></div>
         </div>
         <div class="col-sm-6 col-xl-3">
             <div class="card"><div class="card-body stat-card">
                 <div class="stat-icon" style="background:#f59e0b"><i class="bi bi-box-seam"></i></div>
-                <div><div class="stat-label">재고 품목</div><div class="stat-value">—</div></div>
+                <div><div class="stat-label">재고 평가액</div><div class="stat-value" id="stat-inv-val">—</div></div>
+            </div></div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="card"><div class="card-body stat-card">
+                <div class="stat-icon" style="background:#0ea5e9"><i class="bi bi-clipboard-data"></i></div>
+                <div><div class="stat-label">재고 품목 수</div><div class="stat-value" id="stat-inv-cnt">—</div></div>
             </div></div>
         </div>
     </div>
@@ -70,6 +70,27 @@
             </div></div>
         </div>
     </div>
+
+    <script>
+        (function loadStats() {
+            const ymd = d => d.toISOString().slice(0, 10);
+            const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+            const now = new Date();
+            const monthFirst = new Date(now.getFullYear(), now.getMonth(), 1);
+            const yearFirst = new Date(now.getFullYear(), 0, 1);
+
+            // 권한(FINANCE/ADMIN) 없으면 403 → 조용히 무시하고 '—' 유지.
+            ERP.api('/api/reports/sales' + ERP.query({from: ymd(monthFirst), to: ymd(now), unit: 'MONTH'}))
+                .then(d => set('stat-sales', ERP.won(d.total.totalAmount))).catch(() => {});
+
+            ERP.api('/api/reports/inventory')
+                .then(d => { set('stat-inv-val', ERP.won(d.totalValuation)); set('stat-inv-cnt', ERP.num(d.rows.length)); })
+                .catch(() => {});
+
+            ERP.api('/api/reports/income-statement' + ERP.query({from: ymd(yearFirst), to: ymd(now)}))
+                .then(d => set('stat-net', ERP.won(d.netIncome))).catch(() => {});
+        })();
+    </script>
 
 </div>
 </body>

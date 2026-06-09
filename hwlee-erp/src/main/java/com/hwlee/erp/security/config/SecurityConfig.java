@@ -36,6 +36,7 @@ public class SecurityConfig {
     private static final String[] PUBLIC_PATHS = {
             "/api/auth/login", "/api/auth/logout",
             "/api/health",
+            "/actuator/health", "/actuator/info", // Phase 11 — 모니터링/헬스체크 공개
             "/login", "/css/**", "/js/**", "/favicon.ico", "/error",
             "/swagger-ui.html", "/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**"
     };

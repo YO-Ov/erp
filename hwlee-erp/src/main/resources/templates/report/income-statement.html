@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('손익계산서', 'income-statement', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>손익계산서 <span class="text-muted fs-6">(미니)</span></h1>
+            <div class="crumb">리포트 · Income Statement</div>
+        </div>
+    </div>
+
+    <form id="searchForm" class="filter-bar">
+        <div class="filter-field ff-range">
+            <label>회계기간</label>
+            <div class="date-range">
+                <input type="date" id="f-from" class="form-control form-control-sm">
+                <span class="tilde">~</span>
+                <input type="date" id="f-to" class="form-control form-control-sm">
+            </div>
+        </div>
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> 조회</button>
+            <button type="button" id="btn-reset" class="btn btn-sm btn-outline-secondary btn-icon" title="초기화">
+                <i class="bi bi-arrow-counterclockwise"></i>
+            </button>
+        </div>
+    </form>
+
+    <div class="row g-3">
+        <!-- 손익 요약 -->
+        <div class="col-lg-5">
+            <div class="card"><div class="card-body">
+                <h6 class="fw-bold mb-3">손익 요약</h6>
+                <table class="table table-sm align-middle mb-0" id="summary">
+                    <tbody><tr><td class="text-muted py-4 text-center">불러오는 중…</td></tr></tbody>
+                </table>
+            </div></div>
+        </div>
+        <!-- 계정별 명세 -->
+        <div class="col-lg-7">
+            <div class="card"><div class="card-body">
+                <h6 class="fw-bold mb-3">계정별 명세</h6>
+                <div class="mb-2 small text-muted">수익</div>
+                <table class="table table-sm align-middle">
+                    <tbody id="revenue-rows"><tr><td colspan="2" class="text-muted">—</td></tr></tbody>
+                </table>
+                <div class="mb-2 small text-muted">비용</div>
+                <table class="table table-sm align-middle mb-0">
+                    <tbody id="expense-rows"><tr><td colspan="2" class="text-muted">—</td></tr></tbody>
+                </table>
+            </div></div>
+        </div>
+    </div>
+
+    <script>
+        function ym(d) { return d.toISOString().slice(0, 10); }
+
+        function setDefaults() {
+            const now = new Date();
+            const jan1 = new Date(now.getFullYear(), 0, 1);
+            document.getElementById('f-from').value = ym(jan1);
+            document.getElementById('f-to').value = ym(now);
+        }
+
+        function sumRow(label, value, opts = {}) {
+            const cls = opts.strong ? 'fw-bold' : '';
+            const top = opts.border ? 'border-top' : '';
+            const neg = opts.negative ? '(' + ERP.won(value).replace('₩', '₩') + ')' : ERP.won(value);
+            return `<tr class="${cls} ${top}"><td>${label}</td><td class="text-end">${neg}</td></tr>`;
+        }
+
+        function lineRows(lines, containerId) {
+            const el = document.getElementById(containerId);
+            el.innerHTML = (!lines || lines.length === 0)
+                ? '<tr><td colspan="2" class="text-muted">없음</td></tr>'
+                : lines.map(l => `<tr>
+                    <td>${ERP.esc(l.accountCode)} ${ERP.esc(l.accountName)}</td>
+                    <td class="text-end">${ERP.won(l.amount)}</td></tr>`).join('');
+        }
+
+        async function load() {
+            const params = {
+                from: document.getElementById('f-from').value,
+                to: document.getElementById('f-to').value,
+            };
+            try {
+                const d = await ERP.api('/api/reports/income-statement' + ERP.query(params));
+                document.querySelector('#summary tbody').innerHTML =
+                    sumRow('매출', d.revenue)
+                    + sumRow('매출원가', d.costOfGoodsSold, {negative: true})
+                    + sumRow('매출총이익', d.grossProfit, {strong: true, border: true})
+                    + sumRow('판매관리비', d.sgaExpense, {negative: true})
+                    + sumRow('영업이익', d.operatingProfit, {strong: true, border: true})
+                    + sumRow('당기순이익', d.netIncome, {strong: true, border: true});
+                lineRows(d.revenueLines, 'revenue-rows');
+                lineRows(d.expenseLines, 'expense-rows');
+            } catch (e) {
+                document.querySelector('#summary tbody').innerHTML =
+                    '<tr><td class="text-danger py-4 text-center">불러오기 실패</td></tr>';
+                ERP.flashError(e);
+            }
+        }
+
+        document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); load(); });
+        document.getElementById('btn-reset').addEventListener('click', () => { setDefaults(); load(); });
+
+        setDefaults();
+        load();
+    </script>
+</div>
+</body>
+</html>

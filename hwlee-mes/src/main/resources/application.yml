@@ -1,0 +1,65 @@
+spring:
+  application:
+    name: hwlee-mes
+
+  datasource:
+    url: jdbc:mysql://localhost:3308/mes_db?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: mes
+    password: mes
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+    locations: classpath:db/migration
+
+  # Phase 14 — MES→ERP 실적 전송용 Kafka (실제 토픽/리스너는 후속 Phase)
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: mes
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+server:
+  # 8081 은 React Native Metro 기본 포트라 충돌 → 8082 사용.
+  port: 8082
+
+# 분산 추적 — 모든 요청 샘플링(학습), Zipkin 으로 전송
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /api-docs
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG

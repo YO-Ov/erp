@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('재고 리포트', 'inventory-report', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>재고 현황 리포트</h1>
+            <div class="crumb">리포트 · Inventory Report</div>
+        </div>
+        <button type="button" id="btn-refresh" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-clockwise"></i> 새로고침
+        </button>
+    </div>
+
+    <div class="table-wrap">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+            <tr>
+                <th>품목코드</th>
+                <th>품목명</th>
+                <th>창고</th>
+                <th class="text-end">보유수량</th>
+                <th class="text-end">평균단가</th>
+                <th class="text-end">평가액</th>
+            </tr>
+            </thead>
+            <tbody id="rows">
+            <tr><td colspan="6" class="text-center text-muted py-4">불러오는 중…</td></tr>
+            </tbody>
+            <tfoot id="foot"></tfoot>
+        </table>
+    </div>
+
+    <script>
+        async function load() {
+            const tbody = document.getElementById('rows');
+            const foot = document.getElementById('foot');
+            try {
+                const data = await ERP.api('/api/reports/inventory');
+                const rows = data.rows || [];
+                tbody.innerHTML = rows.length === 0
+                    ? '<tr><td colspan="6" class="text-center text-muted py-4">재고 없음</td></tr>'
+                    : rows.map(r => `<tr>
+                        <td>${ERP.esc(r.itemCode)}</td>
+                        <td>${ERP.esc(r.itemName)}</td>
+                        <td>${ERP.esc(r.warehouseName)}</td>
+                        <td class="text-end">${ERP.num(r.qtyOnHand)}</td>
+                        <td class="text-end">${ERP.won(r.averageCost)}</td>
+                        <td class="text-end fw-semibold">${ERP.won(r.valuationAmount)}</td></tr>`).join('');
+                foot.innerHTML = `<tr class="table-light fw-bold">
+                    <td colspan="5">총 평가액 (${ERP.num(rows.length)}건)</td>
+                    <td class="text-end">${ERP.won(data.totalValuation)}</td></tr>`;
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+                foot.innerHTML = '';
+                ERP.flashError(e);
+            }
+        }
+
+        document.getElementById('btn-refresh').addEventListener('click', load);
+        load();
+    </script>
+</div>
+</body>
+</html>

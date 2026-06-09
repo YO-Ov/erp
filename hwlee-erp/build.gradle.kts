@@ -22,6 +22,17 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-web")
 
+	// Phase 9 — 배치 처리 (야간 마감). 메타테이블은 Flyway(V37)로 생성.
+	implementation("org.springframework.boot:spring-boot-starter-batch")
+	testImplementation("org.springframework.batch:spring-batch-test")
+
+	// Phase 11 — MES 연계 인프라
+	implementation("org.springframework.boot:spring-boot-starter-actuator")      // 헬스/지표
+	implementation("org.springframework.kafka:spring-kafka")                     // MES→ERP 실적 수신 (Phase 14)
+	implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0")     // Circuit Breaker (ERP→MES 호출 보호, Phase 12)
+	implementation("io.micrometer:micrometer-tracing-bridge-brave")             // 분산 추적
+	implementation("io.zipkin.reporter2:zipkin-reporter-brave")                 // Zipkin 전송
+
 	// Phase 6 — 인증/인가 + 화면
 	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation("org.springframework.boot:spring-boot-starter-thymeleaf")

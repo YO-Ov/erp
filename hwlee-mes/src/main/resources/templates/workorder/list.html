@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('작업지시', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <h1>작업지시</h1>
+        <button class="btn btn-outline-secondary btn-sm" onclick="load()">
+            <i class="bi bi-arrow-clockwise"></i> 새로고침
+        </button>
+    </div>
+
+    <div class="card"><div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead>
+            <tr>
+                <th>작업지시</th><th>ERP 지시</th><th>제품</th>
+                <th class="text-end">수량</th><th style="width:170px">진행</th><th>상태</th><th></th>
+            </tr>
+            </thead>
+            <tbody id="rows">
+            <tr><td colspan="7" class="text-center text-muted py-4">불러오는 중…</td></tr>
+            </tbody>
+        </table>
+    </div></div>
+
+    <script>
+        async function load() {
+            const tb = document.getElementById('rows');
+            try {
+                const list = await MES.api('/api/work-orders');
+                tb.innerHTML = list.length === 0
+                    ? '<tr><td colspan="7" class="text-center text-muted py-4">수신된 작업지시가 없습니다</td></tr>'
+                    : list.map(w => {
+                        const q = Number(w.quantity) || 0;
+                        const done = Number(w.producedQty) || 0;
+                        const pct = q > 0 ? Math.min(100, Math.round(done / q * 100)) : 0;
+                        return `<tr style="cursor:pointer" onclick="location.href='/work-orders/${w.id}'">
+                            <td class="fw-semibold">${MES.esc(w.workOrderNo)}</td>
+                            <td>${MES.esc(w.erpOrderNo)}</td>
+                            <td>${MES.esc(w.productName)}</td>
+                            <td class="text-end">${MES.num(w.quantity)}</td>
+                            <td>
+                                <div class="progress"><div class="progress-bar" style="width:${pct}%"></div></div>
+                                <small class="text-muted">${MES.num(done)} / ${MES.num(q)} (${pct}%)</small>
+                            </td>
+                            <td>${MES.badge(w.status, MES.statusColor(w.status))}</td>
+                            <td><a class="btn btn-sm btn-outline-secondary" href="/work-orders/${w.id}"
+                                   onclick="event.stopPropagation()">상세</a></td></tr>`;
+                    }).join('');
+            } catch (e) {
+                tb.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+                MES.flash(e.message);
+            }
+        }
+        load();
+    </script>
+</div>
+</body>
+</html>

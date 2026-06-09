@@ -15,4 +15,10 @@ public interface ProductionOrderRepository
             + "LEFT JOIN FETCH l.component "
             + "WHERE po.id = :id")
     Optional<ProductionOrder> findByIdWithLines(@Param("id") Long id);
+
+    /** Phase 14 — MES 실적 수신 시 생산지시번호(PO-...)로 조회. */
+    Optional<ProductionOrder> findByNumber(String number);
+
+    /** Phase 16 — 정합성 검증: MES 로 전송된(dispatched) 생산지시. */
+    java.util.List<ProductionOrder> findByMesWorkOrderNoIsNotNull();
 }

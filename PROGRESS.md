@@ -19,10 +19,72 @@
 
 ## 현재 위치
 
-- **🎉 Phase 0~16 전체 구현 완료·검증.** 이제 **학습 페이즈(도메인 브리핑/코드 워크스루) 진행 중**.
-- **▶ 다음 학습 = `01 마스터` 부터 순서대로**(hwlee님 요청 2026-06-09). 04·05는 이미 완료 → **01 마스터 → 02 SD → 03 MM** 채운 뒤 06~16 진행. 각 주제 **①도메인 → ②구현** 2단계.
+- **🎉 Phase 0~16 전체 구현 완료·검증.** 이후 hwlee님 요청으로 **실무형 기능을 점진적으로 확장 중**(아래 2026-06-10 항목들). 학습 문서(doc/)는 별도 트랙.
+
+### ▶ 다음 작업 (2026-06-10 세션 종료 — 다음에 여기부터)
+
+> **🅰 우선 후보 = 재고 가시성(영업)** — hwlee님과 논의했으나 **착수 전**(레벨 미결정).
+> - **문제(갭)**: 영업(SALES)이 재고를 **조회조차 못 함**(`StockController`·`MaterialsViewController` 가 PURCHASING/ADMIN). 정작 영업이 출하하려면 재고를 알아야 하는데 못 봄.
+> - **실무 핵심**: 영업이 봐야 할 건 "총 재고"가 아니라 **ATP(약속가능재고) = 현재고 − 미출하 확정수주(orderQty−shippedQty) + 입고·생산 예정**. 총 재고만 보면 이미 다른 수주에 묶인 물량을 중복 약속하는 사고.
+> - **추천 = 레벨②**: 재고 조회 권한 SALES 추가(읽기) + **수주 화면에 ATP 인라인 표시**(신용한도 표시 옆). 데이터는 이미 다 있음(Stock.qtyOnHand, SalesOrderLine.orderQty/shippedQty). 계획오더(MRP)와 연결됨. (레벨① 단순 현재고만 / 레벨③ 영업용 재고 조회 화면 추가 — 선택)
+> - **원칙**: 재고 = **조회는 넓게(영업 등), 변경(입고·출고)은 PURCHASING만**. (고객 마스터 "기본정보 영업/한도 재무" 와 같은 사상.)
+>
+> **🅱 보조 후보**: ① 여신 요청에 결재 이력은 했고, **거래처(Vendor) 마스터도 같은 단순화**(구매팀 등록 화면 없음) → 필요 시 고객과 같은 패턴으로. ② 학습 문서 `doc/03 MM` 부터(아직 01·02만 작성). ③ doc/에 오늘 추가분(MRP·알림·여신·고객권한) 워크스루 글.
+>
+> ⚠️ **오늘(2026-06-10) 작업분 전부 미커밋** — 다른 PC에서 이어가려면 **hwlee님이 직접 커밋+푸시** 해야 함. 양이 많음(아래 6개 기능).
+
+- **▶ 학습 문서 트랙 = `03 MM` 부터**(hwlee님 요청 2026-06-09). 04·05 완료 → 01 마스터 ✅ → 02 SD ✅ → **03 MM** 채운 뒤 06~16. 각 주제 **①도메인 → ②구현** 2단계.
 - **화면 방식**(hwlee님 선택 2026-06-09): **글+코드로 인용**. 앱 안 띄움. 구현 단계에서 화면 템플릿/REST 흐름을 글에 인용. (이 환경은 헤드리스 브라우저 없어 직접 렌더 불가.)
   - 🖥️ 실행/종료: 루트 `실행방법.md` (ERP 8080 / MES 8082 / docker). Zipkin 9411.
+
+### ➕ SD↔PP 연계 기능 추가 — 계획오더(MRP) (2026-06-10, hwlee님 요청 "수주 확정→재고 부족분 계획오더 자동생성→담당자 승인→생산지시 전환")
+
+- **흐름**: 수주 확정 → `SalesOrderConfirmedEvent` 발행(`BEFORE_COMMIT`) → PP 리스너가 완제품별 **주문량 vs 현재고(전 창고 합)** 비교 → 부족분만큼 **계획오더(PROPOSED)** 자동 생성 → 담당자가 **승인(convert, 창고·납기 지정)→생산지시(PLANNED) 전환** 또는 **기각(dismiss)**. 실무의 MRP "계획오더는 제안, 사람이 승인" 개념. 견적→수주 전환과 같은 패턴(별도 엔티티 + markConverted).
+- **설계 결정**: ① 계획오더는 생산지시와 **별개 엔티티**(`pp.planning.PlannedOrder`, BaseEntity, status PROPOSED/CONVERTED/DISMISSED) ② 현재고=품목 전체 보유 합(`StockRepository.sumOnHandByItem`, 창고 무관) ③ **창고는 계획 단계 미정 → 전환 시 담당자 지정**(계획오더에 warehouse 없음) ④ 수주 확정과 같은 트랜잭션(BEFORE_COMMIT, 기존 패턴). convert 는 기존 `ProductionService.createDraft` 재사용(BOM 없으면 거기서 거부).
+- **추가 파일**: `pp/planning/`(PlannedOrder·Status·Repository·Service·Controller·dto 2), `pp/integration/sd/SalesOrderConfirmedListener`, `sd/order/event/SalesOrderConfirmedEvent`. 변경: `SalesOrderService.confirm`(이벤트 발행 + `ApplicationEventPublisher` 주입), `StockRepository.sumOnHandByItem`, `TransactionNumberGenerator`(PLO 채번), `PpViewController`(/pp/planned-orders), `layout.html`(사이드바 "계획오더(MRP)" active='planned'). 화면 `templates/pp/planning/list.html`(목록+승인 모달[창고 선택]+기각). **Flyway V42**(planned_order).
+- **검증(end-to-end, 컴파일 그린·앱 재기동·V42 적용)**: ① 노트북60 수주 확정 → `PLO-20260610-001` 부족7(=60-53) 자동생성 → 승인(본사창고) → 생산지시 `PO-20260610-001` 노트북7·BOM 5라인 전개·PLANNED, 계획오더 CONVERTED+생산지시번호 역기록 ② **재고 충분**(노트북5≤53) → 제안 0건(조용히 통과) ③ **기각**(모니터3, 재고0) → `PLO-20260610-002` 부족3 → dismiss → DISMISSED ④ 화면 `/pp/planned-orders` HTTP 200·스크립트 포함. ⚠️ 헤드리스 없어 모달 클릭 렌더는 hwlee님 육안 권장.
+- ⚠️ **검증용 데이터**: 수주 SO-20260610-001(노트북60,CONFIRMED)·수주5(노트북5,CONFIRMED)·수주(모니터3,CONFIRMED), 계획오더 PLO-001(CONVERTED)·PLO-002(DISMISSED), 생산지시 PO-20260610-001(노트북7,PLANNED). 불필요시 삭제 가능. **전체 미커밋** — 커밋·푸시는 hwlee님이 직접.
+- 📌 (선택) 학습 워크스루 문서 미작성 — 원하면 `doc/`에 "SD↔PP 연계(MRP)" 글 추가 가능.
+
+#### 🔧 생산지시 취소 정합성 갭 2건 보강 (2026-06-10, hwlee님이 취소 눌러보다 발견)
+
+- **발견**: 생산지시 취소 시 ① 그걸 만든 계획오더는 CONVERTED("처리됨")로 잠긴 채 거짓 정보 ② 수주는 출하 대기인데 채울 생산이 죽은 걸 모름 ③ MES 전송된 생산지시도 ERP만 취소되면 MES와 불일치. "출하 시점 재고부족으로 막히긴 하나(데이터 손상X) 미리 경고 없음(가시성 문제)" → hwlee님 지적 타당.
+- **질문1 답(확인)**: 종료(CANCELLED) 생산지시 상태 변경 불가 = **정상 설계**(terminal 상태, 잘못 취소 시 새 생산지시가 정석). 단 계획오더 되살리기로 "다시 만들기" 경로를 열어줌.
+- **개선A — 되살리기**(견적 revertConversion 패턴): 생산지시 취소 → `ProductionOrderCancelledEvent`(pp.order.event) 발행 → `pp/planning/ProductionOrderCancelledListener`(BEFORE_COMMIT) → `PlannedOrderService.revertByProductionNumber` → 계획오더 `revertConversion()`(CONVERTED→PROPOSED, 전환번호 클리어). `PlannedOrderRepository.findByConvertedProductionNumber`. **순환의존(order↔planning)은 이벤트로 끊음**(planning→order는 convert에서 직접 호출, 역방향은 이벤트).
+- **개선B — MES 가드**(SD "출하 실적 있으면 수주 취소 거부" 사상): `ProductionOrder.cancel()` 에 `mesWorkOrderNo != null` 이면 취소 거부 가드 추가.
+- **검증(end-to-end)**: ① 노트북70 수주 확정→계획오더 PLO-20260610-003 부족14→승인(생산지시)→**생산지시 취소→계획오더 PROPOSED+전환번호 null 복원** ✓ ② 복원 계획오더 재승인→생산지시→release→dispatch(MES WO-20260610-003 생성)→**취소 시도 거부**(메시지 정확) ✓. 컴파일 그린·앱 재기동.
+- ✅ **기존 깨진 데이터 정리됨**(2026-06-10): 개선 *전* 취소됐던 PLO-20260610-001(거짓 CONVERTED, 연결 PO-20260610-001은 CANCELLED)을 DB UPDATE 로 **PROPOSED 복원**(converted_production_number=NULL) — 새 revertConversion 로직과 동일 결과. PROPOSED 목록 노출 확인(부족7, 출처 SO-20260610-001). 검증 추가데이터: 수주(노트북70)·PLO-003(CONVERTED)·생산지시 1건 CANCELLED+1건 RELEASED(MES전송 WO-20260610-003). **미커밋**.
+
+### ➕ 인앱 알림 + 여신 상향 요청/승인 (2026-06-10, hwlee님 요청 "알림+딥링크+재무 한도상향, 포트폴리오 디테일")
+
+- **A. 알림(Notification) 코어** `com.hwlee.erp.notification`: `Notification`(수신자 username·type·title·message·**linkUrl 딥링크**·is_read, BaseEntity) + `NotificationType`(PRODUCTION_CANCELLED/CREDIT_REQUEST_SUBMITTED/APPROVED/REJECTED) + `NotificationService`(**notifyUser**[1명]/**notifyRole**[역할 전체 fanout, 수신자별 1행]·list·unreadCount·markRead[본인만]·markAllRead) + `NotificationController`(Principal 기반, `/api/notifications` GET·unread-count·{id}/read·read-all). **Flyway V43**. `AppUserRepository.findByRoleCode`(역할별 사용자, enabled만) 추가.
+  - **🔔 벨 UI**(`layout.html` 상단바 전역): 안읽은 수 badge·**30초 폴링**·드롭다운 최근8건(type별 아이콘/색)·클릭 시 읽음처리+**딥링크 이동**·"모두 읽음". 인박스 화면 `/notifications`(`notification/list.html`, 전체/안읽음 필터·페이징). layout `<style>`+`<script>` 공통 주입(모든 화면 적용).
+- **B. 생산취소 → 영업 알림**: `PlannedOrderService.revertByProductionNumber`(생산취소 복원 시)에서 출처 수주의 **salesperson(Employee.email) 있으면 그 사람, 없으면 SALES 역할 전체**에게 PRODUCTION_CANCELLED 알림 + 딥링크=해당 수주(`/sd/sales-orders/{id}`). SalesOrderRepository·NotificationService 주입.
+- **C. 여신 상향 요청/승인** `com.hwlee.erp.fi.credit`: `CreditLimitRequest`(number CLR·customer·currentLimit 스냅샷·requestedLimit·reason·status PENDING/APPROVED/REJECTED·decidedBy/At/Note) + 상태전이(submit[요청>현재 검증]/approve/reject) + `CreditLimitRequestService`(create→**notifyRole FINANCE**, approve→`Customer.changeCreditLimit`[신규 메서드, 한도만 변경·감사로그]+**notifyUser 요청자**, reject→notifyUser) + Controller(조회 SALES+FINANCE, 요청 SALES, 승인/거부 FINANCE). **Flyway V44**·채번 CLR. 화면 `fi/credit/list.html`(목록+영업 요청 모달[고객선택→현재한도 표시]+재무 승인/거부 모달, **역할 플래그는 sec:authorize 요소 유무로 JS 판별**). 사이드바: 영업 그룹 "여신 상향 요청"·회계 그룹 "여신 승인"(active='credit', 같은 화면).
+- **검증(end-to-end, 컴파일 그린·앱 재기동·V43/V44 적용, 역할별 계정)**: ① **여신**: kim(SALES) 요청 CLR-20260610-001(소한도사 50만→5천만)→lee(FINANCE) 알림 CREDIT_REQUEST_SUBMITTED(안읽음1)→lee 승인→**고객 한도 50만→5천만 반영**→kim 알림 CREDIT_REQUEST_APPROVED ✓ ② **생산취소**: PLO-20260610-001 승인→PO-20260610-004→취소→계획오더 복원+kim 알림 PRODUCTION_CANCELLED(메시지 정확, 딥링크 `/sd/sales-orders/4`) ✓ ③ 화면 `/notifications`·`/fi/credit-limit-requests` HTTP 200. ⚠️ 헤드리스 없어 벨 드롭다운·모달 클릭 렌더는 hwlee님 육안 권장.
+- ⚠️ **검증 데이터**: 알림 다수(kim 2·lee 1), 여신요청 CLR-001(APPROVED, 소한도사 한도 5천만으로 영구 변경됨), 생산지시 PO-004(CANCELLED). **전체 미커밋**.
+
+#### ➕ 포트폴리오 디테일 3종 (2026-06-10, 순수 프론트)
+
+- **① 수주↔여신 연결**: 수주 폼/상세(`sd/order/form.html`·`detail.html`)에서 신용한도 **초과 표시 옆에 "여신 상향 요청" 버튼**(딥링크 `/fi/credit-limit-requests?customerId={선택고객}`). 클릭→여신 화면이 customerId 파람 받아 **요청 모달 자동 오픈+고객 선택+현재한도 표시**(`fi/credit/list.html` DOMContentLoaded에서 `URLSearchParams` 처리, loadCustomers await 후).
+- **② 알림 안읽음 시각화**: 드롭다운(layout `.notif-item.unread .ni-title::after` 파란 점·읽은 건 흐리게)·인박스(`notification/list.html` 안읽음 행 제목 `fw-bold`+앞 파란 점).
+- **③ 여신 결재 이력 타임라인**: 여신 목록 행 **번호 클릭→상세 모달**(`#detailModal`)에 세로 타임라인(`.cl-timeline`: 요청제출[요청자·시각] → 승인/거부[결정자·시각·메모] or 검토대기). 데이터는 기존 응답 필드 재사용(추가 API 없음).
+- **검증**: 앱 재기동 후 마크업/딥링크 포함 확인 — 수주 폼·상세 "여신 상향 요청" 버튼 포함, 여신 `?customerId=3` 200+openDetail/cl-timeline/customerId 처리 포함, 인박스 fw-bold 포함, 3화면 HTTP 200. ⚠️ 버튼 클릭→모달 자동오픈·타임라인·점 렌더는 헤드리스 없어 육안 권장. **미커밋**.
+
+### ➕ 고객 마스터 등록 화면 + 권한 분리 (2026-06-10, hwlee님 요청 "기본정보는 영업, 한도는 재무")
+
+- **배경**: 기존엔 고객 생성/수정/삭제가 **ADMIN only + 화면 없음**(API만) — 영업이 신규 고객 등록 불가 = 영업 흐름 불완전. 실무처럼 기본정보=영업, 신용한도=재무로 분리.
+- **권한 분리(코드 레벨 강제)**: `CustomerController` 생성/수정 = **SALES+ADMIN**(삭제는 ADMIN 유지). **신용한도를 양쪽 DTO(`CustomerCreateRequest`/`CustomerUpdateRequest`)에서 완전 제거** → 영업이 API로도 한도 못 넣음. 신규 고객은 `CustomerService.create`가 **한도 0(현금거래) 강제**. `Customer.update(...creditLimit...)` → **`updateBasicInfo(name,address,paymentTerms)`** 로 교체(한도·사업자번호 불변). 한도 변경은 **여신 요청/승인(`changeCreditLimit`)으로만**.
+- **화면 3종** `master/customer/`(list·detail·form) + `CustomerViewController`(`/master/customers[/new|/{id}|/{id}/edit]`, SALES/ADMIN) + 사이드바 **영업 그룹 "고객"**(active='customer'). 상세에 한도 표시+"재무 권한" 안내+**여신 상향 요청 버튼**(딥링크), 폼에 "신규 한도0·상향은 여신" 안내·한도 입력란 없음·사업자번호 수정 시 잠금·삭제는 ADMIN만. PaymentTerms=NET30/NET60/COD/PREPAID.
+- **테스트 수정**(DTO 시그니처 변경 여파, 서브에이전트): SdMm·PartialDelivery·SalesOrderCrud·CustomerCrud·FiAccounting·AuditLog 6개 테스트에서 creditLimit 인자 제거 + 한도 의존 시나리오는 생성 후 `changeCreditLimit`로 보존. `compileTestJava` BUILD SUCCESSFUL.
+- **검증(end-to-end, 앱 재기동)**: ① kim(SALES) 고객 등록 CUST-2026-0004 **한도0** ② 한도 억지 주입(99000000)→**무시(0)** ③ 영업 수정 시 한도 주입(50000000)→**한도 0 유지**(기본정보만 변경) ④ 한도 변경=여신 요청만(CLR-002 0→3천만 PENDING) ⑤ **park(권한없음)→403** ⑥ 고객 화면 4개 HTTP 200·NET30 매핑·사이드바 메뉴 반영. ⚠️ 클릭 렌더는 육안 권장. **미커밋**.
+- ⚠️ 검증데이터: 고객 신규상사(개명)(CUST-2026-0004, 한도0)·꼼수상사 등 + CLR-20260610-002(PENDING).
+
+### ➕ 여신 요청 중복 방지 + 실무 UI (2026-06-10, hwlee님 요청 "중복 신청 막고 검토 중이면 버튼 대신 안내")
+
+- **서버 이중 방어**: `CreditLimitRequestService.create`가 같은 고객에 PENDING 요청이 이미 있으면 거부(IllegalState "이미 검토 중인 여신 상향 요청이 있습니다…"). `Repository.existsByCustomerIdAndStatus`/`findFirstByCustomerIdAndStatusOrderByIdDesc`. 조회 API `GET /api/credit-limit-requests/pending?customerId=`(있으면 200+본문, 없으면 204).
+- **실무 UI(3곳)**: ① **고객 상세**: 검토 중이면 "여신 상향 요청" 버튼을 **"여신 검토 중 · CLR-xxx" 배지**(노랑, 요청 목록 링크)로 대체 ② **여신 화면 딥링크 진입**(?customerId=): 검토 중이면 모달 대신 flash 안내 + 해당 요청 상세 모달 ③ **여신 요청 모달**: 고객 선택 시 PENDING 있으면 인라인 경고 + **제출 버튼 비활성화**.
+- **검증(end-to-end)**: 우진테크 중복 요청 시도→거부 / `/pending` 200(있음)·204(없음) 분기 / 재무 결정 후 다시 요청 가능 / 1고객=1 PENDING(1차 CLR-004 PENDING, 2차 거부) / 고객상세·여신화면 마크업·HTTP 200. 기존 기능 추가 전 쌓였던 우진테크 중복 PENDING 2건은 reject로 정리(현재 우진테크 CLR-004 PENDING 1건 — 화면 "검토 중" 배지 데모용). ⚠️ 클릭 렌더 육안 권장. **미커밋**.
 
 ### 🔧 학습 중 발견한 SD 갭 2건 수정 (2026-06-09, hwlee님이 화면 돌려보다 발견)
 
@@ -42,7 +104,8 @@
   - `doc/01-마스터데이터/1-도메인.md` — 마스터(명사) vs 트랜잭션(동사), 단일 정의·모든 거래가 참조, 우리 마스터 6종(고객·거래처·품목·창고·부서·직원, master 패키지), 고객/거래처=돈 방향(매출1200/매입2100), 공통 성질(식별코드·거래 분기 속성[품목유형·신용한도]·삭제 대신 비활성).
   - `doc/01-마스터데이터/2-구현.md` — BaseEntityWithCode(code unique·updatable=false + status MasterStatus + deletedAt)·CodeGenerator(REQUIRES_NEW+SELECT FOR UPDATE, 마스터 연4자리/트랜잭션 일3자리)·Customer(creditLimit→02 수주, businessNo 수정불가)·Item(itemType→05 분기)·static create 팩토리 검증·CRUD(중복 이중방지·DTO·Specification 페이징)·**Soft Delete**(@SQLDelete→deleted_at UPDATE + @SQLRestriction 조회 자동제외) vs status 구분·Auditable.
   - `doc/02-SD-영업/1-도메인.md` — OTC(견적Quotation→수주SalesOrder→출하Delivery→세금계산서Invoice→입금), 4단계로 쪼개는 이유(되돌릴 수 없는 선), 각 상태머신(견적 DRAFT→SENT→ACCEPTED/EXPIRED, 수주 DRAFT→CONFIRMED→SHIPPING↔SHIPPED→INVOICING↔INVOICED→CLOSED, 출하/계산서 DRAFT→SHIPPED/ISSUED), **신용한도**(수주 확정 시점 미수금+주문액>creditLimit 거부), SD가 04·05의 출발점.
-- **▶ 다음 후보**: **02 SD ②구현**(엔티티·상태전이 메서드·CreditLimitChecker·출하/발행 이벤트 발행) ⭐ → 03 MM → 06~16.
+  - `doc/02-SD-영업/2-구현.md` — 상태 전이 메서드 = 입구 가드(if status!=… throw, 엔티티 메서드로만 변경)·**견적 1회 소비**(CONVERTED + markConverted/revertConversion, create↔cancel 대칭)·**수주 라인이 진실의 원천**(shippedQty/invoicedQty 누적→recomputeStatus 헤더 재도출, 부분출하·취소에도 불일치 불가)·**CreditLimitChecker**(외부조회[다른 수주 합계] 필요→엔티티 아닌 서비스 컴포넌트, confirm 한곳·excludeOrderId 자기제외, race는 03 보류)·creditStatus(화면 동일산식 예고)·**이벤트 발행**(ship→DeliveryShippedEvent[MM 재고차감], issue[VAT10%]→InvoiceIssuedEvent[FI 매출분개], BEFORE_COMMIT라 실패시 원천 롤백).
+- **▶ 다음 후보**: **03 MM ①도메인 → ②구현**(DeliveryShippedEvent 수신 재고차감, 동시성/락) → 06~16.
 - ⚠️ (정정 2026-06-09) 01·02·03(마스터/SD/MM)도 **순서대로 학습**하기로 함. 04·05 먼저 한 뒤 01부터 채우는 중.
 - 참고: 예전 학습 문서·통합 아키텍처(`doc/10`,`doc/11` 등)는 **`doc_bak/`** 으로 이동됨.
 

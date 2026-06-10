@@ -115,13 +115,16 @@ class SalesOrderCrudIntegrationTest {
     }
 
     private com.hwlee.erp.master.customer.dto.CustomerResponse createCustomer(BigDecimal creditLimit) {
-        return customerService.create(new CustomerCreateRequest(
+        var customer = customerService.create(new CustomerCreateRequest(
                 "고객-" + System.nanoTime(),
                 uniqueBusinessNo(),
                 "주소",
-                creditLimit,
                 PaymentTerms.NET30
         ));
+        // 생성 시 한도는 항상 0이므로, 테스트가 의도한 한도로 올려준다.
+        customerRepository.findById(customer.id()).orElseThrow().changeCreditLimit(creditLimit);
+        customerRepository.flush();
+        return customer;
     }
 
     private com.hwlee.erp.master.item.dto.ItemResponse createItem(BigDecimal price) {

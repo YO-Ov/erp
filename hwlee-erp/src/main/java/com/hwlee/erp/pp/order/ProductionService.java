@@ -15,6 +15,7 @@ import com.hwlee.erp.mm.warehouse.WarehouseRepository;
 import com.hwlee.erp.pp.bom.Bom;
 import com.hwlee.erp.pp.bom.BomRepository;
 import com.hwlee.erp.pp.order.dto.MaterialAvailabilityResponse;
+import com.hwlee.erp.pp.order.event.ProductionOrderCancelledEvent;
 import com.hwlee.erp.pp.order.dto.ProductionOrderCreateRequest;
 import com.hwlee.erp.pp.order.dto.ProductionOrderLineResponse;
 import com.hwlee.erp.pp.order.dto.ProductionOrderResponse;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -59,6 +61,7 @@ public class ProductionService {
     private final StockMovementRepository stockMovementRepository;
     private final AutoJournalService autoJournal;
     private final TransactionNumberGenerator numberGenerator;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
     /** 생산지시 생성 — 완제품의 BOM 을 전개해 소요 자재 라인을 굳힌다(DRAFT=PLANNED). */
@@ -178,6 +181,8 @@ public class ProductionService {
     public ProductionOrderResponse cancel(Long id) {
         ProductionOrder po = orderRepository.findById(id).orElseThrow(() -> notFound(id));
         po.cancel();
+        // ⭐ 생산지시 취소 사건 발행 — planning 리스너가 계획오더(MRP)를 검토 대기로 되살린다.
+        events.publishEvent(new ProductionOrderCancelledEvent(po.getId(), po.getNumber()));
         return toResponse(reload(id));
     }
 

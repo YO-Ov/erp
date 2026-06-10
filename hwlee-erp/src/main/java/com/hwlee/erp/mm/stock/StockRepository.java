@@ -14,6 +14,13 @@ public interface StockRepository
     Optional<Stock> findByItemIdAndWarehouseId(Long itemId, Long warehouseId);
 
     /**
+     * 한 품목의 전 창고 보유량 합. 재고가 한 행도 없으면 0 을 돌려준다(coalesce).
+     * PP 계획오더(MRP)가 "이 완제품이 총 몇 개 있나" 를 창고 무관하게 볼 때 쓴다.
+     */
+    @Query("select coalesce(sum(s.qtyOnHand), 0) from Stock s where s.item.id = :itemId")
+    java.math.BigDecimal sumOnHandByItem(@Param("itemId") Long itemId);
+
+    /**
      * 비관적 쓰기 락 (SELECT ... FOR UPDATE) 으로 (item, warehouse) 행을 점유한다.
      * 출고 경로({@code GoodsIssueService.post}) 의 핵심 — 동시 차감 race 를 원천 차단.
      */

@@ -29,12 +29,13 @@ public class CustomerService {
             throw new IllegalStateException("이미 등록된 사업자번호입니다: " + req.businessNo());
         }
         String code = codeGenerator.nextCode(CODE_PREFIX);
+        // 신규 고객은 신용한도 0(현금거래)으로 시작 — 한도 부여/상향은 재무의 여신 승인으로만.
         Customer customer = Customer.create(
                 code,
                 req.name(),
                 req.businessNo(),
                 req.address(),
-                req.creditLimit(),
+                java.math.BigDecimal.ZERO,
                 req.paymentTerms()
         );
         Customer saved = repository.save(customer);
@@ -58,7 +59,7 @@ public class CustomerService {
     @Transactional
     public CustomerResponse update(Long id, CustomerUpdateRequest req) {
         Customer customer = getOrThrow(id);
-        customer.update(req.name(), req.address(), req.creditLimit(), req.paymentTerms());
+        customer.updateBasicInfo(req.name(), req.address(), req.paymentTerms());
         return mapper.toResponse(customer);
     }
 

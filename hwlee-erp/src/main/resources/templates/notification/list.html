@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('알림', '', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>알림</h1>
+            <div class="crumb">내 알림함 · Notifications</div>
+        </div>
+        <button type="button" id="btn-read-all" class="btn btn-outline-secondary">
+            <i class="bi bi-check2-all"></i> 모두 읽음
+        </button>
+    </div>
+
+    <form id="searchForm" class="filter-bar">
+        <div class="filter-field ff-narrow">
+            <label>구분</label>
+            <select id="f-unread" class="form-select form-select-sm">
+                <option value="false">전체</option>
+                <option value="true">안 읽음만</option>
+            </select>
+        </div>
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> 조회</button>
+        </div>
+    </form>
+
+    <div class="table-wrap">
+    <table class="table table-hover align-middle mb-0">
+        <thead>
+        <tr>
+            <th style="width:44px;"></th><th>내용</th><th style="width:140px;">받은 시각</th><th style="width:90px;">상태</th>
+        </tr>
+        </thead>
+        <tbody id="rows"><tr><td colspan="4" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
+    </table>
+    </div>
+    <nav class="mt-3"><ul class="pagination pagination-sm" id="pager"></ul></nav>
+
+<script>
+    const TYPE_ICON = {
+        PRODUCTION_CANCELLED:     {icon: 'bi-x-octagon', color: '#d63939', label: '생산 취소'},
+        CREDIT_REQUEST_SUBMITTED: {icon: 'bi-shield-exclamation', color: '#f59f00', label: '여신 요청'},
+        CREDIT_REQUEST_APPROVED:  {icon: 'bi-check-circle', color: '#2fb344', label: '여신 승인'},
+        CREDIT_REQUEST_REJECTED:  {icon: 'bi-x-circle', color: '#d63939', label: '여신 거부'},
+    };
+    let page = 0;
+    const SIZE = 15;
+
+    function fmt(iso) { return iso ? new Date(iso).toLocaleString('ko-KR') : ''; }
+
+    async function load() {
+        const tbody = document.getElementById('rows');
+        const unreadOnly = document.getElementById('f-unread').value;
+        try {
+            const data = await ERP.api('/api/notifications' + ERP.query({unreadOnly, page, size: SIZE, sort: 'id,desc'}));
+            const list = data.content || [];
+            tbody.innerHTML = list.length === 0
+                ? '<tr><td colspan="4" class="text-center text-muted py-4">알림이 없습니다.</td></tr>'
+                : list.map(n => {
+                    const t = TYPE_ICON[n.type] || {icon: 'bi-info-circle', color: '#206bc4', label: '알림'};
+                    const clickable = n.linkUrl ? `style="cursor:pointer" onclick='openNotif(${n.id}, ${JSON.stringify(n.linkUrl)})'` : '';
+                    const dot = n.read ? '' : '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#206bc4;margin-right:6px;vertical-align:middle;"></span>';
+                    return `<tr ${clickable} class="${n.read ? '' : 'table-active'}">
+                        <td class="text-center"><i class="bi ${t.icon}" style="color:${t.color};font-size:1.2rem"></i></td>
+                        <td>
+                            <div class="${n.read ? '' : 'fw-bold'}">${dot}${ERP.esc(n.title)} ${n.linkUrl ? '<i class="bi bi-box-arrow-up-right text-muted small"></i>' : ''}</div>
+                            <div class="small text-muted">${ERP.esc(n.message)}</div>
+                        </td>
+                        <td class="small">${fmt(n.createdAt)}</td>
+                        <td>${n.read ? ERP.badge('읽음', 'secondary') : ERP.badge('새 알림', 'primary')}</td>
+                    </tr>`;
+                }).join('');
+            renderPager(data.totalPages || 0, data.number || 0);
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            ERP.flashError(e);
+        }
+    }
+
+    async function openNotif(id, url) {
+        try { await ERP.api(`/api/notifications/${id}/read`, {method: 'POST'}); } catch (e) {}
+        if (url) window.location.href = url;
+    }
+
+    async function readAll() {
+        try {
+            await ERP.api('/api/notifications/read-all', {method: 'POST'});
+            ERP.flash('모두 읽음 처리했습니다.', 'success');
+            load();
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    function renderPager(totalPages, current) {
+        const pager = document.getElementById('pager');
+        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+        let html = '';
+        for (let i = 0; i < totalPages; i++)
+            html += `<li class="page-item ${i === current ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="goto(${i});return false;">${i + 1}</a></li>`;
+        pager.innerHTML = html;
+    }
+    function goto(p) { page = p; load(); }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        load();
+        document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); page = 0; load(); });
+        document.getElementById('btn-read-all').addEventListener('click', readAll);
+    });
+</script>
+</div>
+</body>
+</html>

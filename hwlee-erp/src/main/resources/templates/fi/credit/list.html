@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('여신 상향 요청', 'credit', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<body>
+<div th:fragment="content">
+    <style>
+        .cl-timeline { list-style: none; padding-left: .3rem; margin: 0; }
+        .cl-timeline li { position: relative; padding: 0 0 1.1rem 1.4rem; border-left: 2px solid #e6e8ec; }
+        .cl-timeline li:last-child { border-left-color: transparent; padding-bottom: 0; }
+        .cl-timeline .dot { position: absolute; left: -7px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: #cbd2dc; box-shadow: 0 0 0 3px #fff; }
+        .cl-timeline .dot.ok { background: #2fb344; }
+        .cl-timeline .dot.no { background: #d63939; }
+        .cl-timeline .dot.wait { background: #f59f00; }
+        .cl-timeline .tl-title { font-weight: 600; font-size: .85rem; color: #1c2434; }
+        .cl-timeline .tl-meta { font-size: .75rem; color: #667085; margin-top: .1rem; }
+    </style>
+    <div id="flash"></div>
+
+    <!-- 역할 플래그: 해당 권한이 없으면 이 요소 자체가 렌더되지 않음 → JS에서 null 체크로 판별 -->
+    <span sec:authorize="hasAnyRole('SALES','ADMIN')" id="flagCanRequest" hidden></span>
+    <span sec:authorize="hasAnyRole('FINANCE','ADMIN')" id="flagCanDecide" hidden></span>
+
+    <div class="page-head">
+        <div>
+            <h1>여신 상향 요청</h1>
+            <div class="crumb">신용한도 관리 · 영업 요청 → 재무 승인</div>
+        </div>
+        <button type="button" id="btn-new" class="btn btn-primary" sec:authorize="hasAnyRole('SALES','ADMIN')">
+            <i class="bi bi-plus-lg"></i> 상향 요청
+        </button>
+    </div>
+
+    <form id="searchForm" class="filter-bar">
+        <div class="filter-field ff-narrow">
+            <label>상태</label>
+            <select id="f-status" class="form-select form-select-sm">
+                <option value="PENDING">대기</option>
+                <option value="APPROVED">승인됨</option>
+                <option value="REJECTED">거부됨</option>
+                <option value="">전체</option>
+            </select>
+        </div>
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> 검색</button>
+            <button type="button" id="btn-reset" class="btn btn-sm btn-outline-secondary btn-icon" title="초기화"><i class="bi bi-arrow-counterclockwise"></i></button>
+        </div>
+    </form>
+
+    <div class="table-wrap">
+    <table class="table table-hover align-middle mb-0">
+        <thead>
+        <tr>
+            <th>번호</th><th>고객</th>
+            <th class="text-end">현재 한도</th><th class="text-end">요청 한도</th>
+            <th>사유</th><th>요청자</th><th>상태</th><th style="width:150px;"></th>
+        </tr>
+        </thead>
+        <tbody id="rows"><tr><td colspan="8" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
+    </table>
+    </div>
+    <nav class="mt-3"><ul class="pagination pagination-sm" id="pager"></ul></nav>
+
+    <!-- 상향 요청 모달 (영업) -->
+    <div class="modal fade" id="reqModal" tabindex="-1">
+      <div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">여신 상향 요청</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="mb-3">
+                <label class="form-label">고객 <span class="text-danger">*</span></label>
+                <select class="form-select" id="rq-customer"><option value="">선택…</option></select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">현재 한도</label>
+                <input type="text" class="form-control" id="rq-current" readonly>
+            </div>
+            <div class="alert alert-warning py-2 px-3 small mb-3" id="rq-pending-warn" style="display:none;"></div>
+            <div class="mb-3">
+                <label class="form-label">요청 한도 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="rq-requested" min="0" step="100000" placeholder="예: 80000000">
+                <div class="form-text">현재 한도보다 큰 금액을 입력하세요.</div>
+            </div>
+            <div class="mb-2">
+                <label class="form-label">사유 <span class="text-danger">*</span></label>
+                <textarea class="form-control" id="rq-reason" rows="2" placeholder="예: 거래 6개월 무연체, 월 매출 증가로 한도 상향 필요"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button>
+            <button type="button" class="btn btn-primary" id="rq-submit"><i class="bi bi-send"></i> 요청 제출</button>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 승인/거부 결정 모달 (재무) -->
+    <div class="modal fade" id="decideModal" tabindex="-1">
+      <div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title" id="dc-title">결정</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <p class="mb-2" id="dc-summary"></p>
+            <div class="mb-2">
+                <label class="form-label">메모 <span class="text-muted">(선택)</span></label>
+                <textarea class="form-control" id="dc-note" rows="2"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button>
+            <button type="button" class="btn" id="dc-submit"></button>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 결재 이력 상세 모달 -->
+    <div class="modal fade" id="detailModal" tabindex="-1">
+      <div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title" id="dt-title">요청 상세</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="mb-3" id="dt-summary"></div>
+            <h6 class="text-muted small mb-2"><i class="bi bi-clock-history"></i> 결재 이력</h6>
+            <ul class="cl-timeline" id="dt-timeline"></ul>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">닫기</button>
+        </div>
+      </div></div>
+    </div>
+
+<script>
+    const STATUS = {
+        PENDING:  {label: '대기', color: 'warning'},
+        APPROVED: {label: '승인됨', color: 'success'},
+        REJECTED: {label: '거부됨', color: 'dark'},
+    };
+    const CAN_REQUEST = !!document.getElementById('flagCanRequest');
+    const CAN_DECIDE  = !!document.getElementById('flagCanDecide');
+    let page = 0; const SIZE = 10;
+    let reqModal = null, decideModal = null, detailModal = null;
+    let dcId = null, dcAction = null;
+
+    function fmtTime(iso) { return iso ? new Date(iso).toLocaleString('ko-KR') : ''; }
+
+    // ── 결재 이력 타임라인 ──
+    function openDetail(r) {
+        document.getElementById('dt-title').textContent = `${r.number} · ${r.customerName}`;
+        document.getElementById('dt-summary').innerHTML =
+            `<div>한도 <strong>${ERP.won(r.currentLimit)}</strong> → <strong class="text-primary">${ERP.won(r.requestedLimit)}</strong></div>`
+            + `<div class="small text-muted mt-1">사유: ${ERP.esc(r.reason)}</div>`;
+        let tl = `<li><span class="dot ok"></span>
+                    <div class="tl-title">요청 제출</div>
+                    <div class="tl-meta">${ERP.esc(r.requestedBy)} · ${fmtTime(r.createdAt)}</div></li>`;
+        if (r.status === 'PENDING') {
+            tl += `<li><span class="dot wait"></span>
+                    <div class="tl-title">재무 검토 대기</div>
+                    <div class="tl-meta">아직 결정 전</div></li>`;
+        } else {
+            const ok = r.status === 'APPROVED';
+            tl += `<li><span class="dot ${ok ? 'ok' : 'no'}"></span>
+                    <div class="tl-title">${ok ? '승인됨 — 고객 한도 반영' : '거부됨'}</div>
+                    <div class="tl-meta">${ERP.esc(r.decidedBy || '')} · ${fmtTime(r.decidedAt)}`
+                + (r.decisionNote ? `<br>메모: ${ERP.esc(r.decisionNote)}` : '') + `</div></li>`;
+        }
+        document.getElementById('dt-timeline').innerHTML = tl;
+        detailModal.show();
+    }
+
+    async function loadCustomers() {
+        try {
+            const data = await ERP.api('/api/customers' + ERP.query({size: 500}));
+            const sel = document.getElementById('rq-customer');
+            (data.content || []).forEach(c => {
+                const o = document.createElement('option');
+                o.value = c.id; o.textContent = `${c.name} (${c.code})`;
+                o.dataset.limit = c.creditLimit;
+                sel.appendChild(o);
+            });
+        } catch (e) {}
+    }
+
+    async function load() {
+        const tbody = document.getElementById('rows');
+        const status = document.getElementById('f-status').value;
+        try {
+            const data = await ERP.api('/api/credit-limit-requests' + ERP.query({status, page, size: SIZE, sort: 'id,desc'}));
+            const list = data.content || [];
+            tbody.innerHTML = list.length === 0
+                ? '<tr><td colspan="8" class="text-center text-muted py-4">요청이 없습니다.</td></tr>'
+                : list.map(r => {
+                    const s = STATUS[r.status] || {label: r.status, color: 'secondary'};
+                    let action = '<span class="text-muted">-</span>';
+                    if (r.status === 'PENDING' && CAN_DECIDE) {
+                        action = `<button class="btn btn-sm btn-success" onclick='openDecide(${JSON.stringify(r)},"approve")'>승인</button>
+                                  <button class="btn btn-sm btn-outline-danger" onclick='openDecide(${JSON.stringify(r)},"reject")'>거부</button>`;
+                    } else if (r.status === 'PENDING') {
+                        action = '<span class="badge badge-soft badge-soft-warning">재무 검토 중</span>';
+                    } else if (r.decidedBy) {
+                        action = `<span class="small text-muted">${ERP.esc(r.decidedBy)}</span>`;
+                    }
+                    return `<tr>
+                        <td><a href="javascript:void(0)" onclick='openDetail(${JSON.stringify(r)})'>${ERP.esc(r.number)}</a></td>
+                        <td>${ERP.esc(r.customerName)}</td>
+                        <td class="text-end">${ERP.won(r.currentLimit)}</td>
+                        <td class="text-end fw-semibold text-primary">${ERP.won(r.requestedLimit)}</td>
+                        <td class="small" style="max-width:220px">${ERP.esc(r.reason)}</td>
+                        <td class="small">${ERP.esc(r.requestedBy)}</td>
+                        <td>${ERP.badge(s.label, s.color)}</td>
+                        <td>${action}</td></tr>`;
+                }).join('');
+            renderPager(data.totalPages || 0, data.number || 0);
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            ERP.flashError(e);
+        }
+    }
+
+    // ── 상향 요청(영업) ──
+    function openReq() {
+        document.getElementById('rq-customer').value = '';
+        document.getElementById('rq-current').value = '';
+        document.getElementById('rq-requested').value = '';
+        document.getElementById('rq-reason').value = '';
+        document.getElementById('rq-pending-warn').style.display = 'none';
+        document.getElementById('rq-submit').disabled = false;
+        reqModal.show();
+    }
+    // 고객 선택 시 현재 한도 표시 + 검토 중 요청이 있으면 경고하고 제출을 막는다(중복 방지).
+    async function onCustomerChange() {
+        const opt = document.getElementById('rq-customer').selectedOptions[0];
+        document.getElementById('rq-current').value = opt && opt.dataset.limit ? ERP.won(opt.dataset.limit) : '';
+        const cid = document.getElementById('rq-customer').value;
+        const warn = document.getElementById('rq-pending-warn');
+        const submit = document.getElementById('rq-submit');
+        if (!cid) { warn.style.display = 'none'; submit.disabled = false; return; }
+        let pending = null;
+        try { pending = await ERP.api('/api/credit-limit-requests/pending?customerId=' + cid); } catch (e) {}
+        if (pending) {
+            warn.innerHTML = `<i class="bi bi-exclamation-triangle"></i> 이미 검토 중인 요청(<strong>${ERP.esc(pending.number)}</strong>)이 있어 추가로 요청할 수 없습니다. 재무 결정(승인/거부) 후 다시 시도하세요.`;
+            warn.style.display = ''; submit.disabled = true;
+        } else {
+            warn.style.display = 'none'; submit.disabled = false;
+        }
+    }
+    async function submitReq() {
+        const customerId = document.getElementById('rq-customer').value;
+        const requestedLimit = document.getElementById('rq-requested').value;
+        const reason = document.getElementById('rq-reason').value.trim();
+        if (!customerId) { ERP.flash('고객을 선택하세요.', 'warning'); return; }
+        if (!requestedLimit || Number(requestedLimit) <= 0) { ERP.flash('요청 한도를 입력하세요.', 'warning'); return; }
+        if (!reason) { ERP.flash('사유를 입력하세요.', 'warning'); return; }
+        try {
+            await ERP.api('/api/credit-limit-requests', {
+                method: 'POST', body: {customerId: Number(customerId), requestedLimit: Number(requestedLimit), reason}
+            });
+            reqModal.hide();
+            ERP.flash('요청을 제출했습니다. 재무팀에 알림이 전송되었습니다.', 'success');
+            load();
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    // ── 승인/거부(재무) ──
+    function openDecide(r, action) {
+        dcId = r.id; dcAction = action;
+        const isApprove = action === 'approve';
+        document.getElementById('dc-title').textContent = isApprove ? '여신 상향 승인' : '여신 상향 거부';
+        document.getElementById('dc-summary').innerHTML =
+            `<strong>${ERP.esc(r.customerName)}</strong> 한도 ${ERP.won(r.currentLimit)} → <strong>${ERP.won(r.requestedLimit)}</strong>`
+            + (isApprove ? '<br><span class="text-success small">승인 시 고객 한도가 즉시 상향됩니다.</span>' : '');
+        document.getElementById('dc-note').value = '';
+        const btn = document.getElementById('dc-submit');
+        btn.className = 'btn ' + (isApprove ? 'btn-success' : 'btn-danger');
+        btn.textContent = isApprove ? '승인' : '거부';
+        decideModal.show();
+    }
+    async function submitDecide() {
+        const note = document.getElementById('dc-note').value.trim() || null;
+        try {
+            await ERP.api(`/api/credit-limit-requests/${dcId}/${dcAction}`, {method: 'POST', body: {note}});
+            decideModal.hide();
+            ERP.flash(dcAction === 'approve' ? '승인했습니다. 고객 한도가 상향되었습니다.' : '거부했습니다.', 'success');
+            load();
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    function renderPager(totalPages, current) {
+        const pager = document.getElementById('pager');
+        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+        let html = '';
+        for (let i = 0; i < totalPages; i++)
+            html += `<li class="page-item ${i === current ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="goto(${i});return false;">${i + 1}</a></li>`;
+        pager.innerHTML = html;
+    }
+    function goto(p) { page = p; load(); }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        reqModal = new bootstrap.Modal(document.getElementById('reqModal'));
+        decideModal = new bootstrap.Modal(document.getElementById('decideModal'));
+        detailModal = new bootstrap.Modal(document.getElementById('detailModal'));
+        if (CAN_REQUEST) {
+            await loadCustomers();
+            document.getElementById('btn-new').addEventListener('click', openReq);
+            // 수주/고객 화면에서 "여신 상향 요청" 으로 넘어왔으면(?customerId=):
+            //  - 이미 검토 중인 요청이 있으면 모달 대신 안내 + 그 요청 상세를 보여준다(중복 방지).
+            //  - 없으면 요청 모달을 바로 띄우고 고객을 선택해 둔다.
+            const pre = new URLSearchParams(location.search).get('customerId');
+            if (pre) {
+                let pending = null;
+                try { pending = await ERP.api('/api/credit-limit-requests/pending?customerId=' + pre); } catch (e) {}
+                if (pending) {
+                    ERP.flash(`이 고객은 이미 검토 중인 여신 요청(${pending.number})이 있습니다. 재무 결정 후 다시 요청할 수 있습니다.`, 'warning');
+                    openDetail(pending);
+                } else {
+                    openReq();
+                    document.getElementById('rq-customer').value = pre;
+                    onCustomerChange();
+                }
+            }
+        }
+        load();
+        document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); page = 0; load(); });
+        document.getElementById('btn-reset').addEventListener('click', () => { document.getElementById('f-status').value = 'PENDING'; page = 0; load(); });
+        document.getElementById('rq-customer').addEventListener('change', onCustomerChange);
+        document.getElementById('rq-submit').addEventListener('click', submitReq);
+        document.getElementById('dc-submit').addEventListener('click', submitDecide);
+    });
+</script>
+</div>
+</body>
+</html>

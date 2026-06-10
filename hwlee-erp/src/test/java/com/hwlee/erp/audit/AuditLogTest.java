@@ -49,7 +49,9 @@ class AuditLogTest {
         // 2) 수정 — 신용한도 변경 → afterCommit 에서 UPDATE 감사 기록
         txTemplate.executeWithoutResult(s -> {
             Customer c = customerRepository.findById(id).orElseThrow();
-            c.update("감사테스트상사", "부산", new BigDecimal("5000000"), PaymentTerms.NET60);
+            c.updateBasicInfo("감사테스트상사", "부산", PaymentTerms.NET60);
+            // 한도 변경은 별도 도메인 메서드로 — 감사 스냅샷에 변경된 신용한도가 담기도록
+            c.changeCreditLimit(new BigDecimal("5000000"));
         });
 
         var logs = auditLogRepository.findByEntityTypeAndEntityIdOrderByChangedAtDesc(

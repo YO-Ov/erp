@@ -22,6 +22,12 @@ public class PpViewController {
         return "pp/bom/list";
     }
 
+    // ── 계획오더(PlannedOrder, MRP) ─────────────────────────────
+    @GetMapping("/pp/planned-orders")
+    public String plannedList() {
+        return "pp/planning/list";
+    }
+
     // ── 생산지시(ProductionOrder) ───────────────────────────────
     @GetMapping("/pp/production-orders")
     public String productionList() {

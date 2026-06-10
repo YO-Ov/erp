@@ -163,7 +163,11 @@
             + ` · 남은 <strong>${ERP.won(creditCache.remaining)}</strong>`
             + ` → 이 주문(${ERP.won(grand)}) 포함 시 남은 `
             + `<strong class="${after < 0 ? 'text-danger' : 'text-success'}">${ERP.won(after)}</strong>`
-            + (after < 0 ? ' <span class="badge bg-danger">한도 초과 — 확정 불가</span>' : '');
+            + (after < 0
+                ? ' <span class="badge bg-danger">한도 초과 — 확정 불가</span>'
+                  + ` <a href="/fi/credit-limit-requests?customerId=${creditCache.customerId}"`
+                  + ` class="btn btn-sm btn-outline-danger py-0 px-2 ms-1"><i class="bi bi-shield-plus"></i> 여신 상향 요청</a>`
+                : '');
     }
     function collectLines() {
         const lines = [];

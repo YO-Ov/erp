@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.hwlee.erp.TestcontainersConfiguration;
+import com.hwlee.erp.master.customer.CustomerRepository;
 import com.hwlee.erp.master.customer.CustomerService;
 import com.hwlee.erp.master.customer.PaymentTerms;
 import com.hwlee.erp.master.customer.dto.CustomerCreateRequest;
+import com.hwlee.erp.master.customer.dto.CustomerResponse;
 import com.hwlee.erp.master.item.ItemCategory;
 import com.hwlee.erp.master.item.ItemService;
 import com.hwlee.erp.master.item.ItemUnit;
@@ -54,6 +56,7 @@ import org.springframework.context.annotation.Import;
 class PartialDeliveryAndInvoiceScenarioTest {
 
     @Autowired CustomerService customerService;
+    @Autowired CustomerRepository customerRepository;
     @Autowired ItemService itemService;
     @Autowired VendorService vendorService;
     @Autowired WarehouseService warehouseService;
@@ -66,12 +69,8 @@ class PartialDeliveryAndInvoiceScenarioTest {
     @DisplayName("10대 수주 → 6대 출하 → 6대 청구 → 4대 출하 → 4대 청구 전체 흐름")
     void 부분_출하와_청구가_각_단계마다_누적되며_상태가_전이된다() {
         // given — 한도 충분한 고객 + 노트북
-        var customer = customerService.create(new CustomerCreateRequest(
-                "현우테크-" + System.nanoTime(),
-                uniqueBusinessNo(),
-                "서울시",
-                new BigDecimal("100000000"),
-                PaymentTerms.NET30));
+        var customer = createCustomerWithCreditLimit(
+                "현우테크-" + System.nanoTime(), "서울시", new BigDecimal("100000000"));
         var item = itemService.create(new ItemCreateRequest(
                 "노트북-" + System.nanoTime(),
                 ItemCategory.NOTEBOOK, ItemUnit.EA,
@@ -146,9 +145,8 @@ class PartialDeliveryAndInvoiceScenarioTest {
     @Test
     @DisplayName("주문량 10대를 초과해 11대를 출하하려고 하면 거부된다")
     void 주문량을_초과한_출하는_거부된다() {
-        var customer = customerService.create(new CustomerCreateRequest(
-                "한도큰-" + System.nanoTime(), uniqueBusinessNo(), null,
-                new BigDecimal("100000000"), PaymentTerms.NET30));
+        var customer = createCustomerWithCreditLimit(
+                "한도큰-" + System.nanoTime(), null, new BigDecimal("100000000"));
         var item = itemService.create(new ItemCreateRequest(
                 "노트북-" + System.nanoTime(), ItemCategory.NOTEBOOK, ItemUnit.EA,
                 new BigDecimal("100000"), new BigDecimal("200000")));
@@ -170,9 +168,8 @@ class PartialDeliveryAndInvoiceScenarioTest {
     @Test
     @DisplayName("출하 취소시 SO 라인 shipped_qty 가 복원되고 헤더 상태가 CONFIRMED 로 되돌아간다")
     void 출하_취소시_누적이_복원된다() {
-        var customer = customerService.create(new CustomerCreateRequest(
-                "취소대상-" + System.nanoTime(), uniqueBusinessNo(), null,
-                new BigDecimal("100000000"), PaymentTerms.NET30));
+        var customer = createCustomerWithCreditLimit(
+                "취소대상-" + System.nanoTime(), null, new BigDecimal("100000000"));
         var item = itemService.create(new ItemCreateRequest(
                 "노트북-" + System.nanoTime(), ItemCategory.NOTEBOOK, ItemUnit.EA,
                 new BigDecimal("100000"), new BigDecimal("200000")));
@@ -198,6 +195,15 @@ class PartialDeliveryAndInvoiceScenarioTest {
     }
 
     // === helpers ===
+
+    /** 고객을 생성한 뒤 신용한도를 충분히 올려준다(생성 시 한도는 항상 0이므로). */
+    private CustomerResponse createCustomerWithCreditLimit(String name, String address, BigDecimal creditLimit) {
+        var customer = customerService.create(new CustomerCreateRequest(
+                name, uniqueBusinessNo(), address, PaymentTerms.NET30));
+        customerRepository.findById(customer.id()).orElseThrow().changeCreditLimit(creditLimit);
+        customerRepository.flush();
+        return customer;
+    }
 
     /** 출하될 새 창고 하나 생성, id 반환. */
     private Long warehouseId() {

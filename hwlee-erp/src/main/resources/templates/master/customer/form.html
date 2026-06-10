@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('고객 등록', 'customer', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1 id="form-title">신규 고객</h1>
+            <div class="crumb">영업 (SD) · 고객 마스터</div>
+        </div>
+        <a href="/master/customers" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <div class="card form-card">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">고객명 <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="f-name" maxlength="200">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">사업자번호 <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="f-bizno" maxlength="20" placeholder="000-00-00000">
+                    <div class="form-text" id="bizno-help">등록 후에는 변경할 수 없습니다(외부 식별자).</div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">주소</label>
+                    <input type="text" class="form-control" id="f-address" maxlength="500">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">결제조건 <span class="text-danger">*</span></label>
+                    <select class="form-select" id="f-terms">
+                        <option value="NET30">NET30</option>
+                        <option value="NET60">NET60</option>
+                        <option value="COD">COD</option>
+                        <option value="PREPAID">PREPAID</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="alert alert-light border mt-3 mb-0 py-2 px-3 small" id="credit-note">
+                <i class="bi bi-info-circle text-primary"></i>
+                신규 고객은 <strong>신용한도 0(현금거래)</strong>으로 시작합니다.
+                외상 한도가 필요하면 등록 후 <strong>여신 상향 요청</strong>을 올려 재무 승인을 받으세요.
+                (신용한도는 영업이 직접 설정할 수 없습니다 — 재무 권한)
+            </div>
+        </div>
+    </div>
+
+    <div class="form-actions mt-3">
+        <a href="/master/customers" class="btn btn-outline-secondary">취소</a>
+        <button type="button" id="btn-save" class="btn btn-primary"><i class="bi bi-check-lg"></i> 저장</button>
+    </div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];          // 수정 모드면 고객 id, 신규면 null
+    const isEdit = ID != null;
+
+    async function loadForEdit() {
+        try {
+            const c = await ERP.api('/api/customers/' + ID);
+            document.getElementById('form-title').textContent = '고객 수정 · ' + c.code;
+            document.getElementById('f-name').value = c.name;
+            document.getElementById('f-bizno').value = c.businessNo;
+            document.getElementById('f-bizno').readOnly = true;
+            document.getElementById('f-address').value = c.address || '';
+            document.getElementById('f-terms').value = c.paymentTerms;
+            // 수정 모드: 사업자번호 고정 안내 유지, 신규용 한도 안내는 숨김
+            document.getElementById('credit-note').style.display = 'none';
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    async function save() {
+        const name = document.getElementById('f-name').value.trim();
+        const businessNo = document.getElementById('f-bizno').value.trim();
+        const address = document.getElementById('f-address').value.trim() || null;
+        const paymentTerms = document.getElementById('f-terms').value;
+        if (!name) { ERP.flash('고객명을 입력하세요.', 'warning'); return; }
+        if (!isEdit && !businessNo) { ERP.flash('사업자번호를 입력하세요.', 'warning'); return; }
+        try {
+            if (isEdit) {
+                await ERP.api('/api/customers/' + ID, {method: 'PUT', body: {name, address, paymentTerms}});
+                ERP.flash('수정되었습니다.', 'success');
+                setTimeout(() => location.href = '/master/customers/' + ID, 600);
+            } else {
+                const c = await ERP.api('/api/customers', {method: 'POST', body: {name, businessNo, address, paymentTerms}});
+                ERP.flash('등록되었습니다.', 'success');
+                setTimeout(() => location.href = '/master/customers/' + c.id, 600);
+            }
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (isEdit) loadForEdit();
+        document.getElementById('btn-save').addEventListener('click', save);
+    });
+</script>
+</div>
+</body>
+</html>

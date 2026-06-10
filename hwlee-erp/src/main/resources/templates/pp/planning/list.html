@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('계획오더 (MRP)', 'planned', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>계획오더 <span class="text-muted">(MRP)</span></h1>
+            <div class="crumb">생산 (PP) · Planned Order — 수주 확정 시 부족분만큼 자동 제안</div>
+        </div>
+    </div>
+
+    <form id="searchForm" class="filter-bar">
+        <div class="filter-field ff-narrow">
+            <label>상태</label>
+            <select id="f-status" class="form-select form-select-sm">
+                <option value="PROPOSED">검토 대기</option>
+                <option value="CONVERTED">전환됨</option>
+                <option value="DISMISSED">기각됨</option>
+                <option value="">전체</option>
+            </select>
+        </div>
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> 검색</button>
+            <button type="button" id="btn-reset" class="btn btn-sm btn-outline-secondary btn-icon" title="초기화"><i class="bi bi-arrow-counterclockwise"></i></button>
+        </div>
+    </form>
+
+    <div class="table-wrap">
+    <table class="table table-hover align-middle mb-0">
+        <thead>
+        <tr>
+            <th>번호</th><th>완제품</th>
+            <th class="text-end">필요량</th><th class="text-end">현재고</th><th class="text-end">부족분</th>
+            <th>출처 수주</th><th>상태</th><th style="width:160px;"></th>
+        </tr>
+        </thead>
+        <tbody id="rows"><tr><td colspan="8" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
+    </table>
+    </div>
+    <nav class="mt-3"><ul class="pagination pagination-sm" id="pager"></ul></nav>
+
+    <!-- 승인(전환) 모달 -->
+    <div class="modal fade" id="convertModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">생산지시로 전환</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-3">계획오더 <strong id="cv-number"></strong> 를 승인해 생산지시를 만듭니다.</p>
+            <div class="mb-3">
+                <label class="form-label">완제품</label>
+                <input type="text" class="form-control" id="cv-product" readonly>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">생산 수량 <span class="text-muted">(부족분)</span></label>
+                <input type="text" class="form-control" id="cv-qty" readonly>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">생산 창고 <span class="text-danger">*</span></label>
+                <select class="form-select" id="cv-warehouse"><option value="">선택…</option></select>
+                <div class="form-text">어느 창고에 생산해 넣을지 — 계획 단계엔 미정, 지금 지정합니다.</div>
+            </div>
+            <div class="mb-2">
+                <label class="form-label">완료 예정일 <span class="text-muted">(선택)</span></label>
+                <input type="date" class="form-control" id="cv-due">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button>
+            <button type="button" class="btn btn-primary" id="cv-submit"><i class="bi bi-gear-wide-connected"></i> 생산지시 생성</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<script>
+    const STATUS = {
+        PROPOSED:  {label: '검토 대기', color: 'warning'},
+        CONVERTED: {label: '전환됨', color: 'success'},
+        DISMISSED: {label: '기각됨', color: 'dark'},
+    };
+    let page = 0;
+    const SIZE = 10;
+    let convertModal = null;
+    let cvId = null;
+
+    async function loadWarehouses() {
+        try {
+            const data = await ERP.api('/api/warehouses' + ERP.query({size: 500}));
+            const sel = document.getElementById('cv-warehouse');
+            (data.content || []).forEach(w => {
+                const o = document.createElement('option');
+                o.value = w.id; o.textContent = `${w.name} (${w.code})`;
+                sel.appendChild(o);
+            });
+        } catch (e) {}
+    }
+
+    async function load() {
+        const tbody = document.getElementById('rows');
+        const status = document.getElementById('f-status').value;
+        try {
+            const data = await ERP.api('/api/planned-orders' + ERP.query({status, page, size: SIZE, sort: 'id,desc'}));
+            const list = data.content || [];
+            tbody.innerHTML = list.length === 0
+                ? '<tr><td colspan="8" class="text-center text-muted py-4">계획오더가 없습니다.</td></tr>'
+                : list.map(o => {
+                    const s = STATUS[o.status] || {label: o.status, color: 'secondary'};
+                    let action = '<span class="text-muted">-</span>';
+                    if (o.status === 'PROPOSED') {
+                        action = `<button class="btn btn-sm btn-primary" onclick='openConvert(${JSON.stringify(o)})'>승인</button>
+                                  <button class="btn btn-sm btn-outline-secondary" onclick="dismiss(${o.id})">기각</button>`;
+                    } else if (o.status === 'CONVERTED') {
+                        action = `<span class="small text-success">→ ${ERP.esc(o.convertedProductionNumber ?? '')}</span>`;
+                    }
+                    return `<tr>
+                        <td>${ERP.esc(o.number)}</td>
+                        <td>${ERP.esc(o.productName)} <span class="text-muted small">${ERP.esc(o.productCode)}</span></td>
+                        <td class="text-end">${ERP.num(o.requiredQty)}</td>
+                        <td class="text-end">${ERP.num(o.onHandQty)}</td>
+                        <td class="text-end fw-semibold text-danger">${ERP.num(o.shortageQty)}</td>
+                        <td class="small">${ERP.esc(o.sourceSalesOrderNumber ?? '-')}</td>
+                        <td>${ERP.badge(s.label, s.color)}</td>
+                        <td>${action}</td></tr>`;
+                }).join('');
+            renderPager(data.totalPages || 0, data.number || 0);
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            ERP.flashError(e);
+        }
+    }
+
+    function openConvert(o) {
+        cvId = o.id;
+        document.getElementById('cv-number').textContent = o.number;
+        document.getElementById('cv-product').value = `${o.productName} (${o.productCode})`;
+        document.getElementById('cv-qty').value = ERP.num(o.shortageQty);
+        document.getElementById('cv-warehouse').value = '';
+        document.getElementById('cv-due').value = '';
+        convertModal.show();
+    }
+
+    async function submitConvert() {
+        const warehouseId = document.getElementById('cv-warehouse').value;
+        if (!warehouseId) { ERP.flash('생산 창고를 선택하세요.', 'warning'); return; }
+        const dueDate = document.getElementById('cv-due').value || null;
+        try {
+            const po = await ERP.api(`/api/planned-orders/${cvId}/convert`, {
+                method: 'POST', body: {warehouseId: Number(warehouseId), dueDate}
+            });
+            convertModal.hide();
+            ERP.flash(`생산지시 ${po.number} 생성됨 — 생산지시 화면에서 착수/완료할 수 있습니다.`, 'success');
+            load();
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    async function dismiss(id) {
+        if (!confirm('이 계획오더를 기각하시겠습니까? (생산하지 않음)')) return;
+        try {
+            await ERP.api(`/api/planned-orders/${id}/dismiss`, {method: 'POST'});
+            ERP.flash('기각되었습니다.', 'success');
+            load();
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    function renderPager(totalPages, current) {
+        const pager = document.getElementById('pager');
+        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+        let html = '';
+        for (let i = 0; i < totalPages; i++)
+            html += `<li class="page-item ${i === current ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="goto(${i});return false;">${i + 1}</a></li>`;
+        pager.innerHTML = html;
+    }
+    function goto(p) { page = p; load(); }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        convertModal = new bootstrap.Modal(document.getElementById('convertModal'));
+        loadWarehouses(); load();
+        document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); page = 0; load(); });
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            document.getElementById('f-status').value = 'PROPOSED'; page = 0; load();
+        });
+        document.getElementById('cv-submit').addEventListener('click', submitConvert);
+    });
+</script>
+</div>
+</body>
+</html>

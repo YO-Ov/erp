@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.hwlee.erp.TestcontainersConfiguration;
+import com.hwlee.erp.master.customer.CustomerRepository;
 import com.hwlee.erp.master.customer.CustomerService;
 import com.hwlee.erp.master.customer.PaymentTerms;
 import com.hwlee.erp.master.customer.dto.CustomerCreateRequest;
+import com.hwlee.erp.master.customer.dto.CustomerResponse;
 import com.hwlee.erp.master.item.ItemCategory;
 import com.hwlee.erp.master.item.ItemService;
 import com.hwlee.erp.master.item.ItemUnit;
@@ -61,6 +63,7 @@ import org.springframework.context.annotation.Import;
 class SdMmIntegrationTest {
 
     @Autowired CustomerService customerService;
+    @Autowired CustomerRepository customerRepository;
     @Autowired ItemService itemService;
     @Autowired VendorService vendorService;
     @Autowired WarehouseService warehouseService;
@@ -158,9 +161,8 @@ class SdMmIntegrationTest {
     void 다중_라인_출하는_한_GoodsIssue_가_여러_라인을_가진다() {
         // 노트북 5대 + 모니터 3대 한 출하
         long nano = System.nanoTime();
-        var customer = customerService.create(new CustomerCreateRequest(
-                "다중라인-" + nano, uniqueBusinessNo(), "서울시",
-                new BigDecimal("100000000"), PaymentTerms.NET30));
+        var customer = createCustomerWithCreditLimit(
+                "다중라인-" + nano, "서울시", new BigDecimal("100000000"));
         var notebook = itemService.create(new ItemCreateRequest(
                 "노트북-" + nano, ItemCategory.NOTEBOOK, ItemUnit.EA, bd(800000), bd(1200000)));
         var monitor = itemService.create(new ItemCreateRequest(
@@ -200,9 +202,8 @@ class SdMmIntegrationTest {
     void 리스너_예외는_Delivery_트랜잭션을_롤백시킨다() {
         // 입고를 전혀 안 함 → 출하 시 리스너에서 Stock not found(EntityNotFoundException)
         long nano = System.nanoTime();
-        var customer = customerService.create(new CustomerCreateRequest(
-                "롤백검증-" + nano, uniqueBusinessNo(), "서울시",
-                new BigDecimal("100000000"), PaymentTerms.NET30));
+        var customer = createCustomerWithCreditLimit(
+                "롤백검증-" + nano, "서울시", new BigDecimal("100000000"));
         var item = itemService.create(new ItemCreateRequest(
                 "노트북-" + nano, ItemCategory.NOTEBOOK, ItemUnit.EA, bd(800000), bd(1200000)));
         Long warehouseId = warehouseId();   // 재고 행 없음
@@ -225,14 +226,22 @@ class SdMmIntegrationTest {
 
     // === helpers ===
 
+    /** 고객을 생성한 뒤 신용한도를 충분히 올려준다(생성 시 한도는 항상 0이므로). */
+    private CustomerResponse createCustomerWithCreditLimit(String name, String address, BigDecimal creditLimit) {
+        var customer = customerService.create(new CustomerCreateRequest(
+                name, uniqueBusinessNo(), address, PaymentTerms.NET30));
+        customerRepository.findById(customer.id()).orElseThrow().changeCreditLimit(creditLimit);
+        customerRepository.flush();
+        return customer;
+    }
+
     private record TestContext(Long itemId, Long warehouseId, Long soId, Long solId) {}
 
     /** 고객 + 노트북 + 창고 + qty 입고 + 10대 수주(확정) 까지 준비. */
     private TestContext setup(int stockQty) {
         long nano = System.nanoTime();
-        var customer = customerService.create(new CustomerCreateRequest(
-                "현우테크-" + nano, uniqueBusinessNo(), "서울시",
-                new BigDecimal("100000000"), PaymentTerms.NET30));
+        var customer = createCustomerWithCreditLimit(
+                "현우테크-" + nano, "서울시", new BigDecimal("100000000"));
         var item = itemService.create(new ItemCreateRequest(
                 "노트북-" + nano, ItemCategory.NOTEBOOK, ItemUnit.EA, bd(800000), bd(1200000)));
         Long warehouseId = warehouseId();

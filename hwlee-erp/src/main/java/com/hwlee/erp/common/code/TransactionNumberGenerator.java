@@ -28,6 +28,8 @@ public class TransactionNumberGenerator {
     static final String PREFIX_PAYMENT = "PAY";
     static final String PREFIX_PAYROLL_RUN = "PR";
     static final String PREFIX_PRODUCTION_ORDER = "PO";
+    static final String PREFIX_PLANNED_ORDER = "PLO";
+    static final String PREFIX_CREDIT_REQUEST = "CLR";
 
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter MONTH_FORMAT = DateTimeFormatter.ofPattern("yyyyMM");
@@ -69,6 +71,16 @@ public class TransactionNumberGenerator {
     /** 생산지시 번호 — 일 단위. 예: {@code PO-20260604-001}. */
     public String nextProductionOrderNumber(LocalDate orderDate) {
         return codeGenerator.nextTransactionCode(PREFIX_PRODUCTION_ORDER, periodKey(orderDate));
+    }
+
+    /** 계획오더(MRP 제안) 번호 — 일 단위. 예: {@code PLO-20260610-001}. */
+    public String nextPlannedOrderNumber(LocalDate orderDate) {
+        return codeGenerator.nextTransactionCode(PREFIX_PLANNED_ORDER, periodKey(orderDate));
+    }
+
+    /** 여신(신용한도) 상향 요청 번호 — 일 단위. 예: {@code CLR-20260610-001}. */
+    public String nextCreditLimitRequestNumber(LocalDate requestDate) {
+        return codeGenerator.nextTransactionCode(PREFIX_CREDIT_REQUEST, periodKey(requestDate));
     }
 
     /**

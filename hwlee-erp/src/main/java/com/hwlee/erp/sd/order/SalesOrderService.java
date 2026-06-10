@@ -8,6 +8,7 @@ import com.hwlee.erp.master.item.Item;
 import com.hwlee.erp.master.item.ItemRepository;
 import com.hwlee.erp.common.code.TransactionNumberGenerator;
 import com.hwlee.erp.sd.order.creditcheck.CreditLimitChecker;
+import com.hwlee.erp.sd.order.event.SalesOrderConfirmedEvent;
 import com.hwlee.erp.sd.order.dto.CreditStatusResponse;
 import com.hwlee.erp.sd.order.dto.SalesOrderCreateRequest;
 import com.hwlee.erp.sd.order.dto.SalesOrderLineRequest;
@@ -22,6 +23,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -41,6 +43,7 @@ public class SalesOrderService {
     private final QuotationRepository quotationRepository;
     private final TransactionNumberGenerator numberGenerator;
     private final CreditLimitChecker creditLimitChecker;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
     @Transactional
@@ -95,6 +98,12 @@ public class SalesOrderService {
         SalesOrder order = getOrThrow(id);
         creditLimitChecker.check(order.getCustomer(), order.getTotalAmount(), order.getId());
         order.confirm(LocalDateTime.now(clock));
+        // ⭐ 수주 확정 사건 발행 — PP 리스너가 BEFORE_COMMIT 에서 완제품 부족분만큼 계획오더(MRP) 자동 생성.
+        events.publishEvent(new SalesOrderConfirmedEvent(
+                order.getId(), order.getNumber(),
+                order.getLines().stream()
+                        .map(l -> new SalesOrderConfirmedEvent.Line(l.getItem().getId(), l.getOrderQty()))
+                        .toList()));
         return mapper.toResponse(order);
     }
 

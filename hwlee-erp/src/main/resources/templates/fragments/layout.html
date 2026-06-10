@@ -19,6 +19,35 @@
     <link rel="stylesheet" href="/css/app.css">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/js/erp.js"></script>
+    <style>
+        /* 알림 벨 */
+        .notif-wrap { position: relative; }
+        .notif-bell { position: relative; background: none; border: none; color: #5b6472; font-size: 1.15rem;
+            width: 36px; height: 36px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; }
+        .notif-bell:hover { background: #eef1f6; color: #206bc4; }
+        .notif-badge { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px;
+            background: #d63939; color: #fff; border-radius: 8px; font-size: .62rem; font-weight: 700;
+            display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+        .notif-menu { width: 360px; max-width: 90vw; padding: 0; border: 1px solid #e6e8ec;
+            box-shadow: 0 12px 36px rgba(0,0,0,.14); border-radius: 10px; overflow: hidden; }
+        .notif-head { display: flex; align-items: center; justify-content: space-between;
+            padding: .7rem .9rem; border-bottom: 1px solid #eef0f3; font-size: .9rem; }
+        .notif-list { max-height: 380px; overflow-y: auto; }
+        .notif-item { display: block; padding: .7rem .9rem; border-bottom: 1px solid #f3f4f6;
+            cursor: pointer; text-decoration: none; color: inherit; }
+        .notif-item:hover { background: #f7f9fc; }
+        .notif-item.unread { background: #f0f6ff; }
+        .notif-item.unread:hover { background: #e6f0ff; }
+        .notif-item .ni-title { font-weight: 600; font-size: .83rem; color: #1c2434; display: flex; align-items: center; gap: .35rem; }
+        .notif-item.unread .ni-title::after { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #206bc4; margin-left: auto; flex: none; }
+        .notif-item:not(.unread) .ni-title { font-weight: 500; color: #5b6472; }
+        .notif-item .ni-msg { font-size: .76rem; color: #667085; margin-top: .15rem; line-height: 1.35; }
+        .notif-item .ni-time { font-size: .68rem; color: #98a2b3; margin-top: .2rem; }
+        .notif-all { display: block; text-align: center; padding: .6rem; font-size: .8rem;
+            color: #206bc4; text-decoration: none; border-top: 1px solid #eef0f3; }
+        .notif-all:hover { background: #f7f9fc; }
+        .notif-empty { text-align: center; color: #98a2b3; font-size: .8rem; padding: 1.5rem 1rem; }
+    </style>
 </head>
 <body>
 <div class="app-layout">
@@ -36,6 +65,9 @@
 
             <div sec:authorize="hasAnyRole('SALES','ADMIN')">
                 <div class="nav-section">영업 (SD)</div>
+                <a class="nav-link" th:classappend="${active == 'customer'} ? 'active'" href="/master/customers">
+                    <i class="bi bi-person-vcard"></i> 고객
+                </a>
                 <a class="nav-link" th:classappend="${active == 'quotation'} ? 'active'" href="/sd/quotations">
                     <i class="bi bi-file-earmark-text"></i> 견적
                 </a>
@@ -47,6 +79,9 @@
                 </a>
                 <a class="nav-link" th:classappend="${active == 'invoice'} ? 'active'" href="/sd/invoices">
                     <i class="bi bi-receipt"></i> 인보이스
+                </a>
+                <a class="nav-link" th:classappend="${active == 'credit'} ? 'active'" href="/fi/credit-limit-requests">
+                    <i class="bi bi-shield-plus"></i> 여신 상향 요청
                 </a>
             </div>
 
@@ -68,6 +103,9 @@
 
             <div sec:authorize="hasAnyRole('PRODUCTION','ADMIN')">
                 <div class="nav-section">생산 (PP)</div>
+                <a class="nav-link" th:classappend="${active == 'planned'} ? 'active'" href="/pp/planned-orders">
+                    <i class="bi bi-lightbulb"></i> 계획오더 (MRP)
+                </a>
                 <a class="nav-link" th:classappend="${active == 'production'} ? 'active'" href="/pp/production-orders">
                     <i class="bi bi-gear-wide-connected"></i> 생산지시
                 </a>
@@ -86,6 +124,9 @@
                 </a>
                 <a class="nav-link" th:classappend="${active == 'payment'} ? 'active'" href="/fi/payments">
                     <i class="bi bi-cash-stack"></i> 입출금
+                </a>
+                <a class="nav-link" th:classappend="${active == 'credit'} ? 'active'" href="/fi/credit-limit-requests">
+                    <i class="bi bi-shield-check"></i> 여신 승인
                 </a>
             </div>
 
@@ -134,6 +175,23 @@
             </button>
             <div class="topbar-title" th:text="${title}">제목</div>
             <div class="topbar-right">
+                <div class="notif-wrap dropdown">
+                    <button class="notif-bell" id="notifBell" data-bs-toggle="dropdown"
+                            data-bs-auto-close="outside" aria-expanded="false" title="알림">
+                        <i class="bi bi-bell"></i>
+                        <span class="notif-badge d-none" id="notifBadge">0</span>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end notif-menu">
+                        <div class="notif-head">
+                            <strong>알림</strong>
+                            <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" id="notifReadAll">모두 읽음</button>
+                        </div>
+                        <div class="notif-list" id="notifList">
+                            <div class="notif-empty">불러오는 중…</div>
+                        </div>
+                        <a href="/notifications" class="notif-all">전체 보기</a>
+                    </div>
+                </div>
                 <span class="user-chip">
                     <i class="bi bi-person-circle"></i>
                     <span sec:authentication="name">사용자</span>
@@ -149,5 +207,75 @@
         </main>
     </div>
 </div>
+
+<script>
+    // 공통 알림 벨 — 모든 화면 상단바에서 동작. 안 읽은 수 폴링 + 드롭다운 최근 목록 + 클릭 시 딥링크 이동.
+    (function () {
+        const TYPE_ICON = {
+            PRODUCTION_CANCELLED:     {icon: 'bi-x-octagon', color: '#d63939'},
+            CREDIT_REQUEST_SUBMITTED: {icon: 'bi-shield-exclamation', color: '#f59f00'},
+            CREDIT_REQUEST_APPROVED:  {icon: 'bi-check-circle', color: '#2fb344'},
+            CREDIT_REQUEST_REJECTED:  {icon: 'bi-x-circle', color: '#d63939'},
+        };
+        const bell = document.getElementById('notifBell');
+        if (!bell) return; // 로그인 화면 등 레이아웃 밖
+
+        function timeAgo(iso) {
+            if (!iso) return '';
+            const d = new Date(iso), diff = (Date.now() - d.getTime()) / 1000;
+            if (diff < 60) return '방금';
+            if (diff < 3600) return Math.floor(diff / 60) + '분 전';
+            if (diff < 86400) return Math.floor(diff / 3600) + '시간 전';
+            return d.toLocaleDateString('ko-KR');
+        }
+
+        async function refreshBadge() {
+            try {
+                const r = await ERP.api('/api/notifications/unread-count');
+                const badge = document.getElementById('notifBadge');
+                const n = r.count || 0;
+                badge.textContent = n > 99 ? '99+' : n;
+                badge.classList.toggle('d-none', n === 0);
+            } catch (e) { /* 미인증 등은 조용히 */ }
+        }
+
+        async function loadList() {
+            const box = document.getElementById('notifList');
+            try {
+                const data = await ERP.api('/api/notifications' + ERP.query({size: 8, sort: 'id,desc'}));
+                const list = data.content || [];
+                box.innerHTML = list.length === 0
+                    ? '<div class="notif-empty"><i class="bi bi-bell-slash"></i><br>알림이 없습니다.</div>'
+                    : list.map(n => {
+                        const t = TYPE_ICON[n.type] || {icon: 'bi-info-circle', color: '#206bc4'};
+                        return `<a class="notif-item ${n.read ? '' : 'unread'}"
+                                   href="javascript:void(0)" onclick='NOTIF.open(${n.id}, ${JSON.stringify(n.linkUrl)})'>
+                            <div class="ni-title"><i class="bi ${t.icon}" style="color:${t.color}"></i> ${ERP.esc(n.title)}</div>
+                            <div class="ni-msg">${ERP.esc(n.message)}</div>
+                            <div class="ni-time">${timeAgo(n.createdAt)}</div>
+                        </a>`;
+                    }).join('');
+            } catch (e) {
+                box.innerHTML = '<div class="notif-empty">불러오기 실패</div>';
+            }
+        }
+
+        window.NOTIF = {
+            async open(id, url) {
+                try { await ERP.api(`/api/notifications/${id}/read`, {method: 'POST'}); } catch (e) {}
+                if (url) window.location.href = url; else { refreshBadge(); loadList(); }
+            },
+            async readAll() {
+                try { await ERP.api('/api/notifications/read-all', {method: 'POST'}); } catch (e) {}
+                refreshBadge(); loadList();
+            }
+        };
+
+        bell.addEventListener('show.bs.dropdown', loadList);
+        document.getElementById('notifReadAll').addEventListener('click', () => NOTIF.readAll());
+        refreshBadge();
+        setInterval(refreshBadge, 30000); // 30초 폴링
+    })();
+</script>
 </body>
 </html>

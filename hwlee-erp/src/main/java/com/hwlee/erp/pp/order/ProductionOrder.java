@@ -124,6 +124,12 @@ public class ProductionOrder extends BaseEntity {
     public void cancel() {
         if (status == ProductionOrderStatus.COMPLETED || status == ProductionOrderStatus.CANCELLED)
             throw new IllegalStateException("이미 종료된 생산지시는 취소할 수 없습니다. 현재: " + status);
+        // MES 로 전송된 생산지시는 함부로 취소 못 한다 — 현장 작업지시가 이미 진행 중일 수 있어
+        // ERP 만 취소하면 MES 와 불일치한다. SD 의 "출하 실적 있으면 수주 취소 거부" 와 같은 사상.
+        if (mesWorkOrderNo != null)
+            throw new IllegalStateException(
+                    "MES 로 전송된 생산지시는 취소할 수 없습니다 (MES 작업지시 " + mesWorkOrderNo
+                            + " 진행 중). MES 현장에서 먼저 처리해야 합니다.");
         this.status = ProductionOrderStatus.CANCELLED;
     }
 

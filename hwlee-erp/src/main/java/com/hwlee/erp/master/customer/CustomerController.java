@@ -34,7 +34,7 @@ public class CustomerController {
 
     private final CustomerService service;
 
-    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('SALES','ADMIN')")
     @PostMapping
     public ResponseEntity<CustomerResponse> create(@Valid @RequestBody CustomerCreateRequest req) {
         CustomerResponse created = service.create(req);
@@ -64,7 +64,7 @@ public class CustomerController {
         );
     }
 
-    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('SALES','ADMIN')")
     @PutMapping("/{id}")
     public CustomerResponse update(@PathVariable Long id, @Valid @RequestBody CustomerUpdateRequest req) {
         return service.update(id, req);

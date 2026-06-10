@@ -13,6 +13,7 @@ import com.hwlee.erp.fi.payment.PaymentService;
 import com.hwlee.erp.fi.payment.PaymentType;
 import com.hwlee.erp.fi.payment.dto.PaymentCreateRequest;
 import com.hwlee.erp.fi.payment.dto.PaymentResponse;
+import com.hwlee.erp.master.customer.CustomerRepository;
 import com.hwlee.erp.master.customer.CustomerService;
 import com.hwlee.erp.master.customer.PaymentTerms;
 import com.hwlee.erp.master.customer.dto.CustomerCreateRequest;
@@ -69,6 +70,7 @@ import org.springframework.context.annotation.Import;
 class FiAccountingIntegrationTest {
 
     @Autowired CustomerService customerService;
+    @Autowired CustomerRepository customerRepository;
     @Autowired ItemService itemService;
     @Autowired VendorService vendorService;
     @Autowired WarehouseService warehouseService;
@@ -301,8 +303,10 @@ class FiAccountingIntegrationTest {
     private TestContext setupMasters() {
         long nano = System.nanoTime();
         var customer = customerService.create(new CustomerCreateRequest(
-                "현우테크-" + nano, uniqueBusinessNo(), "서울시",
-                new BigDecimal("100000000"), PaymentTerms.NET30));
+                "현우테크-" + nano, uniqueBusinessNo(), "서울시", PaymentTerms.NET30));
+        // 생성 시 한도는 항상 0이므로, 수주 확정이 신용한도 검증을 통과하도록 충분히 올려준다.
+        customerRepository.findById(customer.id()).orElseThrow().changeCreditLimit(new BigDecimal("100000000"));
+        customerRepository.flush();
         var item = itemService.create(new ItemCreateRequest(
                 "노트북-" + nano, ItemCategory.NOTEBOOK, ItemUnit.EA, bd(800000), bd(1200000)));
         var warehouse = warehouseService.create(new WarehouseCreateRequest(

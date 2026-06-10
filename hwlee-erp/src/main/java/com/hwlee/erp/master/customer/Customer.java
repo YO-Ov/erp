@@ -67,21 +67,31 @@ public class Customer extends BaseEntityWithCode implements Auditable {
         return c;
     }
 
-    public void update(String name, String address, BigDecimal creditLimit, PaymentTerms paymentTerms) {
+    /**
+     * 기본정보 수정 (영업 권한). 신용한도(creditLimit)·사업자번호(business_no)는 건드리지 않는다 —
+     * 한도는 여신(재무) 권한, 사업자번호는 외부 식별자라 불변.
+     */
+    public void updateBasicInfo(String name, String address, PaymentTerms paymentTerms) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("name 은 비어 있을 수 없다.");
-        }
-        if (creditLimit == null || creditLimit.signum() < 0) {
-            throw new IllegalArgumentException("creditLimit 은 0 이상이어야 한다.");
         }
         if (paymentTerms == null) {
             throw new IllegalArgumentException("paymentTerms 은 null 일 수 없다.");
         }
         this.name = name;
         this.address = address;
-        this.creditLimit = creditLimit;
         this.paymentTerms = paymentTerms;
-        // 비즈니스 규칙: business_no 는 수정 불가 (외부 식별자).
+    }
+
+    /**
+     * 신용한도만 변경 — 여신 상향 요청 승인(FI) 시 호출. 다른 필드는 건드리지 않는다.
+     * "누가 언제 한도를 바꿨나" 는 {@link #auditSnapshot()} 으로 감사 로그에 남는다.
+     */
+    public void changeCreditLimit(BigDecimal newCreditLimit) {
+        if (newCreditLimit == null || newCreditLimit.signum() < 0) {
+            throw new IllegalArgumentException("creditLimit 은 0 이상이어야 한다.");
+        }
+        this.creditLimit = newCreditLimit;
     }
 
     /** 감사 로그에 남길 스냅샷 — 어떤 필드를 추적할지 명시적으로 고른다. */

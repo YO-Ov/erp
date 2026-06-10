@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('고객 상세', 'customer', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1 id="d-name">고객</h1>
+            <div class="crumb">영업 (SD) · 고객 마스터 · <span id="d-code"></span></div>
+        </div>
+        <div>
+            <a href="/master/customers" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+            <a id="btn-edit" class="btn btn-primary"><i class="bi bi-pencil"></i> 수정</a>
+            <button id="btn-delete" class="btn btn-outline-danger" sec:authorize="hasRole('ADMIN')"><i class="bi bi-trash"></i> 삭제</button>
+        </div>
+    </div>
+
+    <div class="card form-card">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">코드</dt><dd class="col-sm-9" id="v-code">-</dd>
+                <dt class="col-sm-3">고객명</dt><dd class="col-sm-9" id="v-name">-</dd>
+                <dt class="col-sm-3">사업자번호</dt><dd class="col-sm-9" id="v-bizno">-</dd>
+                <dt class="col-sm-3">주소</dt><dd class="col-sm-9" id="v-address">-</dd>
+                <dt class="col-sm-3">결제조건</dt><dd class="col-sm-9" id="v-terms">-</dd>
+                <dt class="col-sm-3">상태</dt><dd class="col-sm-9" id="v-status">-</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="card mt-3">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <span><i class="bi bi-shield-lock"></i> 신용한도 (여신)</span>
+            <a id="btn-credit" class="btn btn-sm btn-outline-danger"><i class="bi bi-shield-plus"></i> 여신 상향 요청</a>
+        </div>
+        <div class="card-body">
+            <div class="d-flex align-items-baseline gap-2">
+                <span class="fs-4 fw-bold" id="v-credit">-</span>
+                <span id="v-credit-badge"></span>
+            </div>
+            <div class="form-text mt-1">
+                신용한도는 <strong>재무(여신) 권한</strong>입니다. 영업은 변경할 수 없으며,
+                상향이 필요하면 <strong>여신 상향 요청</strong>을 올려 재무 승인을 받습니다.
+            </div>
+        </div>
+    </div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const STATUS = {ACTIVE: {label: '활성', color: 'success'}, INACTIVE: {label: '비활성', color: 'secondary'}};
+
+    async function load() {
+        try {
+            const c = await ERP.api('/api/customers/' + ID);
+            document.getElementById('d-name').textContent = c.name;
+            document.getElementById('d-code').textContent = c.code;
+            document.getElementById('v-code').textContent = c.code;
+            document.getElementById('v-name').textContent = c.name;
+            document.getElementById('v-bizno').textContent = c.businessNo;
+            document.getElementById('v-address').textContent = c.address || '-';
+            document.getElementById('v-terms').textContent = c.paymentTerms;
+            const s = STATUS[c.status] || {label: c.status, color: 'secondary'};
+            document.getElementById('v-status').innerHTML = ERP.badge(s.label, s.color);
+            document.getElementById('v-credit').textContent = ERP.won(c.creditLimit);
+            document.getElementById('v-credit-badge').innerHTML =
+                Number(c.creditLimit) === 0 ? '<span class="badge badge-soft badge-soft-secondary">현금거래 (한도 없음)</span>' : '';
+            document.getElementById('btn-edit').href = `/master/customers/${ID}/edit`;
+            // 검토 중인 여신 요청이 있으면 "상향 요청" 버튼을 "검토 중" 표시로 대체(중복 신청 방지)
+            const creditBtn = document.getElementById('btn-credit');
+            let pending = null;
+            try { pending = await ERP.api('/api/credit-limit-requests/pending?customerId=' + ID); } catch (e) {}
+            if (pending) {
+                creditBtn.outerHTML =
+                    `<a href="/fi/credit-limit-requests" class="badge badge-soft badge-soft-warning text-decoration-none px-2 py-2"
+                        title="재무 검토 대기 중">
+                        <i class="bi bi-hourglass-split"></i> 여신 검토 중 · ${ERP.esc(pending.number)}</a>`;
+            } else {
+                creditBtn.href = `/fi/credit-limit-requests?customerId=${ID}`;
+            }
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    async function del() {
+        if (!confirm('이 고객을 삭제하시겠습니까? (과거 거래는 보존되며 새 거래에서만 숨겨집니다)')) return;
+        try {
+            await ERP.api('/api/customers/' + ID, {method: 'DELETE'});
+            ERP.flash('삭제되었습니다.', 'success');
+            setTimeout(() => location.href = '/master/customers', 600);
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        load();
+        const bd = document.getElementById('btn-delete');
+        if (bd) bd.addEventListener('click', del);
+    });
+</script>
+</div>
+</body>
+</html>

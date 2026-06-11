@@ -21,4 +21,19 @@ public interface ProductionOrderRepository
 
     /** Phase 16 — 정합성 검증: MES 로 전송된(dispatched) 생산지시. */
     java.util.List<ProductionOrder> findByMesWorkOrderNoIsNotNull();
+
+    /**
+     * 영업 ATP — 아직 재고에 반영되지 않은 진행 중 생산지시(PLANNED/RELEASED)의 완제품 산출 예정 수량 합.
+     * (COMPLETED 는 이미 완제품이 입고돼 현재고에 반영됐으므로 제외한다.)
+     */
+    @Query("""
+        select coalesce(sum(po.quantity), 0)
+          from ProductionOrder po
+         where po.product.id = :itemId
+           and po.status in (
+                com.hwlee.erp.pp.order.ProductionOrderStatus.PLANNED,
+                com.hwlee.erp.pp.order.ProductionOrderStatus.RELEASED
+           )
+        """)
+    java.math.BigDecimal sumOpenProductionQtyByProduct(@Param("itemId") Long itemId);
 }

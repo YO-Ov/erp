@@ -18,11 +18,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Stock 은 조회 전용 API. 변경은 입고/출고/조정만이 수행한다.
+ *
+ * <p>재고 "조회는 넓게, 변경은 PURCHASING 만" 원칙 — 영업(SALES)도 출하/약속을 위해
+ * 재고를 봐야 하므로 조회 권한을 영업까지 넓힌다. (입고·출고 변경 API 는 여전히 PURCHASING 만.)
  */
 @RestController
 @RequestMapping("/api/stocks")
 @RequiredArgsConstructor
-@org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('PURCHASING','ADMIN')")
+@org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('SALES','PURCHASING','ADMIN')")
 public class StockController {
 
     private final StockService service;

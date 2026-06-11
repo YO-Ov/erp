@@ -107,7 +107,8 @@
         const tbody = document.getElementById('lines');
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><select class="form-select form-select-sm line-item" onchange="onItemChange(this)">${itemOptions(line?.itemId)}</select></td>
+            <td><select class="form-select form-select-sm line-item" onchange="onItemChange(this)">${itemOptions(line?.itemId)}</select>
+                <div class="atp-line small mt-1"></div></td>
             <td><input type="number" step="any" min="0" class="form-control form-control-sm text-end line-qty"
                        value="${line?.orderQty ?? ''}" oninput="recalc()"></td>
             <td><input type="number" step="any" min="0" class="form-control form-control-sm text-end line-price"
@@ -115,20 +116,57 @@
             <td class="text-end line-total">₩0</td>
             <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove();recalc()">✕</button></td>`;
         tbody.appendChild(tr);
+        if (line?.itemId) loadLineAtp(tr);   // 견적/수정으로 품목이 미리 채워진 라인은 즉시 ATP 조회
         recalc();
     }
     function onItemChange(sel) {
+        const tr = sel.closest('tr');
         const opt = sel.selectedOptions[0];
-        const priceInput = sel.closest('tr').querySelector('.line-price');
+        const priceInput = tr.querySelector('.line-price');
         if (opt && opt.dataset.price && !priceInput.value) priceInput.value = opt.dataset.price;
+        loadLineAtp(tr);     // 품목이 바뀌면 출고가능 수량(ATP) 다시 조회
         recalc();
     }
+
+    // 라인 품목의 출고가능 수량(ATP)을 조회해 라인에 캐시(data-atp)하고 표시한다. (품목이 바뀔 때만 호출)
+    async function loadLineAtp(tr) {
+        const box = tr.querySelector('.atp-line');
+        const itemId = tr.querySelector('.line-item').value;
+        if (!itemId) { tr.removeAttribute('data-atp'); box.innerHTML = ''; return; }
+        try {
+            const a = await ERP.api('/api/atp?itemId=' + itemId);
+            tr.dataset.atp = a.atp;
+            tr.dataset.onHand = a.onHand;
+            tr.dataset.committed = a.committed;
+            tr.dataset.inbound = a.inboundProduction;
+            renderLineAtp(tr);
+        } catch (e) { tr.removeAttribute('data-atp'); box.innerHTML = '<span class="text-muted">출고가능 수량 조회 불가</span>'; }
+    }
+
+    // 캐시된 ATP 와 현재 입력한 주문량을 비교해 라인 안내/초과 경고를 그린다. (주문량 입력마다 호출)
+    // 분해(현재고/출하대기/입고예정)는 ⓘ 아이콘 호버 툴팁으로 숨긴다.
+    function renderLineAtp(tr) {
+        const box = tr.querySelector('.atp-line');
+        if (!box) return;
+        if (tr.dataset.atp == null) { box.innerHTML = ''; return; }
+        const atp = Number(tr.dataset.atp);
+        const qty = parseFloat(tr.querySelector('.line-qty').value) || 0;
+        const over = qty > atp;
+        const tip = `현재고 ${ERP.num(tr.dataset.onHand)} − 출하대기 ${ERP.num(tr.dataset.committed)}`
+            + ` + 입고예정 ${ERP.num(tr.dataset.inbound)}`;
+        box.innerHTML = `<span class="${over ? 'text-danger fw-semibold' : 'text-muted'}">`
+            + `<i class="bi bi-box-seam"></i> 출고가능 수량 ${ERP.num(atp)}`
+            + ` <i class="bi bi-info-circle" title="${tip}" style="cursor:help;"></i></span>`
+            + (over ? ` <span class="badge bg-danger">주문량이 출고가능 수량 초과</span>` : '');
+    }
+
     function recalc() {
         let grand = 0;
         document.querySelectorAll('#lines tr').forEach(tr => {
             const qty = parseFloat(tr.querySelector('.line-qty').value) || 0;
             const price = parseFloat(tr.querySelector('.line-price').value) || 0;
             tr.querySelector('.line-total').textContent = ERP.won(qty * price);
+            renderLineAtp(tr);   // 주문량 변화에 맞춰 ATP 초과 경고 갱신
             grand += qty * price;
         });
         document.getElementById('grandTotal').textContent = ERP.won(grand);

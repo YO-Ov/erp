@@ -76,9 +76,10 @@
             `${o.createdBy ?? '?'} · ${(o.createdAt ?? '').replace('T', ' ').slice(0, 16)}`;
 
         document.getElementById('lines').innerHTML = (o.lines || []).map(l => `
-            <tr>
+            <tr data-item-id="${l.itemId}">
                 <td>${l.lineNo}</td>
-                <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
+                <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span>
+                    <div class="atp-cell small mt-1"></div></td>
                 <td class="text-end">${ERP.num(l.orderQty)}</td>
                 <td class="text-end">${ERP.num(l.shippedQty)}</td>
                 <td class="text-end">${ERP.num(l.invoicedQty)}</td>
@@ -88,6 +89,25 @@
 
         renderActions(o.status);
         loadCreditStatus(o.customerId, o.totalAmount, o.status);
+        loadLineAtps(o.status);
+    }
+
+    // 진행 중(약속이 의미 있는) 수주에서만 라인별 출고가능 수량(ATP)을 보여준다 — 출하 가능성 가늠.
+    async function loadLineAtps(status) {
+        if (!['DRAFT', 'CONFIRMED', 'SHIPPING'].includes(status)) return;
+        for (const tr of document.querySelectorAll('#lines tr')) {
+            const itemId = tr.dataset.itemId;
+            const box = tr.querySelector('.atp-cell');
+            if (!itemId || !box) continue;
+            try {
+                const a = await ERP.api('/api/atp?itemId=' + itemId);
+                // 분해(현재고/출하대기/입고예정)는 ⓘ 아이콘 호버 툴팁으로 숨긴다.
+                const tip = `현재고 ${ERP.num(a.onHand)} − 출하대기 ${ERP.num(a.committed)}`
+                    + ` + 입고예정 ${ERP.num(a.inboundProduction)}`;
+                box.innerHTML = `<i class="bi bi-box-seam"></i> 출고가능 수량 <strong>${ERP.num(a.atp)}</strong>`
+                    + ` <i class="bi bi-info-circle text-muted" title="${tip}" style="cursor:help;"></i>`;
+            } catch (e) { /* 조회 실패는 조용히 무시 */ }
+        }
     }
 
     // 고객 신용한도 현황 표시. DRAFT 수주면 "확정 시 남은 한도" 까지 미리 보여준다.

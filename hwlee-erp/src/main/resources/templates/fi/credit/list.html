@@ -78,7 +78,7 @@
             <div class="alert alert-warning py-2 px-3 small mb-3" id="rq-pending-warn" style="display:none;"></div>
             <div class="mb-3">
                 <label class="form-label">요청 한도 <span class="text-danger">*</span></label>
-                <input type="number" class="form-control" id="rq-requested" min="0" step="100000" placeholder="예: 80000000">
+                <input type="text" inputmode="numeric" class="form-control" id="rq-requested" placeholder="예: 80,000,000">
                 <div class="form-text">현재 한도보다 큰 금액을 입력하세요.</div>
             </div>
             <div class="mb-2">
@@ -215,6 +215,12 @@
         }
     }
 
+    // 요청 한도 입력 시 1000단위 콤마 표시(숫자만 남기고 천단위 구분).
+    function onRequestedInput(e) {
+        const digits = e.target.value.replace(/[^0-9]/g, '');
+        e.target.value = digits ? Number(digits).toLocaleString('ko-KR') : '';
+    }
+
     // ── 상향 요청(영업) ──
     function openReq() {
         document.getElementById('rq-customer').value = '';
@@ -244,7 +250,7 @@
     }
     async function submitReq() {
         const customerId = document.getElementById('rq-customer').value;
-        const requestedLimit = document.getElementById('rq-requested').value;
+        const requestedLimit = document.getElementById('rq-requested').value.replace(/[^0-9]/g, '');
         const reason = document.getElementById('rq-reason').value.trim();
         if (!customerId) { ERP.flash('고객을 선택하세요.', 'warning'); return; }
         if (!requestedLimit || Number(requestedLimit) <= 0) { ERP.flash('요청 한도를 입력하세요.', 'warning'); return; }
@@ -322,6 +328,7 @@
         document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); page = 0; load(); });
         document.getElementById('btn-reset').addEventListener('click', () => { document.getElementById('f-status').value = 'PENDING'; page = 0; load(); });
         document.getElementById('rq-customer').addEventListener('change', onCustomerChange);
+        document.getElementById('rq-requested').addEventListener('input', onRequestedInput);
         document.getElementById('rq-submit').addEventListener('click', submitReq);
         document.getElementById('dc-submit').addEventListener('click', submitDecide);
     });

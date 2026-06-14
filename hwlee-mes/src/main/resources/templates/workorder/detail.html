@@ -23,19 +23,19 @@
     <h6 class="fw-bold mb-2">실적 이력</h6>
     <div class="card"><div class="card-body p-0">
         <table class="table mb-0">
-            <thead><tr><th>#</th><th class="text-end">양품</th><th class="text-end">불량</th><th>비고</th><th>자재 투입</th><th>시각</th></tr></thead>
+            <thead><tr><th>#</th><th class="text-end">양품</th><th class="text-end">불량</th><th>불량코드</th><th>자재 투입</th><th>시각</th></tr></thead>
             <tbody id="results"><tr><td colspan="6" class="text-center text-muted py-3">—</td></tr></tbody>
         </table>
     </div></div>
 
     <script th:inline="javascript">
         const ID = [[${id}]];
-        let equipments = [], operators = [];
+        let equipments = [], operators = [], defectReasons = [];
 
         async function load() {
             try {
-                [equipments, operators] = await Promise.all([
-                    MES.api('/api/equipments'), MES.api('/api/operators')
+                [equipments, operators, defectReasons] = await Promise.all([
+                    MES.api('/api/equipments'), MES.api('/api/operators'), MES.api('/api/defect-reasons')
                 ]);
                 const wo = await MES.api('/api/work-orders/' + ID);
                 renderInfo(wo);
@@ -79,7 +79,11 @@
                     <div class="row g-2 align-items-end">
                         <div class="col-auto"><label class="form-label small">양품</label><input id="f-good" type="number" min="0" step="1" class="form-control form-control-sm" value="1"></div>
                         <div class="col-auto"><label class="form-label small">불량</label><input id="f-defect" type="number" min="0" step="1" class="form-control form-control-sm" value="0"></div>
-                        <div class="col"><label class="form-label small">비고</label><input id="f-note" type="text" class="form-control form-control-sm" placeholder="(선택)"></div>
+                        <div class="col"><label class="form-label small">불량코드</label>
+                            <select id="f-defect-reason" class="form-select form-select-sm">
+                                <option value="">(없음)</option>
+                                ${defectReasons.map(d => `<option value="${d.id}">${MES.esc(d.code)} ${MES.esc(d.name)}</option>`).join('')}
+                            </select></div>
                         <div class="col-auto"><button class="btn btn-primary" onclick="doReport()"><i class="bi bi-plus-lg"></i> 실적 등록</button></div>
                     </div>`;
             } else if (w.status === 'PAUSED') {
@@ -95,11 +99,13 @@
                 ? '<tr><td colspan="6" class="text-center text-muted py-3">실적 없음</td></tr>'
                 : list.map(r => {
                     const cons = (r.consumptions || []).map(c => `${MES.esc(c.componentName)} ${MES.num(c.consumedQty)}`).join(', ');
+                    const reason = r.defectReasonCode
+                        ? `${MES.esc(r.defectReasonCode)} ${MES.esc(r.defectReasonName)}` : '';
                     return `<tr>
                         <td>${r.seq}</td>
                         <td class="text-end">${MES.num(r.goodQty)}</td>
                         <td class="text-end">${MES.num(r.defectQty)}</td>
-                        <td>${MES.esc(r.note || '')}</td>
+                        <td>${reason}</td>
                         <td><small>${cons}</small></td>
                         <td><small>${MES.esc(r.reportedAt)}</small></td></tr>`;
                 }).join('');
@@ -118,12 +124,19 @@
         }
 
         async function doReport() {
+            const defectQty = Number(document.getElementById('f-defect').value);
+            const reasonVal = document.getElementById('f-defect-reason').value;
+            // 불량이 있으면 사유 코드를 반드시 선택 — 불량 분석의 전제.
+            if (defectQty > 0 && !reasonVal) {
+                MES.flash('불량 수량이 있으면 불량코드를 선택하세요.');
+                return;
+            }
             try {
                 await MES.api('/api/work-orders/' + ID + '/results', {
                     method: 'POST',
                     body: {goodQty: Number(document.getElementById('f-good').value),
-                           defectQty: Number(document.getElementById('f-defect').value),
-                           note: document.getElementById('f-note').value}
+                           defectQty: defectQty,
+                           defectReasonId: reasonVal ? Number(reasonVal) : null}
                 });
                 MES.flash('실적을 등록했습니다.', 'success');
                 load();

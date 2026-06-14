@@ -19,6 +19,8 @@ public record ProductionOrderResponse(
         LocalDate orderDate,
         LocalDate dueDate,
         LocalDateTime completedAt,
+        String mesWorkOrderNo,
+        LocalDateTime mesDispatchedAt,
         List<ProductionOrderLineResponse> lines,
         LocalDateTime createdAt,
         String createdBy,

@@ -11,6 +11,8 @@ import com.hwlee.mes.master.operator.Operator;
 import com.hwlee.mes.master.operator.OperatorRepository;
 import com.hwlee.mes.performance.dto.ProductionResultResponse;
 import com.hwlee.mes.performance.dto.ReportRequest;
+import com.hwlee.mes.quality.DefectReason;
+import com.hwlee.mes.quality.DefectReasonRepository;
 import com.hwlee.mes.workorder.WorkOrder;
 import com.hwlee.mes.workorder.WorkOrderLine;
 import com.hwlee.mes.workorder.WorkOrderRepository;
@@ -38,6 +40,7 @@ public class PerformanceService {
     private final OperatorRepository operatorRepository;
     private final ProductionResultRepository resultRepository;
     private final OutboxEventRepository outboxRepository;
+    private final DefectReasonRepository defectReasonRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -78,8 +81,13 @@ public class PerformanceService {
         WorkOrder wo = find(workOrderId);
         int seq = resultRepository.countByWorkOrderId(workOrderId) + 1;
 
+        // 불량코드는 선택 — 지정됐으면 마스터에서 조회(없는 코드면 오류).
+        DefectReason defectReason = req.defectReasonId() == null ? null
+                : defectReasonRepository.findById(req.defectReasonId())
+                        .orElseThrow(() -> new IllegalArgumentException("불량 사유를 찾을 수 없습니다: " + req.defectReasonId()));
+
         ProductionResult result = ProductionResult.of(
-                wo, seq, req.goodQty(), req.defectQty(), LocalDateTime.now(), req.note());
+                wo, seq, req.goodQty(), req.defectQty(), LocalDateTime.now(), defectReason);
 
         // 자재 투입 = 단위소요(라인소요 ÷ 지시수량) × 이번 양품수량.
         for (WorkOrderLine line : wo.getLines()) {

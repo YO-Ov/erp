@@ -101,11 +101,11 @@
             if (!itemId || !box) continue;
             try {
                 const a = await ERP.api('/api/atp?itemId=' + itemId);
-                // 분해(현재고/출하대기/입고예정)는 ⓘ 아이콘 호버 툴팁으로 숨긴다.
-                const tip = `현재고 ${ERP.num(a.onHand)} − 출하대기 ${ERP.num(a.committed)}`
+                // 분해(현재고/출하대기/입고예정)를 괄호로 옆에 연하게 펼쳐 보여준다.
+                const breakdown = `현재고 ${ERP.num(a.onHand)} − 출하대기 ${ERP.num(a.committed)}`
                     + ` + 입고예정 ${ERP.num(a.inboundProduction)}`;
                 box.innerHTML = `<i class="bi bi-box-seam"></i> 출고가능 수량 <strong>${ERP.num(a.atp)}</strong>`
-                    + ` <i class="bi bi-info-circle text-muted" title="${tip}" style="cursor:help;"></i>`;
+                    + ` <span class="text-muted">(${breakdown})</span>`;
             } catch (e) { /* 조회 실패는 조용히 무시 */ }
         }
     }

@@ -14,7 +14,8 @@ public record ProductionResultResponse(
         BigDecimal goodQty,
         BigDecimal defectQty,
         LocalDateTime reportedAt,
-        String note,
+        String defectReasonCode,
+        String defectReasonName,
         List<ConsumptionResponse> consumptions) {
 
     public record ConsumptionResponse(String componentCode, String componentName, BigDecimal consumedQty) {
@@ -25,6 +26,9 @@ public record ProductionResultResponse(
                 .map(c -> new ConsumptionResponse(c.getComponentCode(), c.getComponentName(), c.getConsumedQty()))
                 .toList();
         return new ProductionResultResponse(r.getId(), r.getSeq(), r.getGoodQty(), r.getDefectQty(),
-                r.getReportedAt(), r.getNote(), cons);
+                r.getReportedAt(),
+                r.getDefectReason() != null ? r.getDefectReason().getCode() : null,
+                r.getDefectReason() != null ? r.getDefectReason().getName() : null,
+                cons);
     }
 }

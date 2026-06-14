@@ -30,6 +30,11 @@
                 <dd class="col-sm-4" id="d-orderdate">-</dd>
                 <dt class="col-sm-2">완료 일시</dt>
                 <dd class="col-sm-4" id="d-completed">-</dd>
+
+                <dt class="col-sm-2">MES 작업지시</dt>
+                <dd class="col-sm-4" id="d-mes">-</dd>
+                <dt class="col-sm-2">MES 전송 일시</dt>
+                <dd class="col-sm-4" id="d-mes-at">-</dd>
             </dl>
         </div>
     </div>
@@ -90,6 +95,11 @@
         document.getElementById('d-orderdate').textContent = o.orderDate ?? '-';
         document.getElementById('d-completed').textContent =
             o.completedAt ? o.completedAt.replace('T', ' ').slice(0, 16) : '-';
+        document.getElementById('d-mes').innerHTML = o.mesWorkOrderNo
+            ? ERP.badge(o.mesWorkOrderNo, 'info')
+            : '<span class="text-muted">미전송</span>';
+        document.getElementById('d-mes-at').textContent =
+            o.mesDispatchedAt ? o.mesDispatchedAt.replace('T', ' ').slice(0, 16) : '-';
 
         // 가용성 매핑 (componentItemId 기준)
         const availByItem = {};
@@ -119,19 +129,29 @@
                 ? ERP.badge('생산 가능', 'success') : ERP.badge('자재 부족', 'danger');
         } else badge.innerHTML = '';
 
-        renderActions(o.status);
+        renderActions(o);
     }
 
-    // 상태머신: PLANNED(착수/취소), RELEASED(완료/취소), 그 외 읽기전용
-    function renderActions(status) {
+    // 상태머신: PLANNED(착수/취소), RELEASED(MES전송/완료/취소), 그 외 읽기전용.
+    // MES 로 전송된 뒤에는 취소 불가(현장에 작업지시가 내려갔으므로) — 취소 버튼을 숨긴다.
+    function renderActions(o) {
+        const status = o.status;
+        const dispatched = !!o.mesWorkOrderNo;
         const box = document.getElementById('actions');
         const btns = [];
         if (status === 'PLANNED') {
             btns.push(`<button class="btn btn-sm btn-primary" onclick="act('release','착수')">생산 착수</button>`);
             btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소</button>`);
         } else if (status === 'RELEASED') {
+            if (!dispatched) {
+                btns.push(`<button class="btn btn-sm btn-info" onclick="act('dispatch','MES 작업지시 전송')">MES 작업지시 전송</button>`);
+            } else {
+                btns.push(`<button class="btn btn-sm btn-outline-info" onclick="act('dispatch','MES 재전송')">MES 재전송</button>`);
+            }
             btns.push(`<button class="btn btn-sm btn-success" onclick="act('complete','완료')">생산 완료 (부품 출고 + 완제품 입고)</button>`);
-            btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소</button>`);
+            if (!dispatched) {
+                btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소</button>`);
+            }
         } else {
             box.innerHTML = '<span class="text-muted small">종료된 생산지시입니다(읽기 전용).</span>';
             return;
@@ -144,8 +164,13 @@
             && !confirm('일부 부품이 부족합니다. 그래도 완료를 시도하시겠습니까? (재고 부족 시 실패합니다)')) return;
         if (!confirm(`이 생산지시를 ${label}하시겠습니까?`)) return;
         try {
-            await ERP.api(`/api/production-orders/${ID}/${action}`, {method: 'POST'});
-            ERP.flash(`${label} 완료`, 'success');
+            const res = await ERP.api(`/api/production-orders/${ID}/${action}`, {method: 'POST'});
+            // dispatch 는 MES 작업지시 번호를 돌려준다 — 전송 결과를 그대로 보여준다.
+            if (action === 'dispatch' && res && res.mesWorkOrderNo) {
+                ERP.flash(`MES 작업지시 전송 완료 — ${res.mesWorkOrderNo}`, 'success');
+            } else {
+                ERP.flash(`${label} 완료`, 'success');
+            }
             load();
         } catch (e) {
             ERP.flashError(e);

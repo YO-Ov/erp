@@ -212,6 +212,7 @@ public class ProductionService {
                 po.getProduct().getId(), po.getProduct().getCode(), po.getProduct().getName(),
                 po.getWarehouse().getId(), po.getWarehouse().getName(),
                 po.getQuantity(), po.getStatus(), po.getOrderDate(), po.getDueDate(), po.getCompletedAt(),
+                po.getMesWorkOrderNo(), po.getMesDispatchedAt(),
                 lines,
                 po.getCreatedAt(), po.getCreatedBy(), po.getUpdatedAt(), po.getUpdatedBy());
     }

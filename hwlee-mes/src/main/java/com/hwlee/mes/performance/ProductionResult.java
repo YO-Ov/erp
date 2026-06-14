@@ -1,6 +1,7 @@
 package com.hwlee.mes.performance;
 
 import com.hwlee.mes.common.BaseEntity;
+import com.hwlee.mes.quality.DefectReason;
 import com.hwlee.mes.workorder.WorkOrder;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -48,22 +49,24 @@ public class ProductionResult extends BaseEntity {
     @Column(name = "reported_at", nullable = false)
     private LocalDateTime reportedAt;
 
-    @Column(name = "note", length = 255)
-    private String note;
+    /** 불량 사유(코드). 불량이 없으면 null. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "defect_reason_id")
+    private DefectReason defectReason;
 
     @OneToMany(mappedBy = "productionResult", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("id ASC")
     private List<MaterialConsumption> consumptions = new ArrayList<>();
 
     public static ProductionResult of(WorkOrder workOrder, int seq, BigDecimal goodQty,
-                                      BigDecimal defectQty, LocalDateTime reportedAt, String note) {
+                                      BigDecimal defectQty, LocalDateTime reportedAt, DefectReason defectReason) {
         ProductionResult r = new ProductionResult();
         r.workOrder = workOrder;
         r.seq = seq;
         r.goodQty = goodQty;
         r.defectQty = (defectQty == null) ? BigDecimal.ZERO : defectQty;
         r.reportedAt = reportedAt;
-        r.note = note;
+        r.defectReason = defectReason;
         return r;
     }
 

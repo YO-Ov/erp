@@ -143,8 +143,8 @@
         } catch (e) { tr.removeAttribute('data-atp'); box.innerHTML = '<span class="text-muted">출고가능 수량 조회 불가</span>'; }
     }
 
-    // 캐시된 ATP 와 현재 입력한 주문량을 비교해 라인 안내/초과 경고를 그린다. (주문량 입력마다 호출)
-    // 분해(현재고/출하대기/입고예정)는 ⓘ 아이콘 호버 툴팁으로 숨긴다.
+    // 캐시된 ATP 와 현재 입력한 주문량을 비교해 라인 안내를 그린다. (주문량 입력마다 호출)
+    // 분해(현재고/출하대기/입고예정)를 수량 옆에 항상 인라인으로 표시한다.
     function renderLineAtp(tr) {
         const box = tr.querySelector('.atp-line');
         if (!box) return;
@@ -152,12 +152,11 @@
         const atp = Number(tr.dataset.atp);
         const qty = parseFloat(tr.querySelector('.line-qty').value) || 0;
         const over = qty > atp;
-        const tip = `현재고 ${ERP.num(tr.dataset.onHand)} − 출하대기 ${ERP.num(tr.dataset.committed)}`
+        const breakdown = `현재고 ${ERP.num(tr.dataset.onHand)} − 출하대기 ${ERP.num(tr.dataset.committed)}`
             + ` + 입고예정 ${ERP.num(tr.dataset.inbound)}`;
         box.innerHTML = `<span class="${over ? 'text-danger fw-semibold' : 'text-muted'}">`
             + `<i class="bi bi-box-seam"></i> 출고가능 수량 ${ERP.num(atp)}`
-            + ` <i class="bi bi-info-circle" title="${tip}" style="cursor:help;"></i></span>`
-            + (over ? ` <span class="badge bg-danger">주문량이 출고가능 수량 초과</span>` : '');
+            + ` <span class="text-muted">(${breakdown})</span></span>`;
     }
 
     function recalc() {

@@ -1,4 +1,10 @@
 spring:
+  thymeleaf:
+    cache: false          # 로컬: 템플릿 캐시 끔 → HTML 수정 시 재시작 없이 반영
+  web:
+    resources:
+      cache:
+        period: 0         # 로컬: 정적 리소스(JS/CSS) 캐시도 끔
   datasource:
     url: jdbc:mysql://localhost:3307/erp_db?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: erp

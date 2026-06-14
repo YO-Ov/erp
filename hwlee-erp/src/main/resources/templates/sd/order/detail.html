@@ -76,7 +76,7 @@
             `${o.createdBy ?? '?'} · ${(o.createdAt ?? '').replace('T', ' ').slice(0, 16)}`;
 
         document.getElementById('lines').innerHTML = (o.lines || []).map(l => `
-            <tr data-item-id="${l.itemId}">
+            <tr data-item-id="${l.itemId}" data-order-qty="${l.orderQty}">
                 <td>${l.lineNo}</td>
                 <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span>
                     <div class="atp-cell small mt-1"></div></td>
@@ -102,10 +102,14 @@
             try {
                 const a = await ERP.api('/api/atp?itemId=' + itemId);
                 // 분해(현재고/출하대기/입고예정)를 괄호로 옆에 연하게 펼쳐 보여준다.
+                // 주문량이 출고가능 수량을 초과하면 빨간색, 충분하면 일반(회색) 텍스트.
+                const orderQty = parseFloat(tr.dataset.orderQty) || 0;
+                const over = orderQty > Number(a.atp);
                 const breakdown = `현재고 ${ERP.num(a.onHand)} − 출하대기 ${ERP.num(a.committed)}`
                     + ` + 입고예정 ${ERP.num(a.inboundProduction)}`;
-                box.innerHTML = `<i class="bi bi-box-seam"></i> 출고가능 수량 <strong>${ERP.num(a.atp)}</strong>`
-                    + ` <span class="text-muted">(${breakdown})</span>`;
+                box.innerHTML = `<span class="${over ? 'text-danger fw-semibold' : 'text-muted'}">`
+                    + `<i class="bi bi-box-seam"></i> 출고가능 수량 ${ERP.num(a.atp)}`
+                    + ` <span class="text-muted">(${breakdown})</span></span>`;
             } catch (e) { /* 조회 실패는 조용히 무시 */ }
         }
     }

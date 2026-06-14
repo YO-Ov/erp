@@ -21,6 +21,21 @@
 
 - **🎉 Phase 0~16 전체 구현 완료·검증.** 이후 hwlee님 요청으로 **실무형 기능을 점진적으로 확장 중**(아래 2026-06-10 항목들). 학습 문서(doc/)는 별도 트랙.
 
+### 🗓 2026-06-14 세션 — 출고가능 수량(ATP) UI 개선 + 로컬 핫리로드 설정
+
+> ⚠️ **이 세션 작업 전체 미커밋** — 다른 PC에서 이어가려면 **hwlee님이 직접 커밋+푸시** 해야 함.
+
+- **① 출고가능 수량(ATP) 표시 디자인 변경**(hwlee님 요청, 순수 프론트). 신규 수주 폼·수주 상세 양쪽 동일하게:
+  - **분해(현재고 − 출하대기 + 입고예정)를 ⓘ 호버 툴팁에서 빼서 수량 옆에 항상 인라인 표시.** (예: `📦 출고가능 수량 40 (현재고 50 − 출하대기 10 + 입고예정 0)`)
+  - **"주문량이 출고가능 수량 초과" 빨강 배지 제거.**
+  - **색상 규칙 통일**: 주문량 > 출고가능이면 "출고가능 수량 N"이 빨강(`text-danger fw-semibold`), **주문량 ≤ 출고가능(많거나 같음)이면 일반(회색 text-muted)**. 두 화면 모두 판정식 `over = 주문량 > ATP` 로 일치.
+  - 파일: `sd/order/form.html`(`renderLineAtp` 재작성, ⓘ·배지 제거), `sd/order/detail.html`(`loadLineAtps`에 주문량 비교 추가 — 라인 `<tr>`에 `data-order-qty` 심고 빨강/회색 분기).
+  - ⚠️ 헤드리스 없어 실제 렌더(빨강 표시)는 hwlee님 육안 확인 권장.
+- **② 로컬 핫리로드 설정**(hwlee님 "화면 수정이 재시작 없이 반영 안 됨" 질문). 원인 = thymeleaf 캐시 기본 on + devtools 없음.
+  - `application-local.yml`: `spring.thymeleaf.cache=false` + `spring.web.resources.cache.period=0` 추가.
+  - `build.gradle.kts`: `developmentOnly("org.springframework.boot:spring-boot-devtools")` 추가.
+  - ⚠️ **적용에 필요한 액션(다른 PC에서도)**: Gradle reload(동기화) + 앱 1회 재시작. 이후 HTML 수정은 IDE→브라우저 전환(`ON FRAME DEACTIVATION` 리소스 복사) + `Cmd+Shift+R`로 반영. (IntelliJ Run config는 이미 Update classes and resources 설정됨.)
+
 ### ▶ 다음 작업 (2026-06-11 세션 종료 — 다음에 여기부터)
 
 > **✅ 재고 가시성(영업 ATP) = 레벨② 완료**(2026-06-11, 바로 아래 구현 요약 참조).

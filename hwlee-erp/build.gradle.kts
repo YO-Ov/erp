@@ -22,6 +22,9 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-web")
 
+	// 로컬 개발 편의 — 템플릿/리소스 변경 시 자동 재시작 + LiveReload (운영 빌드 제외)
+	developmentOnly("org.springframework.boot:spring-boot-devtools")
+
 	// Phase 9 — 배치 처리 (야간 마감). 메타테이블은 Flyway(V37)로 생성.
 	implementation("org.springframework.boot:spring-boot-starter-batch")
 	testImplementation("org.springframework.batch:spring-batch-test")

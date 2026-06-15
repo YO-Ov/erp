@@ -21,6 +21,29 @@
 
 - **🎉 Phase 0~16 전체 구현 완료·검증.** 이후 hwlee님 요청으로 **실무형 기능을 점진적으로 확장 중**(아래 2026-06-10 항목들). 학습 문서(doc/)는 별도 트랙.
 
+### 🗓 2026-06-15 세션 — 버그 수정 2건 + 💡 AI 접목 아이디어(미래 적용 후보)
+
+> ⚠️ **이 세션 코드 작업 전체 미커밋** — 다른 PC에서 이어가려면 **hwlee님이 직접 커밋+푸시** 해야 함.
+
+- **① 수주 상세 ATP "출고가능 수량" 빨강 오표시(이중 차감) 버그 수정**(hwlee님이 /sd/sales-orders/7 보다 발견).
+  - **증상**: CONFIRMED 수주 상세에서 출고가능 수량이 양수(예 37, 183)인데도 빨강으로 표시됨.
+  - **원인**: `committed`(출하대기) 쿼리(CONFIRMED~INVOICED 미출하 합)에 **지금 보고 있는 그 수주의 물량이 이미 포함** → ATP는 그걸 이미 뺀 값인데, 빨강 판정 `orderQty > atp`가 **그 수주 물량을 한 번 더 차감**(이중 차감)해서 멀쩡한 주문도 빨강.
+  - **수정**(`sd/order/detail.html` `loadLineAtps`): CONFIRMED/SHIPPING 수주는 이미 committed에 들었으므로 추가 수요 0으로 본다 → `demand = (CONFIRMED|SHIPPING) ? 0 : orderQty; over = demand > atp`. 결과적으로 **확정수주는 atp < 0 일 때만 빨강**(= 진짜 부족). **DRAFT 수주는 기존대로 `orderQty > atp`**(확정 시 한도 초과 예고). `form.html`(신규 작성=DRAFT)은 손대지 않음.
+- **② 출하 폼 "권한 없음" 배너 버그 수정**(hwlee님이 kim(SALES)으로 출하 생성 시도 중 발견).
+  - **증상**: 출하 신규 폼은 떴는데(=페이지 GET 통과) 빨간 "이 작업을 수행할 권한이 없습니다" 배너 + 창고 드롭다운 빈 상태.
+  - **원인**: 출하 폼이 창고 목록을 부르는 `GET /api/warehouses` 가 `WarehouseController` 클래스 단위 `@PreAuthorize`로 **PURCHASING/PRODUCTION/ADMIN만 허용 → SALES 빠짐** → kim 호출이 403. 출하 자체 권한(`DeliveryController`·`SalesViewController`=SALES/ADMIN)은 정상.
+  - **수정**(`mm/warehouse/WarehouseController.java`): "창고 조회는 넓게, 변경은 좁게" 원칙(StockController와 동일 사상). **클래스 단위(=GET 조회)** → `SALES,PURCHASING,PRODUCTION,FINANCE,ADMIN` 로 확대. **쓰기(POST/PUT/DELETE)** → 메서드 단위 `@PreAuthorize`로 기존 `PURCHASING,PRODUCTION,ADMIN` 유지(영업은 창고 생성·수정·삭제 불가).
+  - ⚠️ 적용에 앱 재시작(또는 클래스 핫리로드) 필요. 헤드리스 없어 실제 드롭다운 채워짐은 hwlee님 육안 권장.
+
+- **💡 AI 접목 아이디어 — 나중에 적용해볼 후보(학습 커리큘럼 외 별도 트랙, hwlee님 "LLM 파인튜닝/Agent AI 가 뭐고 이 ERP에 어떻게 접목?" 대화)**:
+  - **개념 정리**: ① **LLM 파인튜닝** = 범용 LLM의 가중치를 우리 데이터로 추가 학습해 특정 용도(말투·형식·도메인)에 고정. ② **Agent AI** = LLM에 "도구(tool/function calling) + 자율 실행 루프"를 붙여 자연어 요청을 실제 행동(API 호출)으로 수행. (지금 쓰는 Claude Code가 에이전트 사례.)
+  - **이 ERP의 강점**: REST API ~180개가 이미 있음 = 에이전트가 호출할 "도구"가 준비됨 → 접목 쉬움.
+  - **Agent 접목 후보(ROI 높음, 권장 우선)**: ⓐ **읽기 전용 조회 비서**(ATP·신용한도·재고·리포트 자연어 질의 → 기존 GET API 호출) ← *추천 1단계, 안전*. ⓑ **분개 추천 에이전트**(자연어 거래 → 차/대 분개 제안 → `/api/journal-entries`, 기존 자동분개의 수동 버전, FI 복습가치). ⓒ **MRP/생산 어시스턴트**(자재 가용성 질의 → `/material-availability`). ⓓ **이상징후 알림 에이전트**(야간 배치 결과를 LLM이 요약 → 기존 Notification 푸시).
+  - **기술 메모**: Spring Boot에 `/api/assistant/chat` 류 엔드포인트 추가 → Claude API tool use에 각 기존 엔드포인트를 함수로 정의해 LLM↔기존 API 중개. 두뇌는 최신 Claude(Opus 4.8 등).
+  - **파인튜닝**: ERP 학습 단계에선 우선순위 낮음 — 대부분 **프롬프트 + RAG(계정과목표·업무규칙 검색해 프롬프트에 주입)로 충분**. 말투·형식·특수 도메인을 모델에 "못 박아야" 할 때만 마지막 카드로 고려.
+  - **추천 로드맵**: 1) 읽기전용 조회 에이전트(function calling 체득) → 2) RAG 추가 → 3) 쓰기 액션 에이전트(사람 승인 끼고) → 4) (선택) 파인튜닝.
+  - ▶ **상태 = 아이디어만, 미착수.** 실제 진행하려면 위 1단계를 구현 계획으로 풀어 별도 Phase로 편성 가능.
+
 ### 🗓 2026-06-14 세션 — 출고가능 수량(ATP) UI 개선 + 로컬 핫리로드 설정
 
 > ⚠️ **이 세션 작업 전체 미커밋** — 다른 PC에서 이어가려면 **hwlee님이 직접 커밋+푸시** 해야 함.

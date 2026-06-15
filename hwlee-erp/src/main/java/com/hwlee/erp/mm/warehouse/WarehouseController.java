@@ -27,12 +27,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/warehouses")
 @RequiredArgsConstructor
-@org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('PURCHASING','PRODUCTION','ADMIN')")
+// 창고 조회(GET)는 출하·재고 등 여러 업무 화면이 참조하는 마스터라 업무 역할에 넓게 허용한다.
+// 쓰기(생성/수정/삭제)는 창고 마스터를 관리하는 구매·생산·관리자로 메서드 단위에서 좁힌다.
+@org.springframework.security.access.prepost.PreAuthorize(
+        "hasAnyRole('SALES','PURCHASING','PRODUCTION','FINANCE','ADMIN')")
 public class WarehouseController {
 
     private final WarehouseService service;
 
     @PostMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('PURCHASING','PRODUCTION','ADMIN')")
     public ResponseEntity<WarehouseResponse> create(@Valid @RequestBody WarehouseCreateRequest req) {
         WarehouseResponse created = service.create(req);
         return ResponseEntity.created(URI.create("/api/warehouses/" + created.id())).body(created);
@@ -58,12 +62,14 @@ public class WarehouseController {
     }
 
     @PutMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('PURCHASING','PRODUCTION','ADMIN')")
     public WarehouseResponse update(@PathVariable Long id,
                                     @Valid @RequestBody WarehouseUpdateRequest req) {
         return service.update(id, req);
     }
 
     @DeleteMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('PURCHASING','PRODUCTION','ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();

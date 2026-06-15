@@ -103,8 +103,12 @@
                 const a = await ERP.api('/api/atp?itemId=' + itemId);
                 // 분해(현재고/출하대기/입고예정)를 괄호로 옆에 연하게 펼쳐 보여준다.
                 // 주문량이 출고가능 수량을 초과하면 빨간색, 충분하면 일반(회색) 텍스트.
+                // 단, CONFIRMED/SHIPPING 수주는 이미 출하대기(committed)에 포함돼 atp 에서 빠져 있으므로
+                // 주문량을 다시 빼면 이중 차감이 된다 → 이 경우엔 추가 수요 0(= atp < 0 일 때만 부족)으로 본다.
                 const orderQty = parseFloat(tr.dataset.orderQty) || 0;
-                const over = orderQty > Number(a.atp);
+                const committedHere = status === 'CONFIRMED' || status === 'SHIPPING';
+                const demand = committedHere ? 0 : orderQty;
+                const over = demand > Number(a.atp);
                 const breakdown = `현재고 ${ERP.num(a.onHand)} − 출하대기 ${ERP.num(a.committed)}`
                     + ` + 입고예정 ${ERP.num(a.inboundProduction)}`;
                 box.innerHTML = `<span class="${over ? 'text-danger fw-semibold' : 'text-muted'}">`

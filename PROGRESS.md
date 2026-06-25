@@ -20,6 +20,19 @@
 ## 현재 위치
 
 - **🎉 Phase 0~16 전체 구현 완료·검증.** 이후 hwlee님 요청으로 **실무형 기능을 점진적으로 확장 중**(아래 2026-06-10 항목들). 학습 문서(doc/)는 별도 트랙.
+- **▶ 다음 = Phase 17(자연어 데이터 검색, Text-to-SQL + 가드레일) 착수 예정** — 아래 2026-06-25 항목 참조. STUDY-PLAN에 Part 3로 편입 완료, **구현 미착수**.
+
+### 🗓 2026-06-25 세션 — Phase 17(자연어 검색/Text-to-SQL) 설계 합의 + 계획 편입
+
+> ⚠️ **문서 편집만 함(STUDY-PLAN Part 3 신설·이 항목 추가). 코드 미착수·미커밋** — 다른 PC에서 이어가려면 hwlee님이 커밋+푸시.
+
+- **요청**: hwlee님 "Ollama 설치해 자연어 검색(Text-to-SQL) 구현해볼까?" → 정식 Phase로 편입 결정.
+- **합의된 설계(STUDY-PLAN `Part 3 > Phase 17`에 상세)**:
+  - **런타임**: 로컬 **Ollama**. **연동 위치 = hwlee-erp 통합**(`/api/nl-query`), MES DB는 읽기전용으로 같이 조회. **대상 = ERP+MES 둘 다**. **깊이 = 가드레일까지 제대로**.
+  - **모델**: `qwen2.5-coder:7b`(17-A에서 `qwen2.5:7b`와 비교 후 확정). ⚠️ **사양 제약 = M2 Pro/통합 16GB** → Ollama 가용 4~6GB(Docker 인프라+ERP/MES 앱+IDE가 나머지). 7B≈5GB가 상한, **14B는 무리**(Docker 내리고 단독 시만).
+  - **구성**: 17-A 단일DB PoC → 17-B **가드레일 4종**(읽기전용 계정 erp_ro/mes_ro·JSqlParser 단일SELECT 검증·강제LIMIT+타임아웃·화이트리스트 스키마카드) → 17-C 정확도(스키마카드+few-shot+self-correct 1회+**SQL 미리보기 후 실행**) → 17-D 두 DB 라우팅 + **Function Calling 비교**.
+  - **vs Function Calling**: 기존 2026-06-15 "읽기전용 조회 비서" 아이디어(REST API 도구호출)와 **접근이 다름**. 실무 안전성은 FC 우위지만, 이 Phase는 자연어→SQL 변환·가드레일 학습이 목적이라 Text-to-SQL을 메인으로 하고 17-D에서 비교.
+- **▶ 다음 액션(구현 착수 시)**: ① `ollama` 설치 + `qwen2.5-coder:7b`·`qwen2.5:7b` pull ② hwlee-erp `build.gradle.kts`에 `spring-ai-ollama` + `JSqlParser` 추가 ③ 17-A PoC 1건.
 
 ### 🗓 2026-06-15 세션 — 버그 수정 2건 + 💡 AI 접목 아이디어(미래 적용 후보)
 

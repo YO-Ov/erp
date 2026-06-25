@@ -5,11 +5,14 @@ import com.hwlee.erp.master.customer.CustomerRepository;
 import com.hwlee.erp.master.item.Item;
 import com.hwlee.erp.master.item.ItemRepository;
 import com.hwlee.erp.common.code.TransactionNumberGenerator;
+import com.hwlee.erp.sd.quotation.dto.QuotationBulkRequest;
+import com.hwlee.erp.sd.quotation.dto.QuotationBulkResponse;
 import com.hwlee.erp.sd.quotation.dto.QuotationCreateRequest;
 import com.hwlee.erp.sd.quotation.dto.QuotationLineRequest;
 import com.hwlee.erp.sd.quotation.dto.QuotationResponse;
 import com.hwlee.erp.sd.quotation.dto.QuotationUpdateRequest;
 import jakarta.persistence.EntityNotFoundException;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -75,6 +78,35 @@ public class QuotationService {
         Quotation quotation = getOrThrow(id);
         quotation.cancel();
         return mapper.toResponse(quotation);
+    }
+
+    /**
+     * 일괄 작업 — 선택된 견적들에 같은 동작(발송/취소)을 적용한다.
+     *
+     * <p>상태 머신상 처리할 수 없는 건은 {@link IllegalStateException} 을 잡아 실패 목록에 담고
+     * 나머지는 계속 진행한다(부분 성공). 잡은 예외는 다시 던지지 않으므로 성공분은 그대로 커밋된다.
+     */
+    @Transactional
+    public QuotationBulkResponse bulk(QuotationBulkRequest req) {
+        List<QuotationBulkResponse.Failure> failed = new ArrayList<>();
+        int succeeded = 0;
+        for (Long id : req.ids()) {
+            Quotation quotation = repository.findById(id).orElse(null);
+            if (quotation == null) {
+                failed.add(new QuotationBulkResponse.Failure(id, null, "견적을 찾을 수 없습니다."));
+                continue;
+            }
+            try {
+                switch (req.action()) {
+                    case SEND -> quotation.send();
+                    case CANCEL -> quotation.cancel();
+                }
+                succeeded++;
+            } catch (IllegalStateException e) {
+                failed.add(new QuotationBulkResponse.Failure(id, quotation.getNumber(), e.getMessage()));
+            }
+        }
+        return new QuotationBulkResponse(req.ids().size(), succeeded, failed);
     }
 
     private void addLines(Quotation quotation, List<QuotationLineRequest> lineReqs) {

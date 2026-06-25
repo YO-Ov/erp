@@ -35,16 +35,46 @@
         </div>
     </form>
 
+    <!-- 목록 툴바: 조회 건수 + 페이지 크기 + 엑셀 -->
+    <div class="list-toolbar">
+        <div class="result-count">조회 <b id="totalCount">0</b>건</div>
+        <div class="toolbar-right">
+            <label class="page-size">표시
+                <select id="pageSize" class="form-select form-select-sm">
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </label>
+            <button type="button" id="btn-excel" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-file-earmark-excel"></i> Excel 다운로드
+            </button>
+        </div>
+    </div>
+
     <div class="table-wrap">
-    <table class="table table-hover align-middle mb-0">
+    <div class="table-scroll">
+    <table class="table table-hover table-striped align-middle mb-0">
         <thead>
         <tr>
-            <th>코드</th><th>이름</th><th>유형</th><th>정상방향</th><th>전기가능</th><th>상태</th><th style="width:80px;"></th>
+            <th class="text-end" style="width:52px;">No.</th>
+            <th class="sortable" data-sort="code">코드<span class="sort-ind"></span></th>
+            <th class="sortable" data-sort="name">이름<span class="sort-ind"></span></th>
+            <th class="sortable" data-sort="type">유형<span class="sort-ind"></span></th>
+            <th>정상방향</th>
+            <th>전기가능</th>
+            <th class="sortable" data-sort="status">상태<span class="sort-ind"></span></th>
         </tr>
         </thead>
         <tbody id="rows"><tr><td colspan="7" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
     </table>
     </div>
+    </div>
+
+    <nav class="pager-bar">
+        <div class="page-info" id="pageInfo"></div>
+        <ul class="pagination pagination-sm mb-0" id="pager"></ul>
+    </nav>
 
 <script>
     const TYPE = {
@@ -61,10 +91,16 @@
         BLOCKED:  {label: '정지', color: 'danger'},
     };
 
-    let all = []; // /api/accounts 는 페이징 없이 전체 List 반환 → 클라이언트 필터
+    let all = []; // /api/accounts 는 페이징 없이 전체 List 반환 → 클라이언트 필터·정렬·페이징
+    let page = 0;
+    let SIZE = 20;
+    // 정렬 상태 — 클라이언트에서 직접 정렬한다(이 API 는 비페이징 List).
+    let sortKey = 'code', sortDir = 'asc';
 
     async function load() {
         const tbody = document.getElementById('rows');
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">
+            <span class="spinner-border spinner-border-sm me-1"></span> 불러오는 중…</td></tr>`;
         try {
             all = await ERP.api('/api/accounts');
             render();
@@ -74,38 +110,115 @@
         }
     }
 
-    function render() {
+    function filtered() {
         const kw = document.getElementById('f-keyword').value.trim().toLowerCase();
         const type = document.getElementById('f-type').value;
         const list = all.filter(a =>
             (!type || a.type === type) &&
             (!kw || (a.code || '').toLowerCase().includes(kw) || (a.name || '').toLowerCase().includes(kw)));
+        const dir = sortDir === 'asc' ? 1 : -1;
+        return list.slice().sort((x, y) => {
+            const a = x[sortKey] ?? '', b = y[sortKey] ?? '';
+            return (a < b ? -1 : a > b ? 1 : 0) * dir;
+        });
+    }
 
+    function rowHtml(a, i) {
+        const t = TYPE[a.type] || {label: a.type, color: 'secondary'};
+        const s = MSTATUS[a.status] || {label: a.status, color: 'secondary'};
+        const seq = page * SIZE + i + 1;
+        return `<tr style="cursor:pointer" onclick="location.href='/fi/accounts/${a.id}'">
+            <td class="text-end text-muted">${seq}</td>
+            <td>${ERP.esc(a.code)}</td>
+            <td>${ERP.esc(a.name)}</td>
+            <td>${ERP.badge(t.label, t.color)}</td>
+            <td class="text-muted">${SIDE[a.normalSide] || a.normalSide}</td>
+            <td>${a.postable
+                ? '<span class="text-success"><i class="bi bi-check-lg"></i></span>'
+                : '<span class="text-muted small">헤더</span>'}</td>
+            <td>${ERP.badge(s.label, s.color)}</td></tr>`;
+    }
+
+    function render() {
+        const list = filtered();
+        const total = list.length;
+        const totalPages = Math.max(1, Math.ceil(total / SIZE));
+        if (page >= totalPages) page = totalPages - 1;
+        const pageList = list.slice(page * SIZE, page * SIZE + SIZE);
+
+        document.getElementById('totalCount').textContent = total.toLocaleString('ko-KR');
         const tbody = document.getElementById('rows');
-        tbody.innerHTML = list.length === 0
-            ? '<tr><td colspan="7" class="text-center text-muted py-4">계정이 없습니다.</td></tr>'
-            : list.map(a => {
-                const t = TYPE[a.type] || {label: a.type, color: 'secondary'};
-                const s = MSTATUS[a.status] || {label: a.status, color: 'secondary'};
-                return `<tr style="cursor:pointer" onclick="location.href='/fi/accounts/${a.id}'">
-                    <td>${ERP.esc(a.code)}</td>
-                    <td>${ERP.esc(a.name)}</td>
-                    <td>${ERP.badge(t.label, t.color)}</td>
-                    <td class="text-muted">${SIDE[a.normalSide] || a.normalSide}</td>
-                    <td>${a.postable
-                        ? '<span class="text-success"><i class="bi bi-check-lg"></i></span>'
-                        : '<span class="text-muted small">헤더</span>'}</td>
-                    <td>${ERP.badge(s.label, s.color)}</td>
-                    <td><a class="btn btn-sm btn-outline-secondary" href="/fi/accounts/${a.id}"
-                           onclick="event.stopPropagation()">상세</a></td></tr>`;
-            }).join('');
+        tbody.innerHTML = total === 0
+            ? '<tr><td colspan="7"><div class="empty-state"><i class="bi bi-inbox"></i>조건에 맞는 계정과목이 없습니다.</div></td></tr>'
+            : pageList.map(rowHtml).join('');
+
+        ERP.pager({page, size: SIZE, totalPages, totalElements: total,
+                   onGo: p => { page = p; render(); }});
+    }
+
+    /** 정렬 헤더 표시(▲▼) 갱신. */
+    function updateSortIndicators() {
+        document.querySelectorAll('th.sortable').forEach(th => {
+            const ind = th.querySelector('.sort-ind');
+            th.classList.remove('asc', 'desc');
+            if (th.dataset.sort === sortKey) {
+                th.classList.add(sortDir);
+                ind.textContent = sortDir === 'asc' ? '▲' : '▼';
+            } else {
+                ind.textContent = '↕';
+            }
+        });
+    }
+
+    /** 헤더 클릭 → 같은 컬럼이면 방향 토글, 다른 컬럼이면 그 컬럼 기준 정렬. */
+    function onSortClick(th) {
+        const key = th.dataset.sort;
+        if (sortKey === key) {
+            sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortKey = key;
+            sortDir = 'asc';
+        }
+        page = 0;
+        updateSortIndicators();
+        render();
+    }
+
+    /** 현재 검색 조건 전체를 CSV(엑셀)로 내려받기. */
+    function exportExcel() {
+        const btn = document.getElementById('btn-excel');
+        btn.disabled = true;
+        try {
+            const list = filtered();
+            if (list.length === 0) { ERP.flash('내보낼 계정과목이 없습니다.', 'warning'); return; }
+            const csv = ERP.toCsv(list, [
+                {label: '코드', value: a => a.code},
+                {label: '이름', value: a => a.name},
+                {label: '유형', value: a => (TYPE[a.type]?.label ?? a.type)},
+                {label: '정상방향', value: a => (SIDE[a.normalSide] ?? a.normalSide)},
+                {label: '전기가능', value: a => (a.postable ? 'Y' : 'N')},
+                {label: '상태', value: a => (MSTATUS[a.status]?.label ?? a.status)},
+            ]);
+            ERP.download(`계정과목목록_${ERP.today()}.csv`, csv);
+        } catch (e) {
+            ERP.flashError(e);
+        } finally {
+            btn.disabled = false;
+        }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        updateSortIndicators();
         load();
-        document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); render(); });
+        document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); page = 0; render(); });
         document.getElementById('btn-reset').addEventListener('click', () => {
-            document.getElementById('searchForm').reset(); render();
+            document.getElementById('searchForm').reset(); page = 0; render();
+        });
+        document.getElementById('btn-excel').addEventListener('click', exportExcel);
+        document.querySelectorAll('th.sortable').forEach(th =>
+            th.addEventListener('click', () => onSortClick(th)));
+        document.getElementById('pageSize').addEventListener('change', e => {
+            SIZE = Number(e.target.value); page = 0; render();
         });
     });
 </script>

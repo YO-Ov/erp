@@ -6,6 +6,8 @@ import static com.hwlee.erp.sd.quotation.QuotationSpecifications.issuedTo;
 import static com.hwlee.erp.sd.quotation.QuotationSpecifications.statusEquals;
 import static org.springframework.data.jpa.domain.Specification.where;
 
+import com.hwlee.erp.sd.quotation.dto.QuotationBulkRequest;
+import com.hwlee.erp.sd.quotation.dto.QuotationBulkResponse;
 import com.hwlee.erp.sd.quotation.dto.QuotationCreateRequest;
 import com.hwlee.erp.sd.quotation.dto.QuotationResponse;
 import com.hwlee.erp.sd.quotation.dto.QuotationUpdateRequest;
@@ -65,6 +67,11 @@ public class QuotationController {
     @PutMapping("/{id}")
     public QuotationResponse update(@PathVariable Long id, @Valid @RequestBody QuotationUpdateRequest req) {
         return service.update(id, req);
+    }
+
+    @PostMapping("/bulk")
+    public QuotationBulkResponse bulk(@Valid @RequestBody QuotationBulkRequest req) {
+        return service.bulk(req);
     }
 
     @PostMapping("/{id}/send")

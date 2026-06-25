@@ -15,22 +15,24 @@
 
     <div class="card mb-3">
         <div class="card-body">
-            <dl class="row mb-0">
-                <dt class="col-sm-2">상태</dt>
-                <dd class="col-sm-4" id="d-status">-</dd>
-                <dt class="col-sm-2">고객</dt>
-                <dd class="col-sm-4" id="d-customer">-</dd>
-
-                <dt class="col-sm-2">발행일</dt>
-                <dd class="col-sm-4" id="d-issued">-</dd>
-                <dt class="col-sm-2">유효기간</dt>
-                <dd class="col-sm-4" id="d-valid">-</dd>
-
-                <dt class="col-sm-2">합계 금액</dt>
-                <dd class="col-sm-4 fw-bold" id="d-total">-</dd>
-                <dt class="col-sm-2">등록</dt>
-                <dd class="col-sm-4 small text-muted" id="d-audit">-</dd>
-            </dl>
+            <!-- 전표 상단: 합계 금액 강조 + 상태 -->
+            <div class="detail-hero">
+                <div class="hero-main">
+                    <span class="hero-label">합계 금액</span>
+                    <div class="hero-amount" id="d-total">-</div>
+                </div>
+                <div class="hero-side">
+                    <span class="hero-label">상태</span>
+                    <div id="d-status">-</div>
+                </div>
+            </div>
+            <!-- 헤더 필드 그리드 -->
+            <div class="detail-grid">
+                <div class="dg-item"><span class="dg-label">고객</span><span class="dg-value" id="d-customer">-</span></div>
+                <div class="dg-item"><span class="dg-label">발행일</span><span class="dg-value" id="d-issued">-</span></div>
+                <div class="dg-item"><span class="dg-label">유효기간</span><span class="dg-value" id="d-valid">-</span></div>
+                <div class="dg-item"><span class="dg-label">등록</span><span class="dg-value muted" id="d-audit">-</span></div>
+            </div>
         </div>
     </div>
 

@@ -13,18 +13,48 @@
         <a href="/hr/payroll-runs/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 급여 계산</a>
     </div>
 
+    <!-- 목록 툴바: 조회 건수 + 페이지 크기 + 엑셀 -->
+    <div class="list-toolbar">
+        <div class="result-count">조회 <b id="totalCount">0</b>건</div>
+        <div class="toolbar-right">
+            <label class="page-size">표시
+                <select id="pageSize" class="form-select form-select-sm">
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </label>
+            <button type="button" id="btn-excel" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-file-earmark-excel"></i> Excel 다운로드
+            </button>
+        </div>
+    </div>
+
     <div class="table-wrap">
-    <table class="table table-hover align-middle mb-0">
+    <div class="table-scroll">
+    <table class="table table-hover table-striped align-middle mb-0">
         <thead>
         <tr>
-            <th>번호</th><th>대상월</th><th>지급일</th>
-            <th class="text-end">총지급</th><th class="text-end">총공제</th><th class="text-end">실수령</th><th>상태</th><th style="width:80px;"></th>
+            <th class="text-end" style="width:52px;">No.</th>
+            <th class="sortable" data-sort="number">번호<span class="sort-ind"></span></th>
+            <th class="sortable" data-sort="period">대상월<span class="sort-ind"></span></th>
+            <th class="sortable" data-sort="runDate">지급일<span class="sort-ind"></span></th>
+            <th class="sortable text-end" data-sort="totalGross">총지급<span class="sort-ind"></span></th>
+            <th class="sortable text-end" data-sort="totalDeduction">총공제<span class="sort-ind"></span></th>
+            <th class="sortable text-end" data-sort="totalNet">실수령<span class="sort-ind"></span></th>
+            <th class="sortable" data-sort="status">상태<span class="sort-ind"></span></th>
         </tr>
         </thead>
         <tbody id="rows"><tr><td colspan="8" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
+        <tfoot id="foot"></tfoot>
     </table>
     </div>
-    <nav class="mt-3"><ul class="pagination pagination-sm" id="pager"></ul></nav>
+    </div>
+
+    <nav class="pager-bar">
+        <div class="page-info" id="pageInfo"></div>
+        <ul class="pagination pagination-sm mb-0" id="pager"></ul>
+    </nav>
 
 <script>
     const STATUS = {
@@ -33,47 +63,127 @@
         PAID:      {label: '지급됨', color: 'success'},
     };
     let page = 0;
-    const SIZE = 10;
+    let SIZE = 20;
+    // 정렬 상태 — 백엔드 Pageable 의 sort 파라미터로 전달된다.
+    let sortKey = 'id', sortDir = 'desc';
+    const sortParam = () => `${sortKey},${sortDir}`;
+
+    function rowHtml(r, i) {
+        const s = STATUS[r.status] || {label: r.status, color: 'secondary'};
+        const seq = page * SIZE + i + 1;
+        return `<tr style="cursor:pointer" onclick="location.href='/hr/payroll-runs/${r.id}'">
+            <td class="text-end text-muted">${seq}</td>
+            <td>${ERP.esc(r.number)}</td>
+            <td>${ERP.esc(r.period)}</td>
+            <td>${r.runDate ?? ''}</td>
+            <td class="text-end">${ERP.won(r.totalGross)}</td>
+            <td class="text-end">${ERP.won(r.totalDeduction)}</td>
+            <td class="text-end fw-bold">${ERP.won(r.totalNet)}</td>
+            <td>${ERP.badge(s.label, s.color)}</td></tr>`;
+    }
+
+    function renderFoot(list) {
+        const foot = document.getElementById('foot');
+        if (list.length === 0) { foot.innerHTML = ''; return; }
+        const gross = list.reduce((a, r) => a + Number(r.totalGross || 0), 0);
+        const ded = list.reduce((a, r) => a + Number(r.totalDeduction || 0), 0);
+        const net = list.reduce((a, r) => a + Number(r.totalNet || 0), 0);
+        foot.innerHTML = `<tr>
+            <td colspan="4" class="text-end text-muted">이 페이지 합계 (${list.length}건)</td>
+            <td class="text-end">${ERP.won(gross)}</td>
+            <td class="text-end">${ERP.won(ded)}</td>
+            <td class="text-end fw-bold">${ERP.won(net)}</td>
+            <td></td>
+        </tr>`;
+    }
 
     async function load() {
         const tbody = document.getElementById('rows');
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">
+            <span class="spinner-border spinner-border-sm me-1"></span> 불러오는 중…</td></tr>`;
         try {
-            const data = await ERP.api('/api/payroll-runs' + ERP.query({page, size: SIZE, sort: 'id,desc'}));
+            const data = await ERP.api('/api/payroll-runs' + ERP.query({page, size: SIZE, sort: sortParam()}));
             const list = data.content || [];
-            tbody.innerHTML = list.length === 0
-                ? '<tr><td colspan="8" class="text-center text-muted py-4">급여대장이 없습니다. “급여 계산”으로 만들어 보세요.</td></tr>'
-                : list.map(r => {
-                    const s = STATUS[r.status] || {label: r.status, color: 'secondary'};
-                    return `<tr style="cursor:pointer" onclick="location.href='/hr/payroll-runs/${r.id}'">
-                        <td>${ERP.esc(r.number)}</td>
-                        <td>${ERP.esc(r.period)}</td>
-                        <td>${r.runDate ?? ''}</td>
-                        <td class="text-end">${ERP.won(r.totalGross)}</td>
-                        <td class="text-end">${ERP.won(r.totalDeduction)}</td>
-                        <td class="text-end fw-bold">${ERP.won(r.totalNet)}</td>
-                        <td>${ERP.badge(s.label, s.color)}</td>
-                        <td><a class="btn btn-sm btn-outline-secondary" href="/hr/payroll-runs/${r.id}"
-                               onclick="event.stopPropagation()">상세</a></td></tr>`;
-                }).join('');
-            renderPager(data.totalPages || 0, data.number || 0);
+            document.getElementById('totalCount').textContent = (data.totalElements ?? list.length).toLocaleString('ko-KR');
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">
+                    <i class="bi bi-inbox"></i>급여대장이 없습니다. “급여 계산”으로 만들어 보세요.</div></td></tr>`;
+            } else {
+                tbody.innerHTML = list.map(rowHtml).join('');
+            }
+            renderFoot(list);
+            ERP.pager({page, size: SIZE, totalPages: data.totalPages || 0, totalElements: data.totalElements || 0,
+                       onGo: p => { page = p; load(); }});
         } catch (e) {
             tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            document.getElementById('foot').innerHTML = '';
             ERP.flashError(e);
         }
     }
 
-    function renderPager(totalPages, current) {
-        const pager = document.getElementById('pager');
-        if (totalPages <= 1) { pager.innerHTML = ''; return; }
-        let html = '';
-        for (let i = 0; i < totalPages; i++)
-            html += `<li class="page-item ${i === current ? 'active' : ''}">
-                <a class="page-link" href="#" onclick="goto(${i});return false;">${i + 1}</a></li>`;
-        pager.innerHTML = html;
+    /** 정렬 헤더 표시(▲▼) 갱신. */
+    function updateSortIndicators() {
+        document.querySelectorAll('th.sortable').forEach(th => {
+            const ind = th.querySelector('.sort-ind');
+            th.classList.remove('asc', 'desc');
+            if (th.dataset.sort === sortKey) {
+                th.classList.add(sortDir);
+                ind.textContent = sortDir === 'asc' ? '▲' : '▼';
+            } else {
+                ind.textContent = '↕';
+            }
+        });
     }
-    function goto(p) { page = p; load(); }
 
-    document.addEventListener('DOMContentLoaded', load);
+    /** 헤더 클릭 → 같은 컬럼이면 방향 토글, 다른 컬럼이면 그 컬럼 기준 정렬. */
+    function onSortClick(th) {
+        const key = th.dataset.sort;
+        if (sortKey === key) {
+            sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortKey = key;
+            sortDir = (key === 'totalGross' || key === 'totalDeduction' || key === 'totalNet') ? 'desc' : 'asc';
+        }
+        page = 0;
+        updateSortIndicators();
+        load();
+    }
+
+    /** 현재 정렬 기준 전체를 한 번에 받아 CSV(엑셀)로 내려받기. */
+    async function exportExcel() {
+        const btn = document.getElementById('btn-excel');
+        btn.disabled = true;
+        try {
+            const data = await ERP.api('/api/payroll-runs' + ERP.query({page: 0, size: 10000, sort: sortParam()}));
+            const list = data.content || [];
+            if (list.length === 0) { ERP.flash('내보낼 급여대장이 없습니다.', 'warning'); return; }
+            const csv = ERP.toCsv(list, [
+                {label: '번호', value: r => r.number},
+                {label: '대상월', value: r => r.period},
+                {label: '지급일', value: r => r.runDate ?? ''},
+                {label: '총지급', value: r => r.totalGross ?? 0},
+                {label: '총공제', value: r => r.totalDeduction ?? 0},
+                {label: '실수령', value: r => r.totalNet ?? 0},
+                {label: '상태', value: r => (STATUS[r.status]?.label ?? r.status)},
+            ]);
+            ERP.download(`급여대장목록_${ERP.today()}.csv`, csv);
+        } catch (e) {
+            ERP.flashError(e);
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        updateSortIndicators();
+        load();
+        document.getElementById('btn-excel').addEventListener('click', exportExcel);
+        document.querySelectorAll('th.sortable').forEach(th =>
+            th.addEventListener('click', () => onSortClick(th)));
+        document.getElementById('pageSize').addEventListener('change', e => {
+            SIZE = Number(e.target.value); page = 0; load();
+        });
+    });
 </script>
 </div>
 </body>

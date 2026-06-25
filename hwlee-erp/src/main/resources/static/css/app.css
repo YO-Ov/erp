@@ -153,22 +153,79 @@ body {
 }
 .card .card-body { padding: 1.25rem 1.4rem; }
 
-/* ── 테이블 ───────────────────────────────────────────────── */
-.table { background: #fff; color: var(--text); }
+/* ── 테이블 (실무형 콤팩트 그리드) ───────────────────────────── */
+.table { background: #fff; color: var(--text); font-size: .82rem; }
 .table > thead { background: #f7f9fc; }
 .table > thead th {
-    font-size: .73rem; text-transform: uppercase; letter-spacing: .04em;
+    font-size: .7rem; text-transform: uppercase; letter-spacing: .04em;
     color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border);
-    padding-top: .7rem; padding-bottom: .7rem;
+    padding: .5rem .75rem; white-space: nowrap;
 }
-.table > tbody > tr > td { padding-top: .68rem; padding-bottom: .68rem; vertical-align: middle; }
+.table > tbody > tr > td { padding: .42rem .75rem; vertical-align: middle; line-height: 1.35; }
 .table > :not(caption) > * > * { border-bottom-color: #eef1f5; }
+/* 숫자 컬럼은 등폭 숫자로 자릿수를 세로 정렬(실무 그리드 관행) */
+.table .text-end, .table .num { font-variant-numeric: tabular-nums; }
+/* 합계 행 */
+.table > tfoot td {
+    padding: .55rem .75rem; background: #fafbfd; font-weight: 700; color: var(--text);
+    border-top: 2px solid var(--border); font-variant-numeric: tabular-nums;
+}
 .table-wrap {
     background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
     overflow: hidden; box-shadow: 0 1px 2px rgba(28, 36, 52, .04);
 }
 .table-wrap .table { margin-bottom: 0; }
-.table-hover > tbody > tr:hover > * { background: #f7f9fc; }
+.table-hover > tbody > tr:hover > * { background: #f3f6fb; }
+/* 옅은 줄무늬 — 행이 촘촘할 때 가독성 보강 */
+.table-striped > tbody > tr:nth-of-type(even) > * { background: #fcfdfe; }
+.table-striped.table-hover > tbody > tr:hover > * { background: #f3f6fb; }
+
+/* 정렬 가능한 헤더 */
+.table th.sortable { cursor: pointer; user-select: none; }
+.table th.sortable:hover { color: var(--text); }
+.table th.sortable .sort-ind { opacity: .3; margin-left: .3rem; font-size: .85em; }
+.table th.sortable.asc .sort-ind,
+.table th.sortable.desc .sort-ind { opacity: 1; color: var(--accent); }
+
+/* 스크롤 영역: 헤더 고정(sticky) + 많은 행을 한 화면에 */
+.table-scroll { max-height: calc(100vh - 320px); overflow-y: auto; }
+.table-scroll > .table > thead th { position: sticky; top: 0; z-index: 2; background: #f7f9fc; }
+
+/* 목록 상단 툴바: 좌측 조회 건수 · 우측 액션(엑셀 등) */
+.list-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: .75rem; flex-wrap: wrap; margin-bottom: .55rem;
+}
+.list-toolbar .result-count { font-size: .8rem; color: var(--muted); }
+.list-toolbar .result-count b { color: var(--text); font-weight: 600; }
+.list-toolbar .toolbar-right { display: flex; align-items: center; gap: .6rem; }
+.list-toolbar .page-size { display: flex; align-items: center; gap: .4rem; margin: 0; font-size: .76rem; color: var(--muted); }
+.list-toolbar .page-size select { width: auto; height: 32px; padding: .15rem 1.6rem .15rem .55rem; font-size: .8rem; }
+
+/* 체크박스(다중선택) 컬럼 */
+.table th.chk-col, .table td.chk-col { width: 38px; text-align: center; padding-left: .5rem; padding-right: .5rem; }
+.table .chk-col .form-check-input, .table .chk-col input[type=checkbox] { cursor: pointer; margin: 0; vertical-align: middle; }
+
+/* 일괄 작업 바 — 선택 시에만 노출(.show) */
+.bulk-bar {
+    display: none; align-items: center; justify-content: space-between; gap: .75rem;
+    background: #eef4fc; border: 1px solid #cfe0f6; border-radius: var(--radius);
+    padding: .5rem .85rem; margin-bottom: .55rem;
+}
+.bulk-bar.show { display: flex; }
+.bulk-bar .bulk-count { font-size: .85rem; color: var(--text); }
+.bulk-bar .bulk-count b { color: var(--accent); }
+.bulk-bar .bulk-actions { display: flex; align-items: center; gap: .4rem; }
+
+/* 페이지 바: 좌측 범위 텍스트 + 우측 페이지네이션 */
+.pager-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; margin-top: .85rem; flex-wrap: wrap;
+}
+.pager-bar .page-info { font-size: .8rem; color: var(--muted); }
+.pagination .page-link { color: var(--accent); }
+.pagination .page-item.active .page-link { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pagination .page-item.disabled .page-link { color: #b6bcc7; }
 
 /* ── 뱃지 (Tabler식 소프트 톤) ─────────────────────────────── */
 .badge {
@@ -267,6 +324,31 @@ input[type=date]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 
 dl.detail-dl dt { color: var(--muted); font-weight: 600; font-size: .85rem; }
 dl.detail-dl dd { color: var(--text); }
+
+/* ── 상세 헤더(전표 상단: 금액 강조 + 필드 그리드) ───────────────── */
+.detail-hero {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 1rem; padding-bottom: 1rem; margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+.detail-hero .hero-side { text-align: right; }
+.detail-hero .hero-amount {
+    font-size: 1.6rem; font-weight: 700; color: var(--text);
+    line-height: 1.15; letter-spacing: -.01em; font-variant-numeric: tabular-nums;
+}
+.hero-label,
+.dg-label {
+    font-size: .7rem; font-weight: 600; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: .25rem; display: block;
+}
+.detail-grid {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem 2.5rem;
+}
+.detail-grid .dg-item { display: flex; flex-direction: column; min-width: 0; }
+.detail-grid .dg-value { font-size: .9rem; color: var(--text); }
+.detail-grid .dg-value.muted { font-size: .82rem; color: var(--muted); }
+@media (max-width: 575.98px) { .detail-grid { grid-template-columns: 1fr; } }
 
 /* ── 대시보드 통계 카드 ───────────────────────────────────── */
 .stat-card { display: flex; align-items: center; gap: 1rem; }

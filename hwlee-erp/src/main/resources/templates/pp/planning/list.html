@@ -28,19 +28,46 @@
         </div>
     </form>
 
+    <!-- 목록 툴바: 조회 건수 + 페이지 크기 + 엑셀 -->
+    <div class="list-toolbar">
+        <div class="result-count">조회 <b id="totalCount">0</b>건</div>
+        <div class="toolbar-right">
+            <label class="page-size">표시
+                <select id="pageSize" class="form-select form-select-sm">
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </label>
+            <button type="button" id="btn-excel" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-file-earmark-excel"></i> Excel 다운로드
+            </button>
+        </div>
+    </div>
+
     <div class="table-wrap">
+    <div class="table-scroll">
     <table class="table table-hover align-middle mb-0">
         <thead>
         <tr>
-            <th>번호</th><th>완제품</th>
+            <th class="text-end" style="width:52px;">No.</th>
+            <th class="sortable" data-sort="number">번호<span class="sort-ind"></span></th>
+            <th>완제품</th>
             <th class="text-end">필요량</th><th class="text-end">현재고</th><th class="text-end">부족분</th>
-            <th>출처 수주</th><th>상태</th><th style="width:160px;"></th>
+            <th>출처 수주</th>
+            <th class="sortable" data-sort="status">상태<span class="sort-ind"></span></th>
+            <th style="width:160px;"></th>
         </tr>
         </thead>
-        <tbody id="rows"><tr><td colspan="8" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
+        <tbody id="rows"><tr><td colspan="9" class="text-center text-muted py-4">불러오는 중…</td></tr></tbody>
     </table>
     </div>
-    <nav class="mt-3"><ul class="pagination pagination-sm" id="pager"></ul></nav>
+    </div>
+
+    <nav class="pager-bar">
+        <div class="page-info" id="pageInfo"></div>
+        <ul class="pagination pagination-sm mb-0" id="pager"></ul>
+    </nav>
 
     <!-- 승인(전환) 모달 -->
     <div class="modal fade" id="convertModal" tabindex="-1">
@@ -85,9 +112,12 @@
         DISMISSED: {label: '기각됨', color: 'dark'},
     };
     let page = 0;
-    const SIZE = 10;
+    let SIZE = 20;
     let convertModal = null;
     let cvId = null;
+    // 정렬 상태 — 백엔드 Pageable 의 sort 파라미터로 전달된다.
+    let sortKey = 'id', sortDir = 'desc';
+    const sortParam = () => `${sortKey},${sortDir}`;
 
     async function loadWarehouses() {
         try {
@@ -101,36 +131,51 @@
         } catch (e) {}
     }
 
+    function filters() {
+        return {status: document.getElementById('f-status').value};
+    }
+
+    function rowHtml(o, i) {
+        const s = STATUS[o.status] || {label: o.status, color: 'secondary'};
+        const seq = page * SIZE + i + 1;
+        let action = '<span class="text-muted">-</span>';
+        if (o.status === 'PROPOSED') {
+            action = `<button class="btn btn-sm btn-primary" onclick='openConvert(${JSON.stringify(o)})'>승인</button>
+                      <button class="btn btn-sm btn-outline-secondary" onclick="dismiss(${o.id})">기각</button>`;
+        } else if (o.status === 'CONVERTED') {
+            action = `<span class="small text-success">→ ${ERP.esc(o.convertedProductionNumber ?? '')}</span>`;
+        }
+        return `<tr>
+            <td class="text-end text-muted">${seq}</td>
+            <td>${ERP.esc(o.number)}</td>
+            <td>${ERP.esc(o.productName)} <span class="text-muted small">${ERP.esc(o.productCode)}</span></td>
+            <td class="text-end">${ERP.num(o.requiredQty)}</td>
+            <td class="text-end">${ERP.num(o.onHandQty)}</td>
+            <td class="text-end fw-semibold text-danger">${ERP.num(o.shortageQty)}</td>
+            <td class="small">${ERP.esc(o.sourceSalesOrderNumber ?? '-')}</td>
+            <td>${ERP.badge(s.label, s.color)}</td>
+            <td>${action}</td></tr>`;
+    }
+
     async function load() {
         const tbody = document.getElementById('rows');
-        const status = document.getElementById('f-status').value;
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">
+            <span class="spinner-border spinner-border-sm me-1"></span> 불러오는 중…</td></tr>`;
         try {
-            const data = await ERP.api('/api/planned-orders' + ERP.query({status, page, size: SIZE, sort: 'id,desc'}));
+            const q = ERP.query({...filters(), page, size: SIZE, sort: sortParam()});
+            const data = await ERP.api('/api/planned-orders' + q);
             const list = data.content || [];
-            tbody.innerHTML = list.length === 0
-                ? '<tr><td colspan="8" class="text-center text-muted py-4">계획오더가 없습니다.</td></tr>'
-                : list.map(o => {
-                    const s = STATUS[o.status] || {label: o.status, color: 'secondary'};
-                    let action = '<span class="text-muted">-</span>';
-                    if (o.status === 'PROPOSED') {
-                        action = `<button class="btn btn-sm btn-primary" onclick='openConvert(${JSON.stringify(o)})'>승인</button>
-                                  <button class="btn btn-sm btn-outline-secondary" onclick="dismiss(${o.id})">기각</button>`;
-                    } else if (o.status === 'CONVERTED') {
-                        action = `<span class="small text-success">→ ${ERP.esc(o.convertedProductionNumber ?? '')}</span>`;
-                    }
-                    return `<tr>
-                        <td>${ERP.esc(o.number)}</td>
-                        <td>${ERP.esc(o.productName)} <span class="text-muted small">${ERP.esc(o.productCode)}</span></td>
-                        <td class="text-end">${ERP.num(o.requiredQty)}</td>
-                        <td class="text-end">${ERP.num(o.onHandQty)}</td>
-                        <td class="text-end fw-semibold text-danger">${ERP.num(o.shortageQty)}</td>
-                        <td class="small">${ERP.esc(o.sourceSalesOrderNumber ?? '-')}</td>
-                        <td>${ERP.badge(s.label, s.color)}</td>
-                        <td>${action}</td></tr>`;
-                }).join('');
-            renderPager(data.totalPages || 0, data.number || 0);
+            document.getElementById('totalCount').textContent = (data.totalElements ?? list.length).toLocaleString('ko-KR');
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state">
+                    <i class="bi bi-inbox"></i>조건에 맞는 계획오더가 없습니다.</div></td></tr>`;
+            } else {
+                tbody.innerHTML = list.map(rowHtml).join('');
+            }
+            ERP.pager({page, size: SIZE, totalPages: data.totalPages || 0, totalElements: data.totalElements || 0,
+                       onGo: p => { page = p; load(); }});
         } catch (e) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-4">불러오기 실패</td></tr>';
             ERP.flashError(e);
         }
     }
@@ -168,25 +213,76 @@
         } catch (e) { ERP.flashError(e); }
     }
 
-    function renderPager(totalPages, current) {
-        const pager = document.getElementById('pager');
-        if (totalPages <= 1) { pager.innerHTML = ''; return; }
-        let html = '';
-        for (let i = 0; i < totalPages; i++)
-            html += `<li class="page-item ${i === current ? 'active' : ''}">
-                <a class="page-link" href="#" onclick="goto(${i});return false;">${i + 1}</a></li>`;
-        pager.innerHTML = html;
+    /** 정렬 헤더 표시(▲▼) 갱신. */
+    function updateSortIndicators() {
+        document.querySelectorAll('th.sortable').forEach(th => {
+            const ind = th.querySelector('.sort-ind');
+            th.classList.remove('asc', 'desc');
+            if (th.dataset.sort === sortKey) {
+                th.classList.add(sortDir);
+                ind.textContent = sortDir === 'asc' ? '▲' : '▼';
+            } else {
+                ind.textContent = '↕';
+            }
+        });
     }
-    function goto(p) { page = p; load(); }
+
+    /** 헤더 클릭 → 같은 컬럼이면 방향 토글, 다른 컬럼이면 그 컬럼 기준 정렬. */
+    function onSortClick(th) {
+        const key = th.dataset.sort;
+        if (sortKey === key) {
+            sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortKey = key;
+            sortDir = 'asc';
+        }
+        page = 0;
+        updateSortIndicators();
+        load();
+    }
+
+    /** 현재 검색 조건 전체를 한 번에 받아 CSV(엑셀)로 내려받기. */
+    async function exportExcel() {
+        const btn = document.getElementById('btn-excel');
+        btn.disabled = true;
+        try {
+            const q = ERP.query({...filters(), page: 0, size: 10000, sort: sortParam()});
+            const data = await ERP.api('/api/planned-orders' + q);
+            const list = data.content || [];
+            if (list.length === 0) { ERP.flash('내보낼 계획오더가 없습니다.', 'warning'); return; }
+            const csv = ERP.toCsv(list, [
+                {label: '번호', value: o => o.number},
+                {label: '완제품코드', value: o => o.productCode},
+                {label: '완제품명', value: o => o.productName},
+                {label: '필요량', value: o => o.requiredQty ?? 0},
+                {label: '현재고', value: o => o.onHandQty ?? 0},
+                {label: '부족분', value: o => o.shortageQty ?? 0},
+                {label: '출처 수주', value: o => o.sourceSalesOrderNumber ?? ''},
+                {label: '상태', value: o => (STATUS[o.status]?.label ?? o.status)},
+            ]);
+            ERP.download(`계획오더목록_${ERP.today()}.csv`, csv);
+        } catch (e) {
+            ERP.flashError(e);
+        } finally {
+            btn.disabled = false;
+        }
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
         convertModal = new bootstrap.Modal(document.getElementById('convertModal'));
+        updateSortIndicators();
         loadWarehouses(); load();
         document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); page = 0; load(); });
         document.getElementById('btn-reset').addEventListener('click', () => {
             document.getElementById('f-status').value = 'PROPOSED'; page = 0; load();
         });
         document.getElementById('cv-submit').addEventListener('click', submitConvert);
+        document.getElementById('btn-excel').addEventListener('click', exportExcel);
+        document.querySelectorAll('th.sortable').forEach(th =>
+            th.addEventListener('click', () => onSortClick(th)));
+        document.getElementById('pageSize').addEventListener('change', e => {
+            SIZE = Number(e.target.value); page = 0; load();
+        });
     });
 </script>
 </div>

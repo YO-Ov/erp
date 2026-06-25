@@ -46,27 +46,59 @@
         </div>
     </form>
 
+    <!-- 목록 툴바: 조회 건수 + 페이지 크기 + 엑셀 -->
+    <div class="list-toolbar">
+        <div class="result-count">조회 <b id="totalCount">0</b>건</div>
+        <div class="toolbar-right">
+            <label class="page-size">표시
+                <select id="pageSize" class="form-select form-select-sm">
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </label>
+            <button type="button" id="btn-excel" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-file-earmark-excel"></i> Excel 다운로드
+            </button>
+        </div>
+    </div>
+
+    <!-- 일괄 작업 바: 행 선택 시에만 노출 -->
+    <div class="bulk-bar" id="bulkbar">
+        <span class="bulk-count"><b id="bulkCount">0</b>건 선택됨</span>
+        <div class="bulk-actions">
+            <button type="button" class="btn btn-sm btn-primary" data-bulk="SEND"><i class="bi bi-send"></i> 일괄 발송</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" data-bulk="CANCEL"><i class="bi bi-x-circle"></i> 일괄 취소</button>
+            <button type="button" class="btn btn-sm btn-link text-muted" id="bulk-clear">선택 해제</button>
+        </div>
+    </div>
+
     <div class="table-wrap">
-    <table class="table table-hover align-middle mb-0">
+    <div class="table-scroll">
+    <table class="table table-hover table-striped align-middle mb-0">
         <thead>
         <tr>
-            <th>번호</th>
+            <th class="chk-col"><input type="checkbox" id="chk-all" title="전체 선택"></th>
+            <th class="text-end" style="width:52px;">No.</th>
+            <th class="sortable" data-sort="number">번호<span class="sort-ind"></span></th>
             <th>고객</th>
-            <th>발행일</th>
-            <th>유효기간</th>
-            <th class="text-end">금액</th>
-            <th>상태</th>
-            <th style="width:80px;"></th>
+            <th class="sortable" data-sort="issuedDate">발행일<span class="sort-ind"></span></th>
+            <th class="sortable" data-sort="validUntil">유효기간<span class="sort-ind"></span></th>
+            <th class="sortable text-end" data-sort="totalAmount">금액<span class="sort-ind"></span></th>
+            <th class="sortable" data-sort="status">상태<span class="sort-ind"></span></th>
         </tr>
         </thead>
         <tbody id="rows">
-        <tr><td colspan="7" class="text-center text-muted py-4">불러오는 중…</td></tr>
+        <tr><td colspan="8" class="text-center text-muted py-4">불러오는 중…</td></tr>
         </tbody>
+        <tfoot id="foot"></tfoot>
     </table>
     </div>
+    </div>
 
-    <nav class="mt-3">
-        <ul class="pagination pagination-sm" id="pager"></ul>
+    <nav class="pager-bar">
+        <div class="page-info" id="pageInfo"></div>
+        <ul class="pagination pagination-sm mb-0" id="pager"></ul>
     </nav>
 
 <script>
@@ -81,7 +113,10 @@
     };
 
     let page = 0;
-    const SIZE = 10;
+    let SIZE = 20;
+    // 정렬 상태 — 백엔드 Pageable 의 sort 파라미터로 전달된다.
+    let sortKey = 'id', sortDir = 'desc';
+    const sortParam = () => `${sortKey},${sortDir}`;
 
     async function loadCustomers() {
         try {
@@ -105,57 +140,186 @@
         };
     }
 
+    function rowHtml(q, i) {
+        const s = STATUS[q.status] || {label: q.status, color: 'secondary'};
+        const seq = page * SIZE + i + 1; // 전체 기준 연속 순번(페이지 넘어가도 이어짐)
+        return `<tr style="cursor:pointer" onclick="location.href='/sd/quotations/${q.id}'">
+            <td class="chk-col"><input type="checkbox" class="row-chk" value="${q.id}" onclick="event.stopPropagation()"></td>
+            <td class="text-end text-muted">${seq}</td>
+            <td>${ERP.esc(q.number)}</td>
+            <td>${ERP.esc(q.customerName)} <span class="text-muted small">${ERP.esc(q.customerCode)}</span></td>
+            <td>${q.issuedDate ?? ''}</td>
+            <td>${q.validUntil ?? '<span class="text-muted">-</span>'}</td>
+            <td class="text-end">${ERP.won(q.totalAmount)}</td>
+            <td>${ERP.badge(s.label, s.color)}</td>
+        </tr>`;
+    }
+
+    function renderFoot(list) {
+        const foot = document.getElementById('foot');
+        if (list.length === 0) { foot.innerHTML = ''; return; }
+        const sum = list.reduce((a, q) => a + Number(q.totalAmount || 0), 0);
+        foot.innerHTML = `<tr>
+            <td colspan="6" class="text-end text-muted">이 페이지 합계 (${list.length}건)</td>
+            <td class="text-end">${ERP.won(sum)}</td>
+            <td></td>
+        </tr>`;
+    }
+
     async function load() {
         const tbody = document.getElementById('rows');
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">
+            <span class="spinner-border spinner-border-sm me-1"></span> 불러오는 중…</td></tr>`;
         try {
-            const q = ERP.query({...filters(), page, size: SIZE, sort: 'id,desc'});
+            const q = ERP.query({...filters(), page, size: SIZE, sort: sortParam()});
             const data = await ERP.api('/api/quotations' + q);
             const list = data.content || [];
+            document.getElementById('totalCount').textContent = (data.totalElements ?? list.length).toLocaleString('ko-KR');
             if (list.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">견적이 없습니다.</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">
+                    <i class="bi bi-inbox"></i>조건에 맞는 견적이 없습니다.</div></td></tr>`;
             } else {
-                tbody.innerHTML = list.map(q => {
-                    const s = STATUS[q.status] || {label: q.status, color: 'secondary'};
-                    return `<tr style="cursor:pointer" onclick="location.href='/sd/quotations/${q.id}'">
-                        <td>${ERP.esc(q.number)}</td>
-                        <td>${ERP.esc(q.customerName)} <span class="text-muted small">${ERP.esc(q.customerCode)}</span></td>
-                        <td>${q.issuedDate ?? ''}</td>
-                        <td>${q.validUntil ?? '<span class="text-muted">-</span>'}</td>
-                        <td class="text-end">${ERP.won(q.totalAmount)}</td>
-                        <td>${ERP.badge(s.label, s.color)}</td>
-                        <td><a class="btn btn-sm btn-outline-secondary" href="/sd/quotations/${q.id}"
-                               onclick="event.stopPropagation()">상세</a></td>
-                    </tr>`;
-                }).join('');
+                tbody.innerHTML = list.map(rowHtml).join('');
             }
-            renderPager(data.totalPages || 0, data.number || 0);
+            renderFoot(list);
+            ERP.pager({page, size: SIZE, totalPages: data.totalPages || 0, totalElements: data.totalElements || 0,
+                       onGo: p => { page = p; load(); }});
+            resetSelection();
         } catch (e) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            document.getElementById('foot').innerHTML = '';
+            resetSelection();
             ERP.flashError(e);
         }
     }
 
-    function renderPager(totalPages, current) {
-        const pager = document.getElementById('pager');
-        if (totalPages <= 1) { pager.innerHTML = ''; return; }
-        let html = '';
-        for (let i = 0; i < totalPages; i++) {
-            html += `<li class="page-item ${i === current ? 'active' : ''}">
-                <a class="page-link" href="#" onclick="goto(${i});return false;">${i + 1}</a></li>`;
-        }
-        pager.innerHTML = html;
+    /** 정렬 헤더 표시(▲▼) 갱신. */
+    function updateSortIndicators() {
+        document.querySelectorAll('th.sortable').forEach(th => {
+            const ind = th.querySelector('.sort-ind');
+            th.classList.remove('asc', 'desc');
+            if (th.dataset.sort === sortKey) {
+                th.classList.add(sortDir);
+                ind.textContent = sortDir === 'asc' ? '▲' : '▼';
+            } else {
+                ind.textContent = '↕';
+            }
+        });
     }
 
-    function goto(p) { page = p; load(); }
+    /** 헤더 클릭 → 같은 컬럼이면 방향 토글, 다른 컬럼이면 그 컬럼 기준 정렬. */
+    function onSortClick(th) {
+        const key = th.dataset.sort;
+        if (sortKey === key) {
+            sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortKey = key;
+            sortDir = (key === 'totalAmount') ? 'desc' : 'asc'; // 금액은 큰 값부터가 직관적
+        }
+        page = 0;
+        updateSortIndicators();
+        load();
+    }
+
+    /** 현재 검색 조건 전체를 한 번에 받아 CSV(엑셀)로 내려받기. */
+    async function exportExcel() {
+        const btn = document.getElementById('btn-excel');
+        btn.disabled = true;
+        try {
+            const q = ERP.query({...filters(), page: 0, size: 10000, sort: sortParam()});
+            const data = await ERP.api('/api/quotations' + q);
+            const list = data.content || [];
+            if (list.length === 0) { ERP.flash('내보낼 견적이 없습니다.', 'warning'); return; }
+            const csv = ERP.toCsv(list, [
+                {label: '번호', value: q => q.number},
+                {label: '고객코드', value: q => q.customerCode},
+                {label: '고객명', value: q => q.customerName},
+                {label: '발행일', value: q => q.issuedDate ?? ''},
+                {label: '유효기간', value: q => q.validUntil ?? ''},
+                {label: '금액', value: q => q.totalAmount ?? 0},
+                {label: '상태', value: q => (STATUS[q.status]?.label ?? q.status)},
+            ]);
+            ERP.download(`견적목록_${ERP.today()}.csv`, csv);
+        } catch (e) {
+            ERP.flashError(e);
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    // ── 다중 선택 / 일괄 작업 ──────────────────────────────────
+    const selectedIds = () => [...document.querySelectorAll('.row-chk:checked')].map(c => Number(c.value));
+
+    function updateBulkBar() {
+        const ids = selectedIds();
+        const all = document.querySelectorAll('.row-chk');
+        document.getElementById('bulkCount').textContent = ids.length;
+        document.getElementById('bulkbar').classList.toggle('show', ids.length > 0);
+        const chkAll = document.getElementById('chk-all');
+        chkAll.checked = all.length > 0 && ids.length === all.length;
+        chkAll.indeterminate = ids.length > 0 && ids.length < all.length;
+    }
+
+    function resetSelection() {
+        const chkAll = document.getElementById('chk-all');
+        chkAll.checked = false;
+        chkAll.indeterminate = false;
+        updateBulkBar();
+    }
+
+    async function runBulk(action) {
+        const ids = selectedIds();
+        if (ids.length === 0) return;
+        const label = action === 'SEND' ? '발송' : '취소';
+        if (!confirm(`선택한 ${ids.length}건을 ${label} 처리하시겠습니까?`)) return;
+        try {
+            const res = await ERP.api('/api/quotations/bulk', {method: 'POST', body: {ids, action}});
+            if (res.failed && res.failed.length) {
+                const ex = res.failed[0];
+                ERP.flash(
+                    `${label} ${res.succeeded}건 완료 · ${res.failed.length}건 실패 (예: ${ex.number ?? ex.id} — ${ex.reason})`,
+                    res.succeeded ? 'warning' : 'danger');
+            } else {
+                ERP.flash(`${label} ${res.succeeded}건 완료`, 'success');
+            }
+            load();
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
         loadCustomers();
+        updateSortIndicators();
         load();
         document.getElementById('searchForm').addEventListener('submit', e => {
             e.preventDefault(); page = 0; load();
         });
         document.getElementById('btn-reset').addEventListener('click', () => {
             document.getElementById('searchForm').reset(); page = 0; load();
+        });
+        document.getElementById('btn-excel').addEventListener('click', exportExcel);
+        document.querySelectorAll('th.sortable').forEach(th =>
+            th.addEventListener('click', () => onSortClick(th)));
+
+        // 페이지 크기 변경
+        document.getElementById('pageSize').addEventListener('change', e => {
+            SIZE = Number(e.target.value); page = 0; load();
+        });
+
+        // 다중 선택: 전체선택 토글 + 행 체크 위임 + 일괄 버튼
+        document.getElementById('chk-all').addEventListener('change', e => {
+            document.querySelectorAll('.row-chk').forEach(c => c.checked = e.target.checked);
+            updateBulkBar();
+        });
+        document.getElementById('rows').addEventListener('change', e => {
+            if (e.target.classList.contains('row-chk')) updateBulkBar();
+        });
+        document.querySelectorAll('[data-bulk]').forEach(b =>
+            b.addEventListener('click', () => runBulk(b.dataset.bulk)));
+        document.getElementById('bulk-clear').addEventListener('click', () => {
+            document.querySelectorAll('.row-chk').forEach(c => c.checked = false);
+            resetSelection();
         });
     });
 </script>

@@ -1,0 +1,14 @@
+spring:
+  thymeleaf:
+    cache: false          # 학습용: 템플릿 캐시 끔 (local 과 동일)
+  web:
+    resources:
+      cache:
+        period: 0
+  datasource:
+    # 회사 RDS(MySQL 8.4) - 학습 전용 스키마 erp_db / 전용 유저 erp_app
+    # 비밀번호는 환경변수 ERP_DB_PASSWORD 로만 주입 (yml 에 평문 금지)
+    url: jdbc:mysql://pro-ddakple.cltffqc0oqvb.ap-northeast-2.rds.amazonaws.com:3306/erp_db?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: erp_app
+    password: ${ERP_DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver

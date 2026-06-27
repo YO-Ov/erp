@@ -22,6 +22,27 @@
 - **🎉 Phase 0~16 전체 구현 완료·검증.** 이후 hwlee님 요청으로 **실무형 기능을 점진적으로 확장 중**(아래 2026-06-10 항목들). 학습 문서(doc/)는 별도 트랙.
 - **▶ 다음 = Phase 17(자연어 데이터 검색, Text-to-SQL + 가드레일) 착수 예정** — 아래 2026-06-25 항목 참조. STUDY-PLAN에 Part 3로 편입 완료, **구현 미착수**.
 
+### 🗓 2026-06-27 세션 — DB를 Docker MySQL → AWS RDS 전환 (PC 간 공유 DB)
+
+> ⚠️ **비밀번호 값은 git 에 두지 않는다.** 아래 환경변수 이름만 기록하고, **실제 값 2줄은 개인 비밀번호 관리자(키체인/메모 등)에 따로 보관** → 각 PC에서 한 번씩 환경변수로 주입. (회사 RDS 접속정보를 평문 커밋하면 git 히스토리에 영구 노출되어 비번 교체가 필요해짐.)
+
+- **변경 내용**: 로컬 Docker MySQL 대신 **회사 AWS RDS(MySQL 8.4)** 를 학습 DB로 사용 → 집/회사 어느 PC에서 켜도 같은 데이터를 본다. `aws` 스프링 프로파일 신설(커밋 `aa68614`).
+  - 추가 파일: `hwlee-erp/src/main/resources/application-aws.yml`, `hwlee-mes/src/main/resources/application-aws.yml` (둘 다 비번은 `${ERP_DB_PASSWORD}` / `${MES_DB_PASSWORD}` 환경변수 참조, 평문 없음).
+- **접속 정보**:
+  - 호스트: `pro-ddakple.cltffqc0oqvb.ap-northeast-2.rds.amazonaws.com:3306`
+  - ERP: 스키마 `erp_db` / 유저 `erp_app` / 비번 환경변수 `ERP_DB_PASSWORD`
+  - MES: 스키마 `mes_db` / 유저 `mes_app` / 비번 환경변수 `MES_DB_PASSWORD`
+  - 🔑 **비번 값 2줄은 개인 비밀번호 관리자에서 꺼내 채운다**(git 에 없음).
+- **다른 PC(집)에서 처음 켜는 법** — 둘 중 하나로 환경변수 설정(한 번만):
+  - **방법 A — 셸 `~/.zshrc`** (터미널 `./gradlew bootRun` 용):
+    ```bash
+    export ERP_DB_PASSWORD='<관리자에서 복사>'
+    export MES_DB_PASSWORD='<관리자에서 복사>'
+    ```
+    추가 후 `source ~/.zshrc`(또는 터미널 재시작).
+  - **방법 B — IntelliJ 실행 구성**(IDE Run 버튼용): 각 Application 실행 구성 → *Edit Configurations* → **Environment variables** 에 `ERP_DB_PASSWORD=...` (MES 구성엔 `MES_DB_PASSWORD=...`). `.idea/` 는 gitignore 라 저장소에 안 올라감.
+- **실행 시 프로파일 지정**: `SPRING_PROFILES_ACTIVE=aws` (예: `SPRING_PROFILES_ACTIVE=aws ./gradlew bootRun`, 또는 IntelliJ 실행 구성의 Active profiles=`aws`). ⚠️ 회사 RDS 보안그룹에 그 PC의 공인 IP가 3306 인바운드로 열려 있어야 접속됨.
+
 ### 🗓 2026-06-25 세션 — Phase 17(자연어 검색/Text-to-SQL) 설계 합의 + 계획 편입
 
 > ⚠️ **문서 편집만 함(STUDY-PLAN Part 3 신설·이 항목 추가). 코드 미착수·미커밋** — 다른 PC에서 이어가려면 hwlee님이 커밋+푸시.

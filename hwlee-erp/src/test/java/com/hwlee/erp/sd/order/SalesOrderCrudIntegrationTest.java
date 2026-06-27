@@ -8,7 +8,6 @@ import com.hwlee.erp.master.customer.CustomerRepository;
 import com.hwlee.erp.master.customer.PaymentTerms;
 import com.hwlee.erp.master.customer.dto.CustomerCreateRequest;
 import com.hwlee.erp.master.customer.CustomerService;
-import com.hwlee.erp.master.item.ItemCategory;
 import com.hwlee.erp.master.item.ItemRepository;
 import com.hwlee.erp.master.item.ItemService;
 import com.hwlee.erp.master.item.ItemUnit;
@@ -130,7 +129,7 @@ class SalesOrderCrudIntegrationTest {
     private com.hwlee.erp.master.item.dto.ItemResponse createItem(BigDecimal price) {
         return itemService.create(new ItemCreateRequest(
                 "상품-" + System.nanoTime(),
-                ItemCategory.NOTEBOOK,
+                "NOTEBOOK",
                 ItemUnit.EA,
                 price,
                 price

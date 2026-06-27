@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.hwlee.erp.master.customer.Customer;
 import com.hwlee.erp.master.customer.PaymentTerms;
 import com.hwlee.erp.master.item.Item;
-import com.hwlee.erp.master.item.ItemCategory;
 import com.hwlee.erp.master.item.ItemUnit;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -146,12 +145,12 @@ class SalesOrderTest {
     }
 
     private static Item itemNotebook() {
-        return Item.create("ITEM-2026-0001", "노트북", ItemCategory.NOTEBOOK, ItemUnit.EA,
+        return Item.create("ITEM-2026-0001", "노트북", "NOTEBOOK", ItemUnit.EA,
                 bd(800000), bd(1200000));
     }
 
     private static Item itemMonitor() {
-        return Item.create("ITEM-2026-0002", "모니터", ItemCategory.MONITOR, ItemUnit.EA,
+        return Item.create("ITEM-2026-0002", "모니터", "MONITOR", ItemUnit.EA,
                 bd(200000), bd(350000));
     }
 

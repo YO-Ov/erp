@@ -14,8 +14,8 @@ public final class ItemSpecifications {
         return (root, query, cb) -> cb.like(root.get("name"), "%" + keyword + "%");
     }
 
-    public static Specification<Item> categoryEquals(ItemCategory category) {
-        if (category == null) {
+    public static Specification<Item> categoryEquals(String category) {
+        if (category == null || category.isBlank()) {
             return null;
         }
         return (root, query, cb) -> cb.equal(root.get("category"), category);

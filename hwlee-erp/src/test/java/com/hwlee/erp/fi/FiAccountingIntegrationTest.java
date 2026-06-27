@@ -17,7 +17,6 @@ import com.hwlee.erp.master.customer.CustomerRepository;
 import com.hwlee.erp.master.customer.CustomerService;
 import com.hwlee.erp.master.customer.PaymentTerms;
 import com.hwlee.erp.master.customer.dto.CustomerCreateRequest;
-import com.hwlee.erp.master.item.ItemCategory;
 import com.hwlee.erp.master.item.ItemService;
 import com.hwlee.erp.master.item.ItemUnit;
 import com.hwlee.erp.master.item.dto.ItemCreateRequest;
@@ -308,7 +307,7 @@ class FiAccountingIntegrationTest {
         customerRepository.findById(customer.id()).orElseThrow().changeCreditLimit(new BigDecimal("100000000"));
         customerRepository.flush();
         var item = itemService.create(new ItemCreateRequest(
-                "노트북-" + nano, ItemCategory.NOTEBOOK, ItemUnit.EA, bd(800000), bd(1200000)));
+                "노트북-" + nano, "NOTEBOOK", ItemUnit.EA, bd(800000), bd(1200000)));
         var warehouse = warehouseService.create(new WarehouseCreateRequest(
                 "WH-" + whSuffix(), "본사창고", "서울시"));
         var vendor = vendorService.create(new VendorCreateRequest(

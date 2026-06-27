@@ -1,6 +1,5 @@
 package com.hwlee.erp.master.item.dto;
 
-import com.hwlee.erp.master.item.ItemCategory;
 import com.hwlee.erp.master.item.ItemUnit;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -10,7 +9,7 @@ import java.math.BigDecimal;
 
 public record ItemUpdateRequest(
         @NotBlank @Size(max = 200) String name,
-        @NotNull ItemCategory category,
+        @NotBlank @Size(max = 20) String category,
         @NotNull ItemUnit unit,
         @NotNull @PositiveOrZero BigDecimal standardCost,
         @NotNull @PositiveOrZero BigDecimal standardPrice

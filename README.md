@@ -10,7 +10,7 @@ ERP(기간계) + MES(현장계) 두 시스템을 별도 앱으로 만들고 **RE
 hwlee-erp(8080, erp_db) ──① 작업지시 발행 (동기 REST, CircuitBreaker)──▶ hwlee-mes(8082, mes_db)
   계획·재무                                                                   현장 실행
   SD/MM/FI/HR/PP/배치/리포트   ◀─② 실적·불량 (비동기 Kafka + Outbox, 멱등)──   작업지시/실적/품질/설비
-            └────── 공유 인프라: Kafka+Zookeeper, Zipkin(분산추적) ──────┘
+            └────── 공유 인프라: Kafka(KRaft), Zipkin(분산추적) ──────┘
 ```
 
 ## 디렉토리 구조
@@ -19,7 +19,7 @@ hwlee-erp(8080, erp_db) ──① 작업지시 발행 (동기 REST, CircuitBreak
 my-app/erp/                   ← 모노레포 루트
 ├─ ERP-STUDY-PLAN.md           학습 계획서
 ├─ PROGRESS.md                 진행 현황판
-├─ docker-compose.yml          공유 인프라 (MySQL×2, Kafka, Zookeeper, Zipkin)
+├─ docker-compose.yml          공유 인프라 (MySQL×2, Kafka(KRaft), Zipkin)
 ├─ doc/                        Phase별 도메인 학습 자료
 ├─ contracts/                  ERP-MES API/이벤트 계약 (openapi/, events/)
 ├─ hwlee-erp/                  ERP 프로젝트 (Phase 0~10 + MES 연계)

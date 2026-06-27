@@ -3,7 +3,6 @@ package com.hwlee.erp.mm;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hwlee.erp.TestcontainersConfiguration;
-import com.hwlee.erp.master.item.ItemCategory;
 import com.hwlee.erp.master.item.ItemService;
 import com.hwlee.erp.master.item.ItemUnit;
 import com.hwlee.erp.master.item.dto.ItemCreateRequest;
@@ -60,7 +59,7 @@ class ConcurrentGoodsIssueTest {
     void 동시_출고_요청은_비관적_락으로_직렬화되어_음수_재고가_발생하지_않는다() throws Exception {
         long nano = System.nanoTime();
         var item = itemService.create(new ItemCreateRequest(
-                "노트북-" + nano, ItemCategory.NOTEBOOK, ItemUnit.EA,
+                "노트북-" + nano, "NOTEBOOK", ItemUnit.EA,
                 new BigDecimal("800000"), new BigDecimal("1200000")));
         var vendor = vendorService.create(new VendorCreateRequest(
                 "거래처-" + nano, uniqueBusinessNo(), "인천시",

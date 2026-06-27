@@ -28,14 +28,19 @@ public class Equipment extends BaseEntity {
     @Column(name = "line_name", length = 100)
     private String lineName;
 
+    /** 소속 공장 코드 — ERP factory.code 를 가리킨다(시스템 간 코드 참조, 공유 FK 아님). */
+    @Column(name = "factory_code", length = 30)
+    private String factoryCode;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 16)
     private EquipmentStatus status = EquipmentStatus.IDLE;
 
-    public Equipment(String code, String name, String lineName) {
+    public Equipment(String code, String name, String lineName, String factoryCode) {
         this.code = code;
         this.name = name;
         this.lineName = lineName;
+        this.factoryCode = factoryCode;
         this.status = EquipmentStatus.IDLE;
     }
 

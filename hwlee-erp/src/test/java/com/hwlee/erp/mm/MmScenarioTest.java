@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.hwlee.erp.TestcontainersConfiguration;
-import com.hwlee.erp.master.item.ItemCategory;
 import com.hwlee.erp.master.item.ItemService;
 import com.hwlee.erp.master.item.ItemUnit;
 import com.hwlee.erp.master.item.dto.ItemCreateRequest;
@@ -197,7 +196,7 @@ class MmScenarioTest {
     private TestContext setup() {
         long nano = System.nanoTime();
         var item = itemService.create(new ItemCreateRequest(
-                "노트북-" + nano, ItemCategory.NOTEBOOK, ItemUnit.EA, bd(800000), bd(1200000)));
+                "노트북-" + nano, "NOTEBOOK", ItemUnit.EA, bd(800000), bd(1200000)));
         var vendor = vendorService.create(new VendorCreateRequest(
                 "거래처-" + nano, uniqueBusinessNo(), "인천시",
                 com.hwlee.erp.master.customer.PaymentTerms.NET30));

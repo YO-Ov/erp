@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.hwlee.erp.master.customer.Customer;
 import com.hwlee.erp.master.customer.PaymentTerms;
 import com.hwlee.erp.master.item.Item;
-import com.hwlee.erp.master.item.ItemCategory;
 import com.hwlee.erp.master.item.ItemUnit;
 import com.hwlee.erp.sd.order.SalesOrder;
 import com.hwlee.erp.sd.order.SalesOrderLine;
@@ -53,7 +52,7 @@ class InvoiceTest {
     private static SalesOrder orderWithLine10() {
         Customer c = Customer.create("CUST-2026-0001", "신원전자", "111-22-33333",
                 "서울시", new BigDecimal("100000000"), PaymentTerms.NET30);
-        Item item = Item.create("ITEM-2026-0001", "노트북", ItemCategory.NOTEBOOK, ItemUnit.EA,
+        Item item = Item.create("ITEM-2026-0001", "노트북", "NOTEBOOK", ItemUnit.EA,
                 new BigDecimal("800000"), new BigDecimal("1200000"));
         SalesOrder order = SalesOrder.draft("SO-20260524-001", c, null, null, LocalDate.now());
         order.addLine(item, new BigDecimal("10"), new BigDecimal("1200000"));

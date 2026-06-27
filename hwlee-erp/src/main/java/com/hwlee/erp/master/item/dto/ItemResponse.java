@@ -1,7 +1,6 @@
 package com.hwlee.erp.master.item.dto;
 
 import com.hwlee.erp.common.entity.MasterStatus;
-import com.hwlee.erp.master.item.ItemCategory;
 import com.hwlee.erp.master.item.ItemType;
 import com.hwlee.erp.master.item.ItemUnit;
 import java.math.BigDecimal;
@@ -11,7 +10,7 @@ public record ItemResponse(
         Long id,
         String code,
         String name,
-        ItemCategory category,
+        String category,
         ItemType itemType,
         ItemUnit unit,
         BigDecimal standardCost,

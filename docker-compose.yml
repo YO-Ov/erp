@@ -49,34 +49,29 @@ services:
       timeout: 5s
       retries: 10
 
-  # ── Kafka 코디네이션 ────────────────────────────────────────
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.1
-    container_name: hwlee-zookeeper
-    restart: unless-stopped
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-      TZ: Asia/Seoul
-    ports:
-      - "2181:2181"
-
   # ── Kafka 단일 브로커 (MES→ERP 비동기 메시지 버스) ──────────────
+  # KRaft 모드: Zookeeper 없이 브로커가 컨트롤러 역할까지 겸한다(broker,controller).
+  # 단일 노드라 quorum voter 도 자기 자신 하나(1@kafka:29093). cp-kafka 7.6.1 은
+  # CLUSTER_ID 가 있으면 기동 시 스토리지를 자동 포맷(kafka-storage format)한다.
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: hwlee-kafka
     restart: unless-stopped
-    depends_on:
-      - zookeeper
     ports:
       - "9092:9092"   # 호스트(앱)에서 접속
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      # 컨테이너 내부(PLAINTEXT)와 호스트(PLAINTEXT_HOST) 리스너 분리.
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      # ── KRaft 핵심 ──
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk   # 22자 base64 UUID (고정값 — 재기동 시 동일 클러스터 유지)
+      # ── 리스너: 내부(PLAINTEXT)·호스트(PLAINTEXT_HOST)·컨트롤러(CONTROLLER) 3종 ──
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # ── 단일 노드 복제계수 ──
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1

@@ -9,7 +9,6 @@ import com.hwlee.erp.master.customer.CustomerService;
 import com.hwlee.erp.master.customer.PaymentTerms;
 import com.hwlee.erp.master.customer.dto.CustomerCreateRequest;
 import com.hwlee.erp.master.customer.dto.CustomerResponse;
-import com.hwlee.erp.master.item.ItemCategory;
 import com.hwlee.erp.master.item.ItemService;
 import com.hwlee.erp.master.item.ItemUnit;
 import com.hwlee.erp.master.item.dto.ItemCreateRequest;
@@ -73,7 +72,7 @@ class PartialDeliveryAndInvoiceScenarioTest {
                 "현우테크-" + System.nanoTime(), "서울시", new BigDecimal("100000000"));
         var item = itemService.create(new ItemCreateRequest(
                 "노트북-" + System.nanoTime(),
-                ItemCategory.NOTEBOOK, ItemUnit.EA,
+                "NOTEBOOK", ItemUnit.EA,
                 new BigDecimal("800000"),
                 new BigDecimal("1200000")));
 
@@ -148,7 +147,7 @@ class PartialDeliveryAndInvoiceScenarioTest {
         var customer = createCustomerWithCreditLimit(
                 "한도큰-" + System.nanoTime(), null, new BigDecimal("100000000"));
         var item = itemService.create(new ItemCreateRequest(
-                "노트북-" + System.nanoTime(), ItemCategory.NOTEBOOK, ItemUnit.EA,
+                "노트북-" + System.nanoTime(), "NOTEBOOK", ItemUnit.EA,
                 new BigDecimal("100000"), new BigDecimal("200000")));
 
         var order = salesOrderService.create(new SalesOrderCreateRequest(
@@ -171,7 +170,7 @@ class PartialDeliveryAndInvoiceScenarioTest {
         var customer = createCustomerWithCreditLimit(
                 "취소대상-" + System.nanoTime(), null, new BigDecimal("100000000"));
         var item = itemService.create(new ItemCreateRequest(
-                "노트북-" + System.nanoTime(), ItemCategory.NOTEBOOK, ItemUnit.EA,
+                "노트북-" + System.nanoTime(), "NOTEBOOK", ItemUnit.EA,
                 new BigDecimal("100000"), new BigDecimal("200000")));
 
         Long warehouseId = warehouseId();

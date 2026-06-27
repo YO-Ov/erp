@@ -1,8 +1,12 @@
 package com.hwlee.erp.mm.warehouse;
 
 import com.hwlee.erp.common.entity.BaseEntityWithCode;
+import com.hwlee.erp.master.factory.Factory;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -30,6 +34,11 @@ public class Warehouse extends BaseEntityWithCode {
     @Column(name = "address", length = 500)
     private String address;
 
+    /** 소속 공장. 본사/물류 창고처럼 특정 공장에 속하지 않을 수 있어 nullable. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "factory_id")
+    private Factory factory;
+
     public static Warehouse create(String code, String name, String address) {
         validate(code, name);
         Warehouse w = new Warehouse();
@@ -37,6 +46,11 @@ public class Warehouse extends BaseEntityWithCode {
         w.name = name;
         w.address = address;
         return w;
+    }
+
+    /** 소속 공장 지정/변경(본사·물류 창고는 null 가능). */
+    public void assignFactory(Factory factory) {
+        this.factory = factory;
     }
 
     public void update(String name, String address) {

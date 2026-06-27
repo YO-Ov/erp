@@ -20,9 +20,33 @@
 ## 현재 위치
 
 - **🎉 Phase 0~16 전체 구현 완료·검증.** 이후 hwlee님 요청으로 **실무형 기능을 점진적으로 확장 중**(아래 2026-06-10 항목들). 학습 문서(doc/)는 별도 트랙.
-- **▶ 다음 = Phase 17(자연어 데이터 검색, Text-to-SQL + 가드레일) 착수 예정** — 아래 2026-06-25 항목 참조. STUDY-PLAN에 Part 3로 편입 완료, **구현 미착수**.
+- **▶ 진행 중 = "실무 리얼리즘 확장" 프로젝트**(2026-06-27 착수, 포트폴리오 외부 공개용). 바로 아래 항목 참조. **STEP 1(KRaft)·2(카테고리 마스터화)·3(Factory 마스터) 완료**, STEP 4~6 대기.
+- (보류) Phase 17(자연어 데이터 검색, Text-to-SQL + 가드레일) — STUDY-PLAN Part 3 편입 완료, 구현 미착수.
 
-### 🗓 2026-06-27 세션 — DB를 Docker MySQL → AWS RDS 전환 (PC 간 공유 DB)
+### 🗓 2026-06-27 세션 ② — 실무 리얼리즘 확장 프로젝트 (포트폴리오 공개용)
+
+> **목표**: 외부 공개 포트폴리오 → 데이터 정합성·디테일 최우선. hwlee님 요청.
+> **확정 스펙**: 회사 hyunwoo전자 **설립 2024**. 연 매출(실거래 합) **2024=150억 / 2025=200억 / 2026 상반기≈160억**(연목표 300억). 매출을 **요약분개가 아니라 실거래(구매→생산→판매→입금 전 체인)**로 깐다. 과거 거래는 완결(CLOSED) 상태로 시드해 현재 ATP·MRP·여신 비오염, 오늘 시점 재고·미수금 정상값.
+
+- **STEP 1 — KRaft 전환 ✅ (2026-06-27 완료)**: `docker-compose.yml` 에서 **zookeeper 서비스 제거**, kafka 를 KRaft 단일노드(broker+controller)로 재구성(`KAFKA_PROCESS_ROLES=broker,controller`, CONTROLLER 리스너 29093, `CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk`→정규화 `...Qg`). **앱 코드 변경 0**(여전히 localhost:9092). cp-kafka 이미지 익명볼륨에 zookeeper 시절 데이터가 남아 첫 기동 때 옛 클러스터ID로 떠서 → `docker compose rm -sfv kafka` 로 볼륨 비우고 재포맷. 검증: `kafka-metadata-quorum describe --status` LeaderId 1·CurrentVoters[1]·healthy, zookeeper 컨테이너 소멸. README 2곳 "Kafka+Zookeeper"→"Kafka(KRaft)" 정리. (⚠️ 앱 레벨 Outbox→Kafka→ERP E2E 는 앱 기동 시 확인 권장 — 브로커 레벨은 검증됨.)
+- **STEP 2 — 카테고리 코드 마스터화 ✅ (2026-06-27 완료)**: `ItemCategory` enum → **마스터 엔티티/테이블**(`item_category`)로 일반화. 이제 데스크탑·키보드 등 카테고리를 **코드 수정 없이 데이터로** 추가 가능.
+  - Flyway **V46**: `item_category`(code uniq·name·sort_order·status·soft-delete) + 기존 enum 3종(NOTEBOOK/MONITOR/PART) 이관 + `ALTER item ADD FK fk_item_category (category→item_category.code)`.
+  - 신규: `ItemCategory`(enum→@Entity, BaseEntityWithCode), `ItemCategoryRepository`, `ItemCategoryController`(`GET /api/item-categories`, 드롭다운용), `dto/ItemCategoryResponse`.
+  - 변경: `Item.category` enum→**String 코드**, DTO 3종(`@NotBlank @Size(20) String category`), `ItemService`(생성/수정 시 `requireActiveCategory` 검증), `ItemSpecifications.categoryEquals(String)`, `ItemController` 검색 파라미터 String. 품목 전용 화면 없어 템플릿 변경 0.
+  - 테스트 11파일 `ItemCategory.NOTEBOOK/.MONITOR` → 문자열 치환. **검증**: `compileJava`/`compileTestJava` 그린 + `ItemCrudIntegrationTest`(Testcontainers) 통과(V46 적용·FK·카테고리 검증 동작). 부수효과로 KRaft Kafka 앱 연결도 확인됨.
+- **STEP 3 — Factory(공장) 마스터 신설 ✅ (2026-06-27 완료)**: 공장 3개 거점 + 창고/설비를 공장에 소속. 생산지시는 자기 창고를 통해 공장에 연결(정규화, production_order 무변경).
+  - ERP: 신규 `master/factory`(Factory[BaseEntityWithCode], FactoryRepository, FactoryController[`GET /api/factories`·`/by-code/{code}`], dto/FactoryResponse). `Warehouse` 에 `@ManyToOne Factory factory`(nullable)+`assignFactory()`, `WarehouseResponse`+`WarehouseMapper` 에 factoryCode/factoryName 노출.
+  - ERP Flyway **V47**: factory 테이블 + 3공장 시드(**FAC-01 수원·FAC-02 구미·FAC-03 광주**) + `warehouse.factory_id` FK(nullable) + WH-HQ→FAC-01 배정.
+  - MES Flyway **V8**: `equipment.factory_code` 컬럼(ERP factory.code 코드참조, 공유FK 아님) + 기존 EQ-001/002→FAC-01. `Equipment` 엔티티에 factoryCode 필드(생성자 4-arg).
+  - **검증**: ERP/MES compileJava·compileTestJava 그린 + `MmScenarioTest`(Testcontainers) 통과(V47 적용·창고 런타임). ⚠️ MES는 테스트 모듈이 없어 V8은 다음 MES 기동 시 적용(SQL 단순 ALTER+UPDATE).
+- **STEP 4~6 — 대기**(미착수):
+  - STEP 4: 마스터 대량확장. **설계 확정 문서 = `doc/실무리얼리즘확장-STEP4-카탈로그.md`**(2026-06-27 작성, 생성 SQL의 기준). 확정 내용: 완제품 16(카테고리 8)·부품 ~30(세분 카테고리 10)·BOM, **창고 4**(중앙 WH-HQ[공장 미소속 재배정]+공장창고 3 WH-SW/GM/GJ), 고객 100, 거래처 ~18, **직원 110**(사무~18+생산직~92, **전원 급여계약**), **로그인 부서별 2~3**(담당+팀장, 생산직 로그인 없음), MES 설비/작업자 공장별. 100건↑은 생성 스크립트로 SQL 산출. ▶ **다음 액션 = 생성 스크립트 작성→Flyway 편입**.
+  - (신규 기능·데이터 STEP 밖) **전자결재(전사 횡단)**: 결재는 견적만이 아니라 구매발주·지급·전표·근태/휴가·생산지시 등 공통(hwlee님 지적). **설계 문서 = `doc/실무리얼리즘확장-전자결재-설계.md`**. 권장=범용 결재 엔진(approval_request/step/rule + 알림 + 문서 콜백), 단계적 도입(코어+견적→구매→지급→…). 기존 여신/계획오더 승인흐름과 통합 고려. ▶ **미결정**: 범위·엔진방식·타이밍(데이터 후 권장). 부서별 담당+팀장 로그인(STEP4)이 상신자/결재자.
+  - STEP 5: 2024~2026 실거래 백필(월별 구매→생산→판매→입금 사이클, 분개 차·대 균형, 완결상태). 매출은 거래 결과로 ~510억.
+  - STEP 6: 테스트 영향 정리(enum 제거 여파)·doc/·PROGRESS 갱신.
+- ⚠️ **미커밋** — 다른 PC에서 이어가려면 hwlee님이 커밋+푸시.
+
+### 🗓 2026-06-27 세션 ① — DB를 Docker MySQL → AWS RDS 전환 (PC 간 공유 DB)
 
 > ⚠️ **비밀번호 값은 git 에 두지 않는다.** 아래 환경변수 이름만 기록하고, **실제 값 2줄은 개인 비밀번호 관리자(키체인/메모 등)에 따로 보관** → 각 PC에서 한 번씩 환경변수로 주입. (회사 RDS 접속정보를 평문 커밋하면 git 히스토리에 영구 노출되어 비번 교체가 필요해짐.)
 

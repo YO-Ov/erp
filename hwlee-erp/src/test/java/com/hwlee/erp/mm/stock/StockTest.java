@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.hwlee.erp.common.entity.MasterStatus;
 import com.hwlee.erp.master.item.Item;
-import com.hwlee.erp.master.item.ItemCategory;
 import com.hwlee.erp.master.item.ItemUnit;
 import com.hwlee.erp.mm.warehouse.Warehouse;
 import java.math.BigDecimal;
@@ -101,7 +100,7 @@ class StockTest {
     // === helpers ===
 
     private static Item item() {
-        return Item.create("ITEM-2026-0001", "노트북", ItemCategory.NOTEBOOK, ItemUnit.EA,
+        return Item.create("ITEM-2026-0001", "노트북", "NOTEBOOK", ItemUnit.EA,
                 bd(800000), bd(1200000));
     }
 

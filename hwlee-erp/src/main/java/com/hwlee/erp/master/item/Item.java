@@ -27,9 +27,9 @@ public class Item extends BaseEntityWithCode {
     @Column(name = "name", nullable = false, length = 200)
     private String name;
 
-    @Enumerated(EnumType.STRING)
+    /** 카테고리 코드 — {@code item_category.code} 를 참조(FK). 값 예: NOTEBOOK/MONITOR/PART/DESKTOP… */
     @Column(name = "category", nullable = false, length = 20)
-    private ItemCategory category;
+    private String category;
 
     /** 완제품/부품 구분 (Phase 8 PP). 신규 품목 기본값 FINISHED, 부품은 시드로 COMPONENT 지정. */
     @Enumerated(EnumType.STRING)
@@ -46,7 +46,7 @@ public class Item extends BaseEntityWithCode {
     @Column(name = "standard_price", nullable = false, precision = 15, scale = 2)
     private BigDecimal standardPrice;
 
-    public static Item create(String code, String name, ItemCategory category, ItemUnit unit,
+    public static Item create(String code, String name, String category, ItemUnit unit,
                               BigDecimal standardCost, BigDecimal standardPrice) {
         validate(name, category, unit, standardCost, standardPrice);
         Item item = new Item();
@@ -59,7 +59,7 @@ public class Item extends BaseEntityWithCode {
         return item;
     }
 
-    public void update(String name, ItemCategory category, ItemUnit unit,
+    public void update(String name, String category, ItemUnit unit,
                        BigDecimal standardCost, BigDecimal standardPrice) {
         validate(name, category, unit, standardCost, standardPrice);
         this.name = name;
@@ -69,13 +69,13 @@ public class Item extends BaseEntityWithCode {
         this.standardPrice = standardPrice;
     }
 
-    private static void validate(String name, ItemCategory category, ItemUnit unit,
+    private static void validate(String name, String category, ItemUnit unit,
                                  BigDecimal standardCost, BigDecimal standardPrice) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("name 은 비어 있을 수 없다.");
         }
-        if (category == null) {
-            throw new IllegalArgumentException("category 는 null 일 수 없다.");
+        if (category == null || category.isBlank()) {
+            throw new IllegalArgumentException("category 는 비어 있을 수 없다.");
         }
         if (unit == null) {
             throw new IllegalArgumentException("unit 은 null 일 수 없다.");

@@ -8,6 +8,8 @@ public record WarehouseResponse(
         String code,
         String name,
         String address,
+        String factoryCode,
+        String factoryName,
         MasterStatus status,
         LocalDateTime createdAt,
         String createdBy,

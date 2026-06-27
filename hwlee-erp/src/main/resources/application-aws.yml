@@ -1,4 +1,9 @@
 spring:
+  # 비밀번호 등 민감값은 git 에서 제외된 secret.properties 로 주입.
+  # (운영에선 이 파일 없이 환경변수 ERP_DB_PASSWORD / JWT_SECRET 가 우선 적용됨)
+  # optional: → 파일이 없어도 기동 실패하지 않고 환경변수로 fallback.
+  config:
+    import: optional:file:./secret.properties
   thymeleaf:
     cache: false          # 학습용: 템플릿 캐시 끔 (local 과 동일)
   web:

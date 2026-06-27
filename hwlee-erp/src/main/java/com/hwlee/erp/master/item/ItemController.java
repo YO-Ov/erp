@@ -54,7 +54,7 @@ public class ItemController {
     @GetMapping
     public Page<ItemResponse> search(
             @RequestParam(required = false) String name,
-            @RequestParam(required = false) ItemCategory category,
+            @RequestParam(required = false) String category,
             @RequestParam(required = false) MasterStatus status,
             Pageable pageable
     ) {

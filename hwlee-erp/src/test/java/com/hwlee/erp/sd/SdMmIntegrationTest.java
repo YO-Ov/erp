@@ -9,7 +9,6 @@ import com.hwlee.erp.master.customer.CustomerService;
 import com.hwlee.erp.master.customer.PaymentTerms;
 import com.hwlee.erp.master.customer.dto.CustomerCreateRequest;
 import com.hwlee.erp.master.customer.dto.CustomerResponse;
-import com.hwlee.erp.master.item.ItemCategory;
 import com.hwlee.erp.master.item.ItemService;
 import com.hwlee.erp.master.item.ItemUnit;
 import com.hwlee.erp.master.item.dto.ItemCreateRequest;
@@ -164,9 +163,9 @@ class SdMmIntegrationTest {
         var customer = createCustomerWithCreditLimit(
                 "다중라인-" + nano, "서울시", new BigDecimal("100000000"));
         var notebook = itemService.create(new ItemCreateRequest(
-                "노트북-" + nano, ItemCategory.NOTEBOOK, ItemUnit.EA, bd(800000), bd(1200000)));
+                "노트북-" + nano, "NOTEBOOK", ItemUnit.EA, bd(800000), bd(1200000)));
         var monitor = itemService.create(new ItemCreateRequest(
-                "모니터-" + nano, ItemCategory.MONITOR, ItemUnit.EA, bd(200000), bd(350000)));
+                "모니터-" + nano, "MONITOR", ItemUnit.EA, bd(200000), bd(350000)));
         Long warehouseId = warehouseId();
         stockUp(notebook.id(), warehouseId, 5);
         stockUp(monitor.id(), warehouseId, 3);
@@ -205,7 +204,7 @@ class SdMmIntegrationTest {
         var customer = createCustomerWithCreditLimit(
                 "롤백검증-" + nano, "서울시", new BigDecimal("100000000"));
         var item = itemService.create(new ItemCreateRequest(
-                "노트북-" + nano, ItemCategory.NOTEBOOK, ItemUnit.EA, bd(800000), bd(1200000)));
+                "노트북-" + nano, "NOTEBOOK", ItemUnit.EA, bd(800000), bd(1200000)));
         Long warehouseId = warehouseId();   // 재고 행 없음
 
         var order = salesOrderService.create(new SalesOrderCreateRequest(
@@ -243,7 +242,7 @@ class SdMmIntegrationTest {
         var customer = createCustomerWithCreditLimit(
                 "현우테크-" + nano, "서울시", new BigDecimal("100000000"));
         var item = itemService.create(new ItemCreateRequest(
-                "노트북-" + nano, ItemCategory.NOTEBOOK, ItemUnit.EA, bd(800000), bd(1200000)));
+                "노트북-" + nano, "NOTEBOOK", ItemUnit.EA, bd(800000), bd(1200000)));
         Long warehouseId = warehouseId();
         stockUp(item.id(), warehouseId, stockQty);
 

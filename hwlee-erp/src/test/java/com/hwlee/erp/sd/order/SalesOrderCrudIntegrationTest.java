@@ -121,8 +121,10 @@ class SalesOrderCrudIntegrationTest {
                 PaymentTerms.NET30
         ));
         // 생성 시 한도는 항상 0이므로, 테스트가 의도한 한도로 올려준다.
-        customerRepository.findById(customer.id()).orElseThrow().changeCreditLimit(creditLimit);
-        customerRepository.flush();
+        // (트랜잭션 밖 findById 로 얻은 엔티티는 detached — saveAndFlush 로 명시 반영.)
+        var c = customerRepository.findById(customer.id()).orElseThrow();
+        c.changeCreditLimit(creditLimit);
+        customerRepository.saveAndFlush(c);
         return customer;
     }
 

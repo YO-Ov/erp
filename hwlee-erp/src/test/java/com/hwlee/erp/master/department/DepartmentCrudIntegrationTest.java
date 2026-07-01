@@ -22,11 +22,12 @@ class DepartmentCrudIntegrationTest {
     @Test
     @DisplayName("자식_부서는_부모_부서_코드로_연결된다")
     void 자식_부서는_부모_부서_코드로_연결된다() {
-        // V8 시드로 이미 DEPT-HQ 와 5개 하위 부서가 존재한다.
+        // V8 시드 후 STEP4(V52)에서 조직이 본부-팀 트리로 재편됨:
+        // DEPT-SALES 는 '국내영업1팀'으로 개명되고 부모가 영업본부(DEPT-SALESHQ)로 이동.
         DepartmentResponse sales = service.findByCode("DEPT-SALES");
 
-        assertThat(sales.parentCode()).isEqualTo("DEPT-HQ");
-        assertThat(sales.name()).isEqualTo("영업팀");
+        assertThat(sales.parentCode()).isEqualTo("DEPT-SALESHQ");
+        assertThat(sales.name()).isEqualTo("국내영업1팀");
     }
 
     @Test
@@ -41,8 +42,9 @@ class DepartmentCrudIntegrationTest {
     @Test
     @DisplayName("존재하지_않는_부모_코드로_생성하면_예외가_발생한다")
     void 존재하지_않는_부모_코드로_생성하면_예외() {
+        // (DEPT-RND 는 STEP4 에서 실제 부서로 생성됐으므로, 코드 충돌을 피해 미사용 코드를 쓴다.)
         assertThatThrownBy(() ->
-                service.create(new DepartmentCreateRequest("DEPT-RND", "연구소", "DEPT-NOWHERE"))
+                service.create(new DepartmentCreateRequest("DEPT-NEW-TEST", "연구소", "DEPT-NOWHERE"))
         ).isInstanceOf(jakarta.persistence.EntityNotFoundException.class);
     }
 }

@@ -99,7 +99,7 @@ class SdMmIntegrationTest {
 
         // 원장에 출고(-6) 한 줄
         StockMovement giMv = stockMovementRepository.findAll().stream()
-                .filter(m -> m.getReason() == MovementReason.GOODS_ISSUE && m.getRefId().equals(giId))
+                .filter(m -> m.getReason() == MovementReason.GOODS_ISSUE && giId.equals(m.getRefId()))
                 .findFirst().orElseThrow();
         assertThat(giMv.getQtyDelta()).isEqualByComparingTo(bd(-6));
     }
@@ -150,7 +150,7 @@ class SdMmIntegrationTest {
 
         // 복원 원장(ADJUSTMENT_PLUS +6) 추가
         StockMovement restore = stockMovementRepository.findAll().stream()
-                .filter(m -> m.getReason() == MovementReason.ADJUSTMENT_PLUS && m.getRefId().equals(giId))
+                .filter(m -> m.getReason() == MovementReason.ADJUSTMENT_PLUS && giId.equals(m.getRefId()))
                 .findFirst().orElseThrow();
         assertThat(restore.getQtyDelta()).isEqualByComparingTo(bd(6));
     }
@@ -229,8 +229,9 @@ class SdMmIntegrationTest {
     private CustomerResponse createCustomerWithCreditLimit(String name, String address, BigDecimal creditLimit) {
         var customer = customerService.create(new CustomerCreateRequest(
                 name, uniqueBusinessNo(), address, PaymentTerms.NET30));
-        customerRepository.findById(customer.id()).orElseThrow().changeCreditLimit(creditLimit);
-        customerRepository.flush();
+        var c = customerRepository.findById(customer.id()).orElseThrow();
+        c.changeCreditLimit(creditLimit);
+        customerRepository.saveAndFlush(c);
         return customer;
     }
 

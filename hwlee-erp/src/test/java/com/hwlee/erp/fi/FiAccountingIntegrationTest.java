@@ -225,6 +225,11 @@ class FiAccountingIntegrationTest {
     @DisplayName("매입→출하→인보이스→입금 전체 시나리오 — 채권 잔액 0 / 손익 = 매출 - 매출원가")
     void 전체_OTC_시나리오로_채권이_닫히고_손익이_맞는다() {
         var ctx = setupMasters();
+        // STEP5 실거래 시드로 계정에 기존 잔액이 있을 수 있으므로, 이 시나리오의 델타로 검증한다.
+        BigDecimal arBefore = accountBalance(SystemAccounts.AR);
+        BigDecimal salesBefore = accountBalance(SystemAccounts.SALES);
+        BigDecimal cogsBefore = accountBalance(SystemAccounts.COGS);
+        BigDecimal vatBefore = accountBalance(SystemAccounts.VAT_PAYABLE);
         // 입고 10대 × 800,000 → 매입 전표 8,000,000
         stockUp(ctx, 10, bd(800000));
         var so = createConfirmedOrder(ctx, 6, bd(1200000));
@@ -244,21 +249,21 @@ class FiAccountingIntegrationTest {
                 PaymentType.RECEIPT, ctx.customerId, null,
                 new BigDecimal("7920000"), LocalDate.now(), "수금"));
 
-        // 매출채권 잔액 = +7,920,000 (인보이스) - 7,920,000 (입금) = 0
-        assertThat(accountBalance(SystemAccounts.AR))
-                .as("외상값을 모두 회수했으므로 매출채권 잔액 0")
+        // 매출채권 델타 = +7,920,000 (인보이스) - 7,920,000 (입금) = 0
+        assertThat(accountBalance(SystemAccounts.AR).subtract(arBefore))
+                .as("외상값을 모두 회수했으므로 이 시나리오의 매출채권 델타 0")
                 .isEqualByComparingTo(BigDecimal.ZERO);
 
-        // 손익 = 매출 7,200,000 - 매출원가 4,800,000 = 2,400,000
-        BigDecimal sales = accountBalance(SystemAccounts.SALES).abs();   // 대변 정상이라 음수
-        BigDecimal cogs = accountBalance(SystemAccounts.COGS);
-        assertThat(sales.subtract(cogs))
+        // 손익 델타 = 매출 7,200,000 - 매출원가 4,800,000 = 2,400,000
+        BigDecimal salesDelta = accountBalance(SystemAccounts.SALES).subtract(salesBefore).abs();
+        BigDecimal cogsDelta = accountBalance(SystemAccounts.COGS).subtract(cogsBefore);
+        assertThat(salesDelta.subtract(cogsDelta))
                 .as("총이익 = 매출(7.2M) - 매출원가(4.8M) = 2.4M")
                 .isEqualByComparingTo("2400000");
 
-        // 부가세예수금 잔액 720,000 (대변, 즉 -720,000 in 차변-대변 차)
-        assertThat(accountBalance(SystemAccounts.VAT_PAYABLE).abs())
-                .as("부가세예수금 잔액 — 다음 부가세 신고 시 납부 대상")
+        // 부가세예수금 델타 720,000
+        assertThat(accountBalance(SystemAccounts.VAT_PAYABLE).subtract(vatBefore).abs())
+                .as("부가세예수금 델타 — 다음 부가세 신고 시 납부 대상")
                 .isEqualByComparingTo("720000");
     }
 
@@ -304,8 +309,10 @@ class FiAccountingIntegrationTest {
         var customer = customerService.create(new CustomerCreateRequest(
                 "현우테크-" + nano, uniqueBusinessNo(), "서울시", PaymentTerms.NET30));
         // 생성 시 한도는 항상 0이므로, 수주 확정이 신용한도 검증을 통과하도록 충분히 올려준다.
-        customerRepository.findById(customer.id()).orElseThrow().changeCreditLimit(new BigDecimal("100000000"));
-        customerRepository.flush();
+        // (트랜잭션 밖에서 findById 로 얻은 엔티티는 detached — 변경 후 saveAndFlush 로 명시 반영.)
+        var created = customerRepository.findById(customer.id()).orElseThrow();
+        created.changeCreditLimit(new BigDecimal("100000000"));
+        customerRepository.saveAndFlush(created);
         var item = itemService.create(new ItemCreateRequest(
                 "노트북-" + nano, "NOTEBOOK", ItemUnit.EA, bd(800000), bd(1200000)));
         var warehouse = warehouseService.create(new WarehouseCreateRequest(

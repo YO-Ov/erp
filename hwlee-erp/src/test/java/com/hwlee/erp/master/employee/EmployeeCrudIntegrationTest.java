@@ -32,7 +32,8 @@ class EmployeeCrudIntegrationTest {
 
         assertThat(e.code()).matches("EMP-\\d{4}-\\d{4}");
         assertThat(e.departmentCode()).isEqualTo("DEPT-SALES");
-        assertThat(e.departmentName()).isEqualTo("영업팀");
+        // STEP4(V52) 조직 재편으로 DEPT-SALES 의 이름이 '영업팀' → '국내영업1팀'.
+        assertThat(e.departmentName()).isEqualTo("국내영업1팀");
     }
 
     @Test

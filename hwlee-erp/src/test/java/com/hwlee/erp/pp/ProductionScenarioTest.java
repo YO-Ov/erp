@@ -105,11 +105,18 @@ class ProductionScenarioTest {
         // 4) 출고 단가 기록됨(완제품 원가 = 직접재료비 합 ÷ 수량)
         assertThat(done.lines()).allSatisfy(l -> assertThat(l.issuedUnitCost()).isNotNull());
 
-        // 5) 생산 완료 전표 차)제품 / 대)원재료 — 직접재료비 = 5 × 680,000 = 3,400,000
-        BigDecimal materialCost = new BigDecimal("3400000.00");
-        JournalEntry je = journalEntryRepository.findAll().stream()
-                .filter(e -> e.getSourceType() == JournalSource.PROD && po.id().equals(e.getSourceId()))
-                .findFirst().orElseThrow();
+        // 5) 생산 완료 전표 차)제품 / 대)원재료 — 직접재료비 = Σ(부품 출고 이동평균 × 소요량).
+        //    (STEP5 실거래 시드가 부품 평균원가를 바꿔도 무관하도록 그 시점 평균으로 기대값을 산출.
+        //     출고는 평균을 바꾸지 않으므로 완료 후 평균 = 출고 시 적용 평균이다.)
+        BigDecimal materialCost = po.lines().stream()
+                .map(l -> stockRepository
+                        .findByItemIdAndWarehouseId(component(l.componentName()).getId(), wh.getId())
+                        .map(Stock::getAverageCost).orElse(BigDecimal.ZERO)
+                        .multiply(l.requiredQty()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        JournalEntry je = journalEntryRepository
+                .findBySourceTypeAndSourceIdWithLines(JournalSource.PROD, po.id())
+                .stream().findFirst().orElseThrow();
         assertThat(je.getLines()).anySatisfy(l -> {
             assertThat(l.getAccount().getCode()).isEqualTo(SystemAccounts.INVENTORY); // 제품(1400)
             assertThat(l.getDebit()).isEqualByComparingTo(materialCost);

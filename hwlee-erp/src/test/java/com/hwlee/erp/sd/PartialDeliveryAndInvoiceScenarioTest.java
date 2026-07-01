@@ -199,8 +199,9 @@ class PartialDeliveryAndInvoiceScenarioTest {
     private CustomerResponse createCustomerWithCreditLimit(String name, String address, BigDecimal creditLimit) {
         var customer = customerService.create(new CustomerCreateRequest(
                 name, uniqueBusinessNo(), address, PaymentTerms.NET30));
-        customerRepository.findById(customer.id()).orElseThrow().changeCreditLimit(creditLimit);
-        customerRepository.flush();
+        var c = customerRepository.findById(customer.id()).orElseThrow();
+        c.changeCreditLimit(creditLimit);
+        customerRepository.saveAndFlush(c);
         return customer;
     }
 

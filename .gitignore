@@ -30,3 +30,4 @@ build/
 # 모든 모듈의 민감값 파일 제외 (템플릿 *.example 은 추적)
 secret.properties
 **/secret.properties
+__pycache__/

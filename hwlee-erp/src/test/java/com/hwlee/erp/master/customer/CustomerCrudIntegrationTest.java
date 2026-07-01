@@ -111,8 +111,10 @@ class CustomerCrudIntegrationTest {
         assertThat(updated.businessNo()).isEqualTo(created.businessNo());
 
         // 한도 변경은 별도 도메인 메서드(changeCreditLimit)로만 — 변경이 조회에 반영된다
-        repository.findById(created.id()).orElseThrow().changeCreditLimit(new BigDecimal("5000000.00"));
-        repository.flush();
+        // (트랜잭션 밖 findById 엔티티는 detached — saveAndFlush 로 명시 반영.)
+        var toUpdate = repository.findById(created.id()).orElseThrow();
+        toUpdate.changeCreditLimit(new BigDecimal("5000000.00"));
+        repository.saveAndFlush(toUpdate);
         assertThat(service.findById(created.id()).creditLimit())
                 .isEqualByComparingTo(new BigDecimal("5000000.00"));
     }

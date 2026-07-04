@@ -23,6 +23,16 @@
 - **▶ 진행 중 = "실무 리얼리즘 확장" 프로젝트**(2026-06-27 착수, 포트폴리오 외부 공개용). 바로 아래 항목 참조. **STEP 1(KRaft)·2(카테고리 마스터화)·3(Factory)·4(마스터 대량확장)·5(3년치 실거래 백필) 완료. STEP 6은 테스트 정리 완료·`doc/` 학습문서만 남음.** 전체 94개 테스트 그린.
 - (보류) Phase 17(자연어 데이터 검색, Text-to-SQL + 가드레일) — STUDY-PLAN Part 3 편입 완료, 구현 미착수.
 
+### 🗓 2026-07-04 세션 — 수주 마감(CLOSED) 기능 완성 (백엔드+UI)
+
+> 이전 세션에서 백엔드만 만들다 `/clear` 됨. 이번 세션에 UI 버튼까지 붙여 수직 슬라이스 완결.
+
+- **배경**: 전량 출하·청구된 수주(INVOICED)를 영업상 명시적으로 **거래 종료(CLOSED)** 처리하는 흐름. 수금 여부와 무관(실입금은 FI Payment 소관). CLOSED 는 terminal 상태로 이후 출하/청구/재계산에서 동결.
+- **백엔드**(이전 세션 산출, 미커밋): `SalesOrder.close()`(INVOICED→CLOSED 가드) + `recomputeStatus()`/`ensureProgressable()` 가 CLOSED 를 동결(추가 출하/청구 거부) + `SalesOrderService.close(id)` + `SalesOrderController` `POST /api/sales-orders/{id}/close`(클래스 `@PreAuthorize hasAnyRole('SALES','ADMIN')` 상속). 테스트 3건(정상마감/INVOICED아니면거부/마감후동결) **그린**.
+- **UI**(이번 세션 추가): `sd/order/detail.html` `renderActions()` 에 **INVOICED 상태일 때 "마감 (거래 종료)" 버튼**(기존 `act('close','마감')` 패턴, `POST .../close` 호출). 상태 배지 맵 `detail.html`·`list.html` 양쪽에 **CLOSED='거래종료'** 추가(STEP5 시드한 다수 CLOSED 수주가 영문 회색으로 나오던 것 교정). `list.html` 상태 필터 드롭다운에 **거래종료** 옵션 추가.
+- **검증**: `SalesOrderTest` BUILD SUCCESSFUL(4건 그린). 프론트는 순수 HTML — ⚠️ 헤드리스 없어 실제 버튼 클릭→마감 렌더는 hwlee님 육안 권장.
+- ⚠️ **미커밋** — 다른 PC에서 이어가려면 hwlee님이 커밋+푸시. (변경 파일: SalesOrder.java·Service·Controller·Test + detail.html·list.html)
+
 ### 🗓 2026-06-27 세션 ② — 실무 리얼리즘 확장 프로젝트 (포트폴리오 공개용)
 
 > **목표**: 외부 공개 포트폴리오 → 데이터 정합성·디테일 최우선. hwlee님 요청.

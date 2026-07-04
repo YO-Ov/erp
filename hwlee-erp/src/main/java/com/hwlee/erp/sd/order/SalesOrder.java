@@ -131,6 +131,19 @@ public class SalesOrder extends BaseEntity {
     }
 
     /**
+     * INVOICED → CLOSED. 전량 출하·청구가 끝난 수주를 담당자가 명시적으로 마감한다.
+     *
+     * <p>수금 여부와는 무관하다 — 실제 입금은 FI 의 Payment(RECEIPT) 소관이며,
+     * 이 마감은 "물건 다 보내고 세금계산서도 다 끊었으니 영업상 종료" 라는 의미다.
+     * CLOSED 는 {@link #recomputeStatus()} 재계산에서 제외되어 이후 동결된다.
+     */
+    public void close() {
+        if (status != SalesOrderStatus.INVOICED)
+            throw new IllegalStateException("INVOICED(전량 청구 완료) 수주만 종료 가능합니다. 현재: " + status);
+        this.status = SalesOrderStatus.CLOSED;
+    }
+
+    /**
      * 출하 라인 한 건의 수량을 SO 라인에 누적하고, 헤더 상태를 라인 누적값에서 다시 계산한다.
      * 호출 측: Delivery 가 SHIPPED 로 확정되는 시점.
      */

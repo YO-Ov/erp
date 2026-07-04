@@ -121,6 +121,39 @@ class SalesOrderTest {
     }
 
     @Test
+    @DisplayName("전량 청구(INVOICED)된 수주는 CLOSED 로 마감된다")
+    void close_전량_청구되면_CLOSED로_마감된다() {
+        SalesOrder order = fullyInvoicedOrder();
+        assertThat(order.getStatus()).isEqualTo(SalesOrderStatus.INVOICED);
+
+        order.close();
+        assertThat(order.getStatus()).isEqualTo(SalesOrderStatus.CLOSED);
+    }
+
+    @Test
+    @DisplayName("INVOICED 가 아닌 수주는 close 할 수 없다 — SHIPPED 단계 마감 금지")
+    void close_INVOICED가_아니면_거부된다() {
+        SalesOrder order = orderWith2Lines();
+        order.confirm(LocalDateTime.now());
+        order.recordShipment(order.getLines().get(0), bd(10));
+        order.recordShipment(order.getLines().get(1), bd(5));   // → SHIPPED (청구 전)
+
+        assertThatThrownBy(order::close)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("INVOICED");
+    }
+
+    @Test
+    @DisplayName("CLOSED 수주는 추가 출하/청구가 거부된다 — 마감 후 동결")
+    void close_이후_진행이_거부된다() {
+        SalesOrder order = fullyInvoicedOrder();
+        order.close();
+
+        assertThatThrownBy(() -> order.recordShipment(order.getLines().get(0), bd(1)))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     @DisplayName("totalAmount 는 라인 합계로 재계산된다")
     void totalAmount는_라인_합계로_재계산된다() {
         SalesOrder order = SalesOrder.draft("SO-20260524-001", customer(), null, null, LocalDate.now());
@@ -136,6 +169,19 @@ class SalesOrderTest {
         SalesOrder order = SalesOrder.draft("SO-20260524-001", customer(), null, null, LocalDate.now());
         order.addLine(itemNotebook(), bd(10), bd(1200000));  // line1
         order.addLine(itemMonitor(), bd(5), bd(350000));     // line2
+        return order;
+    }
+
+    /** 두 라인 모두 전량 출하·청구까지 마쳐 INVOICED 상태가 된 수주. */
+    private static SalesOrder fullyInvoicedOrder() {
+        SalesOrder order = orderWith2Lines();
+        order.confirm(LocalDateTime.now());
+        SalesOrderLine line1 = order.getLines().get(0);  // qty=10
+        SalesOrderLine line2 = order.getLines().get(1);  // qty=5
+        order.recordShipment(line1, bd(10));
+        order.recordShipment(line2, bd(5));
+        order.recordInvoicing(line1, bd(10));
+        order.recordInvoicing(line2, bd(5));
         return order;
     }
 

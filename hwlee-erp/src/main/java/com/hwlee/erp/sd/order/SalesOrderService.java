@@ -119,6 +119,16 @@ public class SalesOrderService {
         return mapper.toResponse(order);
     }
 
+    /**
+     * 전량 청구(INVOICED)된 수주를 CLOSED(거래 종료)로 마감한다. 수금 여부와 무관 — FI Payment 소관.
+     */
+    @Transactional
+    public SalesOrderResponse close(Long id) {
+        SalesOrder order = getOrThrow(id);
+        order.close();
+        return mapper.toResponse(order);
+    }
+
     private void addLines(SalesOrder order, List<SalesOrderLineRequest> lineReqs) {
         for (SalesOrderLineRequest lineReq : lineReqs) {
             Item item = itemRepository.findById(lineReq.itemId())

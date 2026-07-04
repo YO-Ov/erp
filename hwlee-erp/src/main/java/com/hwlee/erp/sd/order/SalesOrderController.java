@@ -86,4 +86,10 @@ public class SalesOrderController {
     public SalesOrderResponse cancel(@PathVariable Long id) {
         return service.cancel(id);
     }
+
+    /** 전량 청구된 수주를 CLOSED(거래 종료)로 마감. */
+    @PostMapping("/{id}/close")
+    public SalesOrderResponse close(@PathVariable Long id) {
+        return service.close(id);
+    }
 }

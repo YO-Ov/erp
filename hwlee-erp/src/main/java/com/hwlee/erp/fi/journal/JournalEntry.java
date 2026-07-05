@@ -140,6 +140,11 @@ public class JournalEntry extends BaseEntity {
         this.status = JournalEntryStatus.CANCELLED;
     }
 
+    /** 차변 합계 — 결재 상신 시 전결 금액 기준. */
+    public BigDecimal totalDebit() {
+        return lines.stream().map(JournalLine::getDebit).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
     public List<JournalLine> getLines() {
         return Collections.unmodifiableList(lines);
     }

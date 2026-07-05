@@ -62,6 +62,9 @@
             <a class="nav-link" th:classappend="${active == 'dashboard'} ? 'active'" href="/">
                 <i class="bi bi-grid-1x2"></i> 대시보드
             </a>
+            <a class="nav-link" th:classappend="${active == 'approval'} ? 'active'" href="/approvals">
+                <i class="bi bi-pen"></i> 전자결재
+            </a>
 
             <div sec:authorize="hasAnyRole('SALES','ADMIN')">
                 <div class="nav-section">영업 (SD)</div>
@@ -216,6 +219,11 @@
             CREDIT_REQUEST_SUBMITTED: {icon: 'bi-shield-exclamation', color: '#f59f00'},
             CREDIT_REQUEST_APPROVED:  {icon: 'bi-check-circle', color: '#2fb344'},
             CREDIT_REQUEST_REJECTED:  {icon: 'bi-x-circle', color: '#d63939'},
+            APPROVAL_REQUESTED:       {icon: 'bi-pen', color: '#1e5eff'},
+            APPROVAL_APPROVED:        {icon: 'bi-check2-circle', color: '#2fb344'},
+            APPROVAL_REJECTED:        {icon: 'bi-x-circle', color: '#d63939'},
+            APPROVAL_RETURNED:        {icon: 'bi-arrow-return-left', color: '#f59f00'},
+            APPROVAL_REFERENCED:      {icon: 'bi-eye', color: '#667085'},
         };
         const bell = document.getElementById('notifBell');
         if (!bell) return; // 로그인 화면 등 레이아웃 밖

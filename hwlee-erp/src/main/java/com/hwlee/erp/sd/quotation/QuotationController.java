@@ -6,6 +6,7 @@ import static com.hwlee.erp.sd.quotation.QuotationSpecifications.issuedTo;
 import static com.hwlee.erp.sd.quotation.QuotationSpecifications.statusEquals;
 import static org.springframework.data.jpa.domain.Specification.where;
 
+import com.hwlee.erp.approval.dto.ApprovalResponse;
 import com.hwlee.erp.sd.quotation.dto.QuotationBulkRequest;
 import com.hwlee.erp.sd.quotation.dto.QuotationBulkResponse;
 import com.hwlee.erp.sd.quotation.dto.QuotationCreateRequest;
@@ -13,6 +14,7 @@ import com.hwlee.erp.sd.quotation.dto.QuotationResponse;
 import com.hwlee.erp.sd.quotation.dto.QuotationUpdateRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.security.Principal;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -77,6 +79,12 @@ public class QuotationController {
     @PostMapping("/{id}/send")
     public QuotationResponse send(@PathVariable Long id) {
         return service.send(id);
+    }
+
+    /** 결재 상신 — 작성 중 견적을 전자결재에 올린다. 최종 승인 시 자동 발송(SENT). */
+    @PostMapping("/{id}/submit-approval")
+    public ApprovalResponse submitForApproval(@PathVariable Long id, Principal principal) {
+        return service.submitForApproval(id, principal.getName());
     }
 
     @PostMapping("/{id}/accept")

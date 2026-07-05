@@ -73,7 +73,7 @@
         </div>
     </div>
 
-    <div class="table-wrap">
+    <div class="table-wrap d-none d-md-block">
     <div class="table-scroll">
     <table class="table table-hover table-striped align-middle mb-0">
         <thead>
@@ -96,6 +96,9 @@
     </div>
     </div>
 
+    <!-- 모바일: 표 대신 카드 목록 -->
+    <div class="list-cards d-md-none" id="cards"></div>
+
     <nav class="pager-bar">
         <div class="page-info" id="pageInfo"></div>
         <ul class="pagination pagination-sm mb-0" id="pager"></ul>
@@ -111,6 +114,19 @@
         EXPIRED:   {label: '만료',   color: 'warning'},
         CANCELLED: {label: '취소됨', color: 'dark'},
     };
+    // 결재(전자결재) 상태 — 문서 상태와 별개로 함께 표시한다(상신/반려 가시성).
+    const APV_STATUS = {
+        PENDING:   {label: '결재중', color: 'warning'},
+        REJECTED:  {label: '결재반려', color: 'danger'},
+        DRAFT:     {label: '반송', color: 'secondary'},   // 반송돼 재상신 대기
+        WITHDRAWN: {label: '회수', color: 'dark'},
+        // APPROVED 는 견적이 이미 '발송됨'이라 문서 상태와 중복 → 배지 생략
+    };
+    let approvalStatusMap = {};   // refId(견적 id) → 최신 결재 상태
+    function apvBadge(qid) {
+        const a = APV_STATUS[approvalStatusMap[qid]];
+        return a ? ' ' + ERP.badge(a.label, a.color) : '';
+    }
 
     let page = 0;
     let SIZE = 20;
@@ -151,8 +167,25 @@
             <td>${q.issuedDate ?? ''}</td>
             <td>${q.validUntil ?? '<span class="text-muted">-</span>'}</td>
             <td class="text-end">${ERP.won(q.totalAmount)}</td>
-            <td>${ERP.badge(s.label, s.color)}</td>
+            <td>${ERP.badge(s.label, s.color)}${apvBadge(q.id)}</td>
         </tr>`;
+    }
+
+    // 모바일 카드 — 표의 각 행과 같은 데이터를 카드로 표현(번호·상태/결재 배지·금액·일자).
+    function cardHtml(q) {
+        const s = STATUS[q.status] || {label: q.status, color: 'secondary'};
+        return `<div class="lc-card" onclick="location.href='/sd/quotations/${q.id}'">
+            <div class="lc-top">
+                <span class="lc-num">${ERP.esc(q.number)}</span>
+                <span class="lc-badges">${ERP.badge(s.label, s.color)}${apvBadge(q.id)}</span>
+            </div>
+            <div class="lc-sub">${ERP.esc(q.customerName)} <span class="code">${ERP.esc(q.customerCode)}</span></div>
+            <div class="lc-amt">${ERP.won(q.totalAmount)}</div>
+            <div class="lc-meta">
+                <div>발행 <b>${q.issuedDate ?? '-'}</b></div>
+                <div>유효 <b>${q.validUntil ?? '-'}</b></div>
+            </div>
+        </div>`;
     }
 
     function renderFoot(list) {
@@ -178,8 +211,17 @@
             if (list.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">
                     <i class="bi bi-inbox"></i>조건에 맞는 견적이 없습니다.</div></td></tr>`;
+                document.getElementById('cards').innerHTML =
+                    `<div class="empty-state"><i class="bi bi-inbox"></i>조건에 맞는 견적이 없습니다.</div>`;
             } else {
+                // 이 페이지 견적들의 결재 상태를 한 번에 조회해 배지로 덧입힌다(N+1 방지).
+                approvalStatusMap = {};
+                try {
+                    approvalStatusMap = await ERP.api('/api/approvals/status'
+                        + ERP.query({docType: 'QUOTATION', refIds: list.map(q => q.id).join(',')})) || {};
+                } catch (e) { /* 결재 배지는 부가 정보 — 실패해도 목록은 표시 */ }
                 tbody.innerHTML = list.map(rowHtml).join('');
+                document.getElementById('cards').innerHTML = list.map(cardHtml).join('');
             }
             renderFoot(list);
             ERP.pager({page, size: SIZE, totalPages: data.totalPages || 0, totalElements: data.totalElements || 0,

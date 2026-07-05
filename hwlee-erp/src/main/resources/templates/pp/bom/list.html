@@ -33,7 +33,7 @@
             </div>
 
             <div class="table-scroll">
-            <table class="table line-table align-middle mb-0">
+            <table class="table rtable line-table align-middle mb-0">
                 <thead>
                 <tr>
                     <th class="text-end" style="width:52px;">No.</th>
@@ -122,11 +122,11 @@
             return String(va ?? '').localeCompare(String(vb ?? ''), 'ko') * dir;
         });
         tbody.innerHTML = sorted.map((b, i) => `<tr>
-            <td class="text-end text-muted">${i + 1}</td>
-            <td>${ERP.esc(b.componentCode)}</td>
-            <td>${ERP.esc(b.componentName)}</td>
-            <td class="text-end">${ERP.num(b.quantity)}</td>
-            <td><button class="btn btn-sm btn-outline-danger" onclick="del(${b.id})">✕</button></td></tr>`).join('');
+            <td class="text-end text-muted" data-label="">${i + 1}</td>
+            <td data-label="부품 코드">${ERP.esc(b.componentCode)}</td>
+            <td data-label="부품명">${ERP.esc(b.componentName)}</td>
+            <td class="text-end" data-label="소요량(완제품 1개당)">${ERP.num(b.quantity)}</td>
+            <td data-label=""><button class="btn btn-sm btn-outline-danger" onclick="del(${b.id})">✕</button></td></tr>`).join('');
     }
 
     /** 정렬 헤더 표시(▲▼) 갱신. */

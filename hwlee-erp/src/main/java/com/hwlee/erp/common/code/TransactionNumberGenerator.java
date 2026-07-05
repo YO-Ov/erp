@@ -30,6 +30,7 @@ public class TransactionNumberGenerator {
     static final String PREFIX_PRODUCTION_ORDER = "PO";
     static final String PREFIX_PLANNED_ORDER = "PLO";
     static final String PREFIX_CREDIT_REQUEST = "CLR";
+    static final String PREFIX_APPROVAL = "APV";
 
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter MONTH_FORMAT = DateTimeFormatter.ofPattern("yyyyMM");
@@ -81,6 +82,11 @@ public class TransactionNumberGenerator {
     /** 여신(신용한도) 상향 요청 번호 — 일 단위. 예: {@code CLR-20260610-001}. */
     public String nextCreditLimitRequestNumber(LocalDate requestDate) {
         return codeGenerator.nextTransactionCode(PREFIX_CREDIT_REQUEST, periodKey(requestDate));
+    }
+
+    /** 전자결재 문서 번호 — 일 단위. 예: {@code APV-20260705-001}. */
+    public String nextApprovalNumber(LocalDate requestDate) {
+        return codeGenerator.nextTransactionCode(PREFIX_APPROVAL, periodKey(requestDate));
     }
 
     /**

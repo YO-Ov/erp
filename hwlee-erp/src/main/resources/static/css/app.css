@@ -373,3 +373,53 @@ dl.detail-dl dd { color: var(--text); }
     body.sidebar-open .app-sidebar { transform: translateX(0); }
     body.sidebar-open .sidebar-backdrop { display: block; }
 }
+
+/* ══ 반응형 목록: 좁은 화면에서 표를 카드로 ═══════════════════════ */
+
+/* [방식 A] 커스텀 카드 — 핵심 목록. 표(.d-md-block)와 카드(.list-cards.d-md-none)를
+   둘 다 두고 Bootstrap d-* 유틸로 폭에 따라 토글한다. 아래는 카드 스타일. */
+.list-cards { display: flex; flex-direction: column; gap: .6rem; }
+.lc-card {
+    background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+    padding: .75rem .85rem; box-shadow: 0 1px 2px rgba(28, 36, 52, .05);
+    cursor: pointer; transition: border-color .12s, box-shadow .12s;
+}
+.lc-card:hover { border-color: #c9d6ea; box-shadow: 0 2px 8px rgba(28, 36, 52, .08); }
+.lc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
+.lc-num { font-weight: 700; font-size: .92rem; color: var(--text); letter-spacing: -.01em; }
+.lc-badges { display: flex; flex-wrap: wrap; gap: .28rem; justify-content: flex-end; }
+.lc-sub { color: var(--muted); font-size: .82rem; margin: .25rem 0 .5rem; }
+.lc-sub .code { font-size: .76rem; opacity: .85; }
+.lc-amt { font-size: 1.2rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.02em; color: var(--text); }
+.lc-meta { display: flex; flex-wrap: wrap; gap: .15rem 1rem; margin-top: .45rem; padding-top: .5rem; border-top: 1px dashed var(--border); }
+.lc-meta div { font-size: .76rem; color: var(--muted); }
+.lc-meta b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 767.98px) {
+    /* [방식 B] .rtable — 나머지 목록. 헤더를 숨기고 각 행을 라벨–값 카드로.
+       각 <td> 에 data-label="컬럼명" 을 붙이면 라벨이 표시된다. */
+    .rtable > thead { display: none; }
+    .rtable, .rtable > tbody, .rtable > tbody > tr, .rtable > tbody > tr > td { display: block; width: 100%; }
+    .rtable > tbody > tr {
+        border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: .6rem;
+        background: #fff; box-shadow: 0 1px 2px rgba(28, 36, 52, .05); overflow: hidden;
+    }
+    .rtable > tbody > tr > td {
+        display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+        text-align: right; padding: .4rem .8rem; border: 0; border-bottom: 1px dashed #eef1f5; line-height: 1.4;
+    }
+    .rtable > tbody > tr > td:last-child { border-bottom: 0; }
+    .rtable > tbody > tr > td::before {
+        content: attr(data-label); font-weight: 600; color: var(--muted); font-size: .7rem;
+        text-transform: uppercase; letter-spacing: .03em; text-align: left; flex: 0 0 auto; white-space: nowrap;
+    }
+    /* 라벨 없는(빈 data-label) 액션/체크 칸은 라벨 숨김 */
+    .rtable > tbody > tr > td[data-label=""]::before { content: none; }
+    .rtable td.chk-col { display: none; }
+    .rtable > tfoot { display: none; } /* 합계 행은 모바일 카드에서 생략 */
+
+    /* 스크롤 높이 제한 해제 + 필터바 세로 스택 */
+    .table-scroll { max-height: none; }
+    .filter-bar { flex-direction: column; align-items: stretch; }
+    .filter-bar .filter-actions { margin-left: 0; }
+}

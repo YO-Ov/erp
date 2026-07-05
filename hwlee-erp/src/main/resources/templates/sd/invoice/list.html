@@ -57,7 +57,7 @@
 
     <div class="table-wrap">
     <div class="table-scroll">
-    <table class="table table-hover align-middle mb-0">
+    <table class="table rtable table-hover align-middle mb-0">
         <thead>
         <tr>
             <th class="text-end" style="width:52px;">No.</th>
@@ -104,12 +104,12 @@
         const s = STATUS[v.status] || {label: v.status, color: 'secondary'};
         const seq = page * SIZE + i + 1; // 전체 기준 연속 순번(페이지 넘어가도 이어짐)
         return `<tr style="cursor:pointer" onclick="location.href='/sd/invoices/${v.id}'">
-            <td class="text-end text-muted">${seq}</td>
-            <td>${ERP.esc(v.number)}</td>
-            <td><a href="/sd/sales-orders/${v.salesOrderId}" onclick="event.stopPropagation()">${ERP.esc(v.salesOrderNumber)}</a></td>
-            <td>${v.invoiceDate ?? ''}</td>
-            <td class="text-end">${ERP.won(v.totalAmount)}</td>
-            <td>${ERP.badge(s.label, s.color)}</td>
+            <td class="text-end text-muted" data-label="">${seq}</td>
+            <td data-label="번호">${ERP.esc(v.number)}</td>
+            <td data-label="수주"><a href="/sd/sales-orders/${v.salesOrderId}" onclick="event.stopPropagation()">${ERP.esc(v.salesOrderNumber)}</a></td>
+            <td data-label="발행일">${v.invoiceDate ?? ''}</td>
+            <td class="text-end" data-label="합계(VAT포함)">${ERP.won(v.totalAmount)}</td>
+            <td data-label="상태">${ERP.badge(s.label, s.color)}</td>
         </tr>`;
     }
 

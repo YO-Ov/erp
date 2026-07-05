@@ -64,7 +64,7 @@
 
     <div class="table-wrap">
     <div class="table-scroll">
-    <table class="table table-hover align-middle mb-0">
+    <table class="table rtable table-hover align-middle mb-0">
         <thead>
         <tr>
             <th class="text-end" style="width:52px;">No.</th>
@@ -183,8 +183,8 @@
                     <div class="tl-meta">${ERP.esc(r.requestedBy)} · ${fmtTime(r.createdAt)}</div></li>`;
         if (r.status === 'PENDING') {
             tl += `<li><span class="dot wait"></span>
-                    <div class="tl-title">재무 검토 대기</div>
-                    <div class="tl-meta">아직 결정 전</div></li>`;
+                    <div class="tl-title">재무팀장 결재 진행 중</div>
+                    <div class="tl-meta">전자결재 <a href="/approvals">결재함</a>에서 처리됩니다</div></li>`;
         } else {
             const ok = r.status === 'APPROVED';
             tl += `<li><span class="dot ${ok ? 'ok' : 'no'}"></span>
@@ -225,24 +225,22 @@
                     const s = STATUS[r.status] || {label: r.status, color: 'secondary'};
                     const seq = page * SIZE + i + 1;
                     let action = '<span class="text-muted">-</span>';
-                    if (r.status === 'PENDING' && CAN_DECIDE) {
-                        action = `<button class="btn btn-sm btn-success" onclick='openDecide(${JSON.stringify(r)},"approve")'>승인</button>
-                                  <button class="btn btn-sm btn-outline-danger" onclick='openDecide(${JSON.stringify(r)},"reject")'>거부</button>`;
-                    } else if (r.status === 'PENDING') {
-                        action = '<span class="badge badge-soft badge-soft-warning">재무 검토 중</span>';
+                    if (r.status === 'PENDING') {
+                        // 승인/거부는 전자결재로 이관 — 재무팀장이 결재함에서 처리.
+                        action = '<a href="/approvals" class="badge badge-soft badge-soft-warning text-decoration-none"><i class="bi bi-pen"></i> 결재 진행 중</a>';
                     } else if (r.decidedBy) {
                         action = `<span class="small text-muted">${ERP.esc(r.decidedBy)}</span>`;
                     }
                     return `<tr>
-                        <td class="text-end text-muted">${seq}</td>
-                        <td><a href="javascript:void(0)" onclick='openDetail(${JSON.stringify(r)})'>${ERP.esc(r.number)}</a></td>
-                        <td>${ERP.esc(r.customerName)}</td>
-                        <td class="text-end">${ERP.won(r.currentLimit)}</td>
-                        <td class="text-end fw-semibold text-primary">${ERP.won(r.requestedLimit)}</td>
-                        <td class="small" style="max-width:220px">${ERP.esc(r.reason)}</td>
-                        <td class="small">${ERP.esc(r.requestedBy)}</td>
-                        <td>${ERP.badge(s.label, s.color)}</td>
-                        <td>${action}</td></tr>`;
+                        <td class="text-end text-muted" data-label="">${seq}</td>
+                        <td data-label="번호"><a href="javascript:void(0)" onclick='openDetail(${JSON.stringify(r)})'>${ERP.esc(r.number)}</a></td>
+                        <td data-label="고객">${ERP.esc(r.customerName)}</td>
+                        <td class="text-end" data-label="현재 한도">${ERP.won(r.currentLimit)}</td>
+                        <td class="text-end fw-semibold text-primary" data-label="요청 한도">${ERP.won(r.requestedLimit)}</td>
+                        <td class="small" style="max-width:220px" data-label="사유">${ERP.esc(r.reason)}</td>
+                        <td class="small" data-label="요청자">${ERP.esc(r.requestedBy)}</td>
+                        <td data-label="상태">${ERP.badge(s.label, s.color)}</td>
+                        <td data-label="">${action}</td></tr>`;
                 }).join('');
             ERP.pager({page, size: SIZE, totalPages: data.totalPages || 0, totalElements: data.totalElements || 0,
                        onGo: p => { page = p; load(); }});
@@ -418,7 +416,12 @@
         document.getElementById('rq-customer').addEventListener('change', onCustomerChange);
         document.getElementById('rq-requested').addEventListener('input', onRequestedInput);
         document.getElementById('rq-submit').addEventListener('click', submitReq);
-        document.getElementById('dc-submit').addEventListener('click', submitDecide);
+
+        // 결재 알림 딥링크(?id=) — 특정 여신 요청 상세 열기.
+        const preId = new URLSearchParams(location.search).get('id');
+        if (preId) {
+            try { openDetail(await ERP.api('/api/credit-limit-requests/' + preId)); } catch (e) {}
+        }
     });
 </script>
 </div>

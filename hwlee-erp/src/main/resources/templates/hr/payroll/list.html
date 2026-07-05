@@ -32,7 +32,7 @@
 
     <div class="table-wrap">
     <div class="table-scroll">
-    <table class="table table-hover table-striped align-middle mb-0">
+    <table class="table rtable table-hover table-striped align-middle mb-0">
         <thead>
         <tr>
             <th class="text-end" style="width:52px;">No.</th>
@@ -72,14 +72,14 @@
         const s = STATUS[r.status] || {label: r.status, color: 'secondary'};
         const seq = page * SIZE + i + 1;
         return `<tr style="cursor:pointer" onclick="location.href='/hr/payroll-runs/${r.id}'">
-            <td class="text-end text-muted">${seq}</td>
-            <td>${ERP.esc(r.number)}</td>
-            <td>${ERP.esc(r.period)}</td>
-            <td>${r.runDate ?? ''}</td>
-            <td class="text-end">${ERP.won(r.totalGross)}</td>
-            <td class="text-end">${ERP.won(r.totalDeduction)}</td>
-            <td class="text-end fw-bold">${ERP.won(r.totalNet)}</td>
-            <td>${ERP.badge(s.label, s.color)}</td></tr>`;
+            <td class="text-end text-muted" data-label="">${seq}</td>
+            <td data-label="번호">${ERP.esc(r.number)}</td>
+            <td data-label="대상월">${ERP.esc(r.period)}</td>
+            <td data-label="지급일">${r.runDate ?? ''}</td>
+            <td class="text-end" data-label="총지급">${ERP.won(r.totalGross)}</td>
+            <td class="text-end" data-label="총공제">${ERP.won(r.totalDeduction)}</td>
+            <td class="text-end fw-bold" data-label="실수령">${ERP.won(r.totalNet)}</td>
+            <td data-label="상태">${ERP.badge(s.label, s.color)}</td></tr>`;
     }
 
     function renderFoot(list) {

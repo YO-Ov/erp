@@ -51,7 +51,7 @@
 
     <div class="table-wrap">
     <div class="table-scroll">
-    <table class="table table-hover table-striped align-middle mb-0">
+    <table class="table rtable table-hover table-striped align-middle mb-0">
         <thead>
         <tr>
             <th class="text-end" style="width:52px;">No.</th>
@@ -115,13 +115,13 @@
         const s = MSTATUS[e.status] || {label: e.status, color: 'secondary'};
         const seq = page * SIZE + i + 1;
         return `<tr style="cursor:pointer" onclick="location.href='/hr/employees/${e.id}'">
-            <td class="text-end text-muted">${seq}</td>
-            <td>${ERP.esc(e.code)}</td>
-            <td>${ERP.esc(e.name)}</td>
-            <td>${ERP.esc(e.departmentName) || '-'} <span class="text-muted small">${ERP.esc(e.departmentCode)}</span></td>
-            <td class="text-muted">${ERP.esc(e.email) || '-'}</td>
-            <td>${e.hireDate ?? '-'}</td>
-            <td>${ERP.badge(s.label, s.color)}</td></tr>`;
+            <td class="text-end text-muted" data-label="">${seq}</td>
+            <td data-label="코드">${ERP.esc(e.code)}</td>
+            <td data-label="이름">${ERP.esc(e.name)}</td>
+            <td data-label="부서">${ERP.esc(e.departmentName) || '-'} <span class="text-muted small">${ERP.esc(e.departmentCode)}</span></td>
+            <td class="text-muted" data-label="이메일">${ERP.esc(e.email) || '-'}</td>
+            <td data-label="입사일">${e.hireDate ?? '-'}</td>
+            <td data-label="상태">${ERP.badge(s.label, s.color)}</td></tr>`;
     }
 
     function render() {

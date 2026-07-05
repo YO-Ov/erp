@@ -51,7 +51,7 @@
         </div>
     </div>
 
-    <div class="table-wrap">
+    <div class="table-wrap d-none d-md-block">
     <div class="table-scroll">
     <table class="table table-hover align-middle mb-0">
         <thead>
@@ -71,6 +71,9 @@
     </div>
     </div>
 
+    <!-- 모바일: 표 대신 카드 목록 -->
+    <div class="list-cards d-md-none" id="cards"></div>
+
     <nav class="pager-bar">
         <div class="page-info" id="pageInfo"></div>
         <ul class="pagination pagination-sm mb-0" id="pager"></ul>
@@ -85,6 +88,19 @@
         DRAFT:  {label: '초안',   color: 'secondary'},
         POSTED: {label: '전기됨', color: 'success'},
     };
+    // 결재 상태 — 지급(출금)은 전자결재를 타므로 문서 상태와 별개로 함께 표시(상신/반려 가시성).
+    const APV_STATUS = {
+        PENDING:   {label: '결재중', color: 'warning'},
+        REJECTED:  {label: '결재반려', color: 'danger'},
+        DRAFT:     {label: '반송', color: 'secondary'},
+        WITHDRAWN: {label: '회수', color: 'dark'},
+        // APPROVED 는 전기됨(POSTED)과 중복 → 배지 생략
+    };
+    let approvalStatusMap = {};   // refId(지급 id) → 최신 결재 상태
+    function apvBadge(pid) {
+        const a = APV_STATUS[approvalStatusMap[pid]];
+        return a ? ' ' + ERP.badge(a.label, a.color) : '';
+    }
     let page = 0;
     let SIZE = 20;
     // 정렬 상태 — 백엔드 Pageable 의 sort 파라미터로 전달된다.
@@ -113,8 +129,29 @@
             <td>${party}</td>
             <td class="text-end">${ERP.won(p.amount)}</td>
             <td>${p.paymentDate ?? ''}</td>
-            <td>${ERP.badge(s.label, s.color)}</td>
+            <td>${ERP.badge(s.label, s.color)}${apvBadge(p.id)}</td>
         </tr>`;
+    }
+
+    // 모바일 카드 — 표의 각 행과 같은 데이터를 카드로 표현(번호·상태/결재 배지·금액·구분/거래일).
+    function cardHtml(p) {
+        const t = TYPE[p.type] || {label: p.type, color: 'secondary'};
+        const s = STATUS[p.status] || {label: p.status, color: 'secondary'};
+        const party = p.type === 'RECEIPT'
+            ? `<span class="text-muted small">고객</span> ${ERP.esc(p.customerCode) || '-'}`
+            : `<span class="text-muted small">거래처</span> ${ERP.esc(p.vendorCode) || '-'}`;
+        return `<div class="lc-card" onclick="location.href='/fi/payments/${p.id}'">
+            <div class="lc-top">
+                <span class="lc-num">${ERP.esc(p.number)}</span>
+                <span class="lc-badges">${ERP.badge(s.label, s.color)}${apvBadge(p.id)}</span>
+            </div>
+            <div class="lc-sub">${party}</div>
+            <div class="lc-amt">${ERP.won(p.amount)}</div>
+            <div class="lc-meta">
+                <div>구분 <b>${ERP.badge(t.label, t.color)}</b></div>
+                <div>거래일 <b>${p.paymentDate ?? '-'}</b></div>
+            </div>
+        </div>`;
     }
 
     function renderFoot(list) {
@@ -139,8 +176,17 @@
             if (list.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">
                     <i class="bi bi-inbox"></i>조건에 맞는 입출금 내역이 없습니다.</div></td></tr>`;
+                document.getElementById('cards').innerHTML =
+                    `<div class="empty-state"><i class="bi bi-inbox"></i>조건에 맞는 입출금 내역이 없습니다.</div>`;
             } else {
+                // 이 페이지 지급 건들의 결재 상태를 한 번에 조회(입금은 결재 없어 맵에 없음).
+                approvalStatusMap = {};
+                try {
+                    approvalStatusMap = await ERP.api('/api/approvals/status'
+                        + ERP.query({docType: 'PAYMENT', refIds: list.map(p => p.id).join(',')})) || {};
+                } catch (e) { /* 결재 배지는 부가 정보 */ }
                 tbody.innerHTML = list.map(rowHtml).join('');
+                document.getElementById('cards').innerHTML = list.map(cardHtml).join('');
             }
             renderFoot(list);
             ERP.pager({page, size: SIZE, totalPages: data.totalPages || 0, totalElements: data.totalElements || 0,

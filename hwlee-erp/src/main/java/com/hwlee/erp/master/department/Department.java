@@ -1,6 +1,7 @@
 package com.hwlee.erp.master.department;
 
 import com.hwlee.erp.common.entity.BaseEntityWithCode;
+import com.hwlee.erp.master.employee.Employee;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -33,6 +34,15 @@ public class Department extends BaseEntityWithCode {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")
     private Department parent;
+
+    /**
+     * 부서장(長) — 이 부서를 대표해 결재하는 직원. 전자결재의 결재선은 상신자 부서에서
+     * 조직 트리를 타고 올라가며 각 노드의 부서장을 결재 단계로 삼는다. 미지정(null)이면
+     * 그 단계는 건너뛰고 상위 부서장으로 넘어간다.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manager_id")
+    private Employee manager;
 
     public static Department create(String code, String name, Department parent) {
         if (code == null || code.isBlank()) {

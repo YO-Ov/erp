@@ -1,10 +1,8 @@
 package com.hwlee.erp.fi.credit;
 
-import com.hwlee.erp.fi.credit.dto.CreditLimitDecisionRequest;
 import com.hwlee.erp.fi.credit.dto.CreditLimitRequestCreateRequest;
 import com.hwlee.erp.fi.credit.dto.CreditLimitRequestResponse;
 import jakarta.validation.Valid;
-import java.security.Principal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -53,20 +51,5 @@ public class CreditLimitRequestController {
     public CreditLimitRequestResponse create(@Valid @RequestBody CreditLimitRequestCreateRequest req) {
         return service.create(req);
     }
-
-    @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAnyRole('FINANCE','ADMIN')")
-    public CreditLimitRequestResponse approve(@PathVariable Long id,
-                                              @RequestBody(required = false) CreditLimitDecisionRequest decision,
-                                              Principal principal) {
-        return service.approve(id, decision, principal.getName());
-    }
-
-    @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAnyRole('FINANCE','ADMIN')")
-    public CreditLimitRequestResponse reject(@PathVariable Long id,
-                                             @RequestBody(required = false) CreditLimitDecisionRequest decision,
-                                             Principal principal) {
-        return service.reject(id, decision, principal.getName());
-    }
+    // 승인/거부는 전자결재로 이관 — 재무팀장이 결재함(/approvals)에서 처리한다.
 }

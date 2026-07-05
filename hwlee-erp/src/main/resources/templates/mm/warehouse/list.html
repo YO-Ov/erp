@@ -50,7 +50,7 @@
 
     <div class="table-wrap">
     <div class="table-scroll">
-    <table class="table table-hover align-middle mb-0">
+    <table class="table rtable table-hover align-middle mb-0">
         <thead>
         <tr>
             <th class="text-end" style="width:52px;">No.</th>
@@ -104,11 +104,11 @@
                 tbody.innerHTML = list.map((w, i) => {
                     const s = STATUS[w.status] || {label: w.status, color: 'secondary'};
                     return `<tr style="cursor:pointer" onclick="location.href='/mm/warehouses/${w.id}'">
-                        <td class="text-end text-muted">${page * SIZE + i + 1}</td>
-                        <td>${ERP.esc(w.code)}</td>
-                        <td>${ERP.esc(w.name)}</td>
-                        <td class="text-muted">${ERP.esc(w.address) || '-'}</td>
-                        <td>${ERP.badge(s.label, s.color)}</td></tr>`;
+                        <td class="text-end text-muted" data-label="">${page * SIZE + i + 1}</td>
+                        <td data-label="코드">${ERP.esc(w.code)}</td>
+                        <td data-label="이름">${ERP.esc(w.name)}</td>
+                        <td class="text-muted" data-label="주소">${ERP.esc(w.address) || '-'}</td>
+                        <td data-label="상태">${ERP.badge(s.label, s.color)}</td></tr>`;
                 }).join('');
             }
             ERP.pager({page, size: SIZE, totalPages: data.totalPages || 0, totalElements: data.totalElements || 0,

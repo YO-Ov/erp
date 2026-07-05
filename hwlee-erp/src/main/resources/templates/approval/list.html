@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('전자결재', 'approval', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<body>
+<div th:fragment="content">
+    <style>
+        .cl-timeline { list-style: none; padding-left: .3rem; margin: 0; }
+        .cl-timeline li { position: relative; padding: 0 0 1.1rem 1.4rem; border-left: 2px solid #e6e8ec; }
+        .cl-timeline li:last-child { border-left-color: transparent; padding-bottom: 0; }
+        .cl-timeline .dot { position: absolute; left: -7px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: #cbd2dc; box-shadow: 0 0 0 3px #fff; }
+        .cl-timeline .dot.ok { background: #2fb344; }
+        .cl-timeline .dot.no { background: #d63939; }
+        .cl-timeline .dot.wait { background: #f59f00; }
+        .cl-timeline .tl-title { font-weight: 600; font-size: .85rem; color: #1c2434; }
+        .cl-timeline .tl-meta { font-size: .75rem; color: #667085; margin-top: .1rem; }
+        .step-type { font-size: .7rem; padding: .05rem .35rem; border-radius: 4px; margin-right: .3rem; }
+        .step-type.APPROVAL { background: #e7f0ff; color: #1e5eff; }
+        .step-type.AGREEMENT { background: #fff3e0; color: #e8830c; }
+        .step-type.REFERENCE { background: #eef0f2; color: #667085; }
+    </style>
+    <div id="flash"></div>
+
+    <!-- 현재 로그인 사용자 — 결재선에서 "내 차례 단계"를 판별하는 데 쓴다. -->
+    <span sec:authentication="name" id="currentUser" hidden></span>
+
+    <div class="page-head">
+        <div>
+            <h1>전자결재</h1>
+            <div class="crumb">상신함 · 결재함 — 전결 규정에 따라 결재선이 자동 구성됩니다</div>
+        </div>
+    </div>
+
+    <ul class="nav nav-tabs mb-3" id="tabs">
+        <li class="nav-item"><a class="nav-link active" href="javascript:void(0)" data-tab="inbox">
+            <i class="bi bi-inbox"></i> 결재함 <span class="badge bg-danger ms-1" id="inboxCount" style="display:none">0</span></a></li>
+        <li class="nav-item"><a class="nav-link" href="javascript:void(0)" data-tab="outbox">
+            <i class="bi bi-send"></i> 상신함</a></li>
+    </ul>
+
+    <div class="list-toolbar">
+        <div class="result-count">조회 <b id="totalCount">0</b>건</div>
+    </div>
+
+    <div class="table-wrap">
+    <div class="table-scroll">
+    <table class="table rtable table-hover align-middle mb-0">
+        <thead>
+        <tr>
+            <th class="text-end" style="width:52px;">No.</th>
+            <th>번호</th>
+            <th>문서</th>
+            <th>제목</th>
+            <th class="text-end">금액</th>
+            <th>상신자</th>
+            <th>진행</th>
+            <th>상태</th>
+        </tr>
+        </thead>
+        <tbody id="rows"><tr><td colspan="8" class="text-center text-muted py-4">
+            <span class="spinner-border spinner-border-sm me-1"></span> 불러오는 중…</td></tr></tbody>
+    </table>
+    </div>
+    </div>
+
+    <nav class="pager-bar">
+        <div class="page-info" id="pageInfo"></div>
+        <ul class="pagination pagination-sm mb-0" id="pager"></ul>
+    </nav>
+
+    <!-- 결재 상세 + 결재선 타임라인 + 처리 -->
+    <div class="modal fade" id="detailModal" tabindex="-1">
+      <div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title" id="dt-title">결재 상세</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="mb-3" id="dt-summary"></div>
+            <h6 class="text-muted small mb-2"><i class="bi bi-diagram-3"></i> 결재선</h6>
+            <ul class="cl-timeline" id="dt-timeline"></ul>
+            <div class="mt-3" id="dt-actionArea" style="display:none">
+                <label class="form-label small">의견 <span class="text-muted">(반려/반송 시 사유)</span></label>
+                <textarea class="form-control form-control-sm" id="dt-comment" rows="2"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer" id="dt-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">닫기</button>
+        </div>
+      </div></div>
+    </div>
+
+<script>
+    const STATUS = {
+        DRAFT:     {label: '반송/작성', color: 'secondary'},
+        PENDING:   {label: '진행 중', color: 'warning'},
+        APPROVED:  {label: '승인', color: 'success'},
+        REJECTED:  {label: '반려', color: 'danger'},
+        WITHDRAWN: {label: '회수', color: 'dark'},
+    };
+    const STEP_STATUS = {
+        PENDING:  {label: '대기', dot: ''},
+        APPROVED: {label: '처리', dot: 'ok'},
+        REJECTED: {label: '반려', dot: 'no'},
+        SKIPPED:  {label: '생략', dot: ''},
+    };
+    const CURRENT_USER = (document.getElementById('currentUser').textContent || '').trim();
+    let tab = 'inbox';
+    let page = 0; const SIZE = 20;
+    let detailModal = null;
+    let cur = null; // 현재 상세 모달에 열린 결재
+
+    function fmtTime(iso) { return iso ? new Date(iso).toLocaleString('ko-KR') : ''; }
+    const apiBase = () => tab === 'inbox' ? '/api/approvals/inbox' : '/api/approvals/outbox';
+
+    /** 내가 지금 처리할 차례인 단계(결재/합의)를 찾는다 — 없으면 null. */
+    function myActiveStep(r) {
+        return (r.steps || []).find(s => s.status === 'PENDING' && s.approver === CURRENT_USER
+            && (s.type === 'AGREEMENT' || (s.type === 'APPROVAL' && s.stepNo === r.currentStep))) || null;
+    }
+
+    function openDetail(r) {
+        cur = r;
+        document.getElementById('dt-title').textContent = `${r.number} · ${r.docTypeLabel}`;
+        const st = STATUS[r.status] || {label: r.status, color: 'secondary'};
+        document.getElementById('dt-summary').innerHTML =
+            `<div class="d-flex justify-content-between align-items-start">
+                <div><div class="fw-semibold">${ERP.esc(r.title)}</div>
+                <div class="small text-muted mt-1">원본: <a href="${r.docLink}">${ERP.esc(r.refNo || '-')}</a>
+                 · 금액 <strong>${ERP.won(r.amount)}</strong></div>
+                <div class="small text-muted">상신 ${ERP.esc(r.requester)} · ${fmtTime(r.requestedAt)}</div></div>
+                <div>${ERP.badge(st.label, st.color)}</div></div>`
+            + (r.returnReason && r.status === 'DRAFT'
+                ? `<div class="alert alert-warning py-2 px-3 small mt-2 mb-0"><i class="bi bi-arrow-return-left"></i> 반송 사유: ${ERP.esc(r.returnReason)}</div>` : '');
+
+        // 결재선 타임라인
+        document.getElementById('dt-timeline').innerHTML = (r.steps || []).map(s => {
+            const ss = STEP_STATUS[s.status] || {label: s.status, dot: ''};
+            const isActive = r.status === 'PENDING' && s.status === 'PENDING'
+                && (s.type === 'AGREEMENT' || (s.type === 'APPROVAL' && s.stepNo === r.currentStep));
+            const dot = ss.dot || (isActive ? 'wait' : '');
+            const meta = s.type === 'REFERENCE'
+                ? '참조 · 열람 대상 (결재권 없음)'
+                : s.status === 'PENDING'
+                    ? (isActive ? '진행 중' : '대기')
+                    : `${ss.label} · ${fmtTime(s.decidedAt)}` + (s.comment ? `<br>의견: ${ERP.esc(s.comment)}` : '');
+            return `<li><span class="dot ${dot}"></span>
+                <div class="tl-title"><span class="step-type ${s.type}">${ERP.esc(s.typeLabel)}</span>
+                    ${ERP.esc(s.approverName || s.approver)}</div>
+                <div class="tl-meta">${ERP.esc(s.deptName || '')} · ${meta}</div></li>`;
+        }).join('');
+
+        renderActions(r);
+        detailModal.show();
+    }
+
+    /** 상세 모달의 액션 버튼과 의견 입력창을 상황에 맞게 구성. */
+    function renderActions(r) {
+        const footer = document.getElementById('dt-footer');
+        const actionArea = document.getElementById('dt-actionArea');
+        footer.innerHTML = '<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">닫기</button>';
+        actionArea.style.display = 'none';
+        document.getElementById('dt-comment').value = '';
+
+        const active = myActiveStep(r);
+        const isRequester = r.requester === CURRENT_USER;
+        const noneDecided = (r.steps || []).every(s => s.status === 'PENDING');
+
+        if (active) {
+            // 내 차례 — 승인/합의 + 반려. 결재(APPROVAL) 단계면 반송도.
+            actionArea.style.display = '';
+            const approveLabel = active.type === 'AGREEMENT' ? '합의' : '승인';
+            let btns = `<button type="button" class="btn btn-success" onclick="act('approve')">${approveLabel}</button>
+                        <button type="button" class="btn btn-outline-danger" onclick="act('reject')">반려</button>`;
+            if (active.type === 'APPROVAL')
+                btns += `<button type="button" class="btn btn-outline-warning" onclick="act('return')">반송</button>`;
+            footer.insertAdjacentHTML('beforeend', btns);
+        }
+        if (isRequester && r.status === 'DRAFT') {
+            footer.insertAdjacentHTML('beforeend',
+                `<button type="button" class="btn btn-primary" onclick="resubmit()"><i class="bi bi-send"></i> 재상신</button>`);
+        } else if (isRequester && r.status === 'PENDING' && noneDecided) {
+            footer.insertAdjacentHTML('beforeend',
+                `<button type="button" class="btn btn-outline-dark" onclick="withdrawIt()">회수</button>`);
+        }
+    }
+
+    async function act(action) {
+        const comment = document.getElementById('dt-comment').value.trim() || null;
+        try {
+            await ERP.api(`/api/approvals/${cur.id}/${action}`, {method: 'POST', body: {comment}});
+            detailModal.hide();
+            ERP.flash(action === 'approve' ? '처리했습니다.' : action === 'reject' ? '반려했습니다.' : '반송했습니다.', 'success');
+            refresh();
+        } catch (e) { ERP.flashError(e); }
+    }
+    async function resubmit() {
+        try {
+            await ERP.api(`/api/approvals/${cur.id}/resubmit`, {method: 'POST'});
+            detailModal.hide(); ERP.flash('재상신했습니다.', 'success'); refresh();
+        } catch (e) { ERP.flashError(e); }
+    }
+    async function withdrawIt() {
+        if (!confirm('이 결재를 회수하시겠습니까?')) return;
+        try {
+            await ERP.api(`/api/approvals/${cur.id}/withdraw`, {method: 'POST'});
+            detailModal.hide(); ERP.flash('회수했습니다.', 'success'); refresh();
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    async function load() {
+        const tbody = document.getElementById('rows');
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">
+            <span class="spinner-border spinner-border-sm me-1"></span> 불러오는 중…</td></tr>`;
+        try {
+            const data = await ERP.api(apiBase() + ERP.query({page, size: SIZE}));
+            const list = data.content || [];
+            document.getElementById('totalCount').textContent = (data.totalElements ?? list.length).toLocaleString('ko-KR');
+            tbody.innerHTML = list.length === 0
+                ? `<tr><td colspan="8"><div class="empty-state"><i class="bi bi-inbox"></i>${tab === 'inbox' ? '결재할 문서가 없습니다.' : '상신한 문서가 없습니다.'}</div></td></tr>`
+                : list.map((r, i) => {
+                    const s = STATUS[r.status] || {label: r.status, color: 'secondary'};
+                    const seq = page * SIZE + i + 1;
+                    const total = (r.steps || []).filter(x => x.type === 'APPROVAL').length;
+                    const done = (r.steps || []).filter(x => x.type === 'APPROVAL' && x.status === 'APPROVED').length;
+                    const mine = tab === 'inbox' ? '<span class="badge badge-soft badge-soft-warning ms-1">내 차례</span>' : '';
+                    return `<tr style="cursor:pointer" onclick='openDetail(${JSON.stringify(r)})'>
+                        <td class="text-end text-muted" data-label="">${seq}</td>
+                        <td data-label="번호">${ERP.esc(r.number)}</td>
+                        <td data-label="문서">${ERP.esc(r.docTypeLabel)}</td>
+                        <td class="small" style="max-width:260px" data-label="제목">${ERP.esc(r.title)}${mine}</td>
+                        <td class="text-end" data-label="금액">${ERP.won(r.amount)}</td>
+                        <td class="small" data-label="상신자">${ERP.esc(r.requester)}</td>
+                        <td class="small text-muted" data-label="진행">결재 ${done}/${total}</td>
+                        <td data-label="상태">${ERP.badge(s.label, s.color)}</td></tr>`;
+                }).join('');
+            ERP.pager({page, size: SIZE, totalPages: data.totalPages || 0, totalElements: data.totalElements || 0,
+                       onGo: p => { page = p; load(); }});
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            ERP.flashError(e);
+        }
+    }
+
+    /** 결재함 배지(내 차례 건수) 갱신. */
+    async function refreshInboxCount() {
+        try {
+            const data = await ERP.api('/api/approvals/inbox' + ERP.query({page: 0, size: 1}));
+            const n = data.totalElements || 0;
+            const badge = document.getElementById('inboxCount');
+            badge.textContent = n; badge.style.display = n > 0 ? '' : 'none';
+        } catch (e) {}
+    }
+
+    function refresh() { load(); refreshInboxCount(); }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        detailModal = new bootstrap.Modal(document.getElementById('detailModal'));
+        document.querySelectorAll('#tabs .nav-link').forEach(a => a.addEventListener('click', () => {
+            document.querySelectorAll('#tabs .nav-link').forEach(x => x.classList.remove('active'));
+            a.classList.add('active');
+            tab = a.dataset.tab; page = 0; load();
+        }));
+        refresh();
+        // 알림 딥링크(?id=) — 특정 결재 문서를 바로 연다(참조자 열람, 결재자 처리 등).
+        const preId = new URLSearchParams(location.search).get('id');
+        if (preId) ERP.api('/api/approvals/' + preId).then(openDetail).catch(() => {});
+    });
+</script>
+</div>
+</body>
+</html>

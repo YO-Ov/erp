@@ -7,10 +7,12 @@ import static com.hwlee.erp.fi.payment.PaymentSpecifications.typeEquals;
 import static com.hwlee.erp.fi.payment.PaymentSpecifications.vendorIdEquals;
 import static org.springframework.data.jpa.domain.Specification.where;
 
+import com.hwlee.erp.approval.dto.ApprovalResponse;
 import com.hwlee.erp.fi.payment.dto.PaymentCreateRequest;
 import com.hwlee.erp.fi.payment.dto.PaymentResponse;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.security.Principal;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -37,6 +39,19 @@ public class PaymentController {
     public ResponseEntity<PaymentResponse> create(@Valid @RequestBody PaymentCreateRequest req) {
         PaymentResponse created = service.createAndPost(req);
         return ResponseEntity.created(URI.create("/api/payments/" + created.id())).body(created);
+    }
+
+    /** 결재용 초안 등록 — 전기하지 않고 DRAFT 로만 저장(지급 결재 상신 대상). */
+    @PostMapping("/draft")
+    public ResponseEntity<PaymentResponse> createDraft(@Valid @RequestBody PaymentCreateRequest req) {
+        PaymentResponse created = service.createDraft(req);
+        return ResponseEntity.created(URI.create("/api/payments/" + created.id())).body(created);
+    }
+
+    /** 지급(출금) 결재 상신 — 최종 승인 시 자동 전기(POSTED)+분개. */
+    @PostMapping("/{id}/submit-approval")
+    public ApprovalResponse submitForApproval(@PathVariable Long id, Principal principal) {
+        return service.submitForApproval(id, principal.getName());
     }
 
     @GetMapping("/{id}")

@@ -47,7 +47,7 @@
 
     <div class="table-wrap">
     <div class="table-scroll">
-    <table class="table table-hover align-middle mb-0">
+    <table class="table rtable table-hover align-middle mb-0">
         <thead>
         <tr>
             <th class="text-end" style="width:52px;">No.</th>
@@ -146,15 +146,15 @@
             action = `<span class="small text-success">→ ${ERP.esc(o.convertedProductionNumber ?? '')}</span>`;
         }
         return `<tr>
-            <td class="text-end text-muted">${seq}</td>
-            <td>${ERP.esc(o.number)}</td>
-            <td>${ERP.esc(o.productName)} <span class="text-muted small">${ERP.esc(o.productCode)}</span></td>
-            <td class="text-end">${ERP.num(o.requiredQty)}</td>
-            <td class="text-end">${ERP.num(o.onHandQty)}</td>
-            <td class="text-end fw-semibold text-danger">${ERP.num(o.shortageQty)}</td>
-            <td class="small">${ERP.esc(o.sourceSalesOrderNumber ?? '-')}</td>
-            <td>${ERP.badge(s.label, s.color)}</td>
-            <td>${action}</td></tr>`;
+            <td class="text-end text-muted" data-label="">${seq}</td>
+            <td data-label="번호">${ERP.esc(o.number)}</td>
+            <td data-label="완제품">${ERP.esc(o.productName)} <span class="text-muted small">${ERP.esc(o.productCode)}</span></td>
+            <td class="text-end" data-label="필요량">${ERP.num(o.requiredQty)}</td>
+            <td class="text-end" data-label="현재고">${ERP.num(o.onHandQty)}</td>
+            <td class="text-end fw-semibold text-danger" data-label="부족분">${ERP.num(o.shortageQty)}</td>
+            <td class="small" data-label="출처 수주">${ERP.esc(o.sourceSalesOrderNumber ?? '-')}</td>
+            <td data-label="상태">${ERP.badge(s.label, s.color)}</td>
+            <td data-label="">${action}</td></tr>`;
     }
 
     async function load() {

@@ -59,7 +59,7 @@
 
     <div class="table-wrap">
     <div class="table-scroll">
-    <table class="table table-hover align-middle mb-0">
+    <table class="table rtable table-hover align-middle mb-0">
         <thead>
         <tr>
             <th class="text-end" style="width:52px;">No.</th>
@@ -130,13 +130,13 @@
                 tbody.innerHTML = list.map((o, i) => {
                     const s = STATUS[o.status] || {label: o.status, color: 'secondary'};
                     return `<tr style="cursor:pointer" onclick="location.href='/pp/production-orders/${o.id}'">
-                        <td class="text-end text-muted">${page * SIZE + i + 1}</td>
-                        <td>${ERP.esc(o.number)}</td>
-                        <td>${ERP.esc(o.productName)} <span class="text-muted small">${ERP.esc(o.productCode)}</span></td>
-                        <td class="text-end">${ERP.num(o.quantity)}</td>
-                        <td>${o.orderDate ?? ''}</td>
-                        <td>${o.dueDate ?? '<span class="text-muted">-</span>'}</td>
-                        <td>${ERP.badge(s.label, s.color)}</td></tr>`;
+                        <td class="text-end text-muted" data-label="">${page * SIZE + i + 1}</td>
+                        <td data-label="번호">${ERP.esc(o.number)}</td>
+                        <td data-label="완제품">${ERP.esc(o.productName)} <span class="text-muted small">${ERP.esc(o.productCode)}</span></td>
+                        <td class="text-end" data-label="수량">${ERP.num(o.quantity)}</td>
+                        <td data-label="지시일">${o.orderDate ?? ''}</td>
+                        <td data-label="완료예정">${o.dueDate ?? '<span class="text-muted">-</span>'}</td>
+                        <td data-label="상태">${ERP.badge(s.label, s.color)}</td></tr>`;
                 }).join('');
             }
             ERP.pager({page, size: SIZE, totalPages: data.totalPages || 0, totalElements: data.totalElements || 0,

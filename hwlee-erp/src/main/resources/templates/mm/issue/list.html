@@ -67,7 +67,7 @@
 
     <div class="table-wrap">
     <div class="table-scroll">
-    <table class="table table-hover align-middle mb-0">
+    <table class="table rtable table-hover align-middle mb-0">
         <thead>
         <tr>
             <th class="text-end" style="width:52px;">No.</th>
@@ -142,12 +142,12 @@
                     const s = STATUS[g.status] || {label: g.status, color: 'secondary'};
                     const rs = REASON[g.reason] || {label: g.reason, color: 'secondary'};
                     return `<tr style="cursor:pointer" onclick="location.href='/mm/goods-issues/${g.id}'">
-                        <td class="text-end text-muted">${page * SIZE + i + 1}</td>
-                        <td>${ERP.esc(g.number)}</td>
-                        <td>${ERP.esc(g.warehouseName)} <span class="text-muted small">${ERP.esc(g.warehouseCode)}</span></td>
-                        <td>${ERP.badge(rs.label, rs.color)}</td>
-                        <td>${g.issueDate ?? ''}</td>
-                        <td>${ERP.badge(s.label, s.color)}</td></tr>`;
+                        <td class="text-end text-muted" data-label="">${page * SIZE + i + 1}</td>
+                        <td data-label="번호">${ERP.esc(g.number)}</td>
+                        <td data-label="창고">${ERP.esc(g.warehouseName)} <span class="text-muted small">${ERP.esc(g.warehouseCode)}</span></td>
+                        <td data-label="사유">${ERP.badge(rs.label, rs.color)}</td>
+                        <td data-label="출고일">${g.issueDate ?? ''}</td>
+                        <td data-label="상태">${ERP.badge(s.label, s.color)}</td></tr>`;
                 }).join('');
             }
             ERP.pager({page, size: SIZE, totalPages: data.totalPages || 0, totalElements: data.totalElements || 0,

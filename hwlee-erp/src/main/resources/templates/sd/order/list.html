@@ -65,7 +65,7 @@
         </div>
     </div>
 
-    <div class="table-wrap">
+    <div class="table-wrap d-none d-md-block">
     <div class="table-scroll">
     <table class="table table-hover align-middle mb-0">
         <thead>
@@ -84,6 +84,9 @@
     </table>
     </div>
     </div>
+
+    <!-- 모바일: 표 대신 카드 목록 -->
+    <div class="list-cards d-md-none" id="cards"></div>
 
     <nav class="pager-bar">
         <div class="page-info" id="pageInfo"></div>
@@ -149,6 +152,23 @@
         </tr>`;
     }
 
+    // 모바일 카드 — 표의 각 행과 같은 데이터를 카드로 표현(번호·상태 배지·금액·일자).
+    function cardHtml(o) {
+        const s = STATUS[o.status] || {label: o.status, color: 'secondary'};
+        return `<div class="lc-card" onclick="location.href='/sd/sales-orders/${o.id}'">
+            <div class="lc-top">
+                <span class="lc-num">${ERP.esc(o.number)}</span>
+                <span class="lc-badges">${ERP.badge(s.label, s.color)}</span>
+            </div>
+            <div class="lc-sub">${ERP.esc(o.customerName)} <span class="code">${ERP.esc(o.customerCode)}</span></div>
+            <div class="lc-amt">${ERP.won(o.totalAmount)}</div>
+            <div class="lc-meta">
+                <div>주문 <b>${o.orderDate ?? '-'}</b></div>
+                <div>영업 <b>${ERP.esc(o.salespersonName) || '-'}</b></div>
+            </div>
+        </div>`;
+    }
+
     function renderFoot(list) {
         const foot = document.getElementById('foot');
         if (list.length === 0) { foot.innerHTML = ''; return; }
@@ -171,8 +191,11 @@
             if (list.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">
                     <i class="bi bi-inbox"></i>조건에 맞는 수주가 없습니다.</div></td></tr>`;
+                document.getElementById('cards').innerHTML =
+                    `<div class="empty-state"><i class="bi bi-inbox"></i>조건에 맞는 수주가 없습니다.</div>`;
             } else {
                 tbody.innerHTML = list.map(rowHtml).join('');
+                document.getElementById('cards').innerHTML = list.map(cardHtml).join('');
             }
             renderFoot(list);
             ERP.pager({page, size: SIZE, totalPages: data.totalPages || 0, totalElements: data.totalElements || 0,

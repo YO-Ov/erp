@@ -49,7 +49,7 @@
         </div>
     </div>
 
-    <div class="table-wrap">
+    <div class="table-wrap d-none d-md-block">
     <div class="table-scroll">
     <table class="table table-hover align-middle mb-0">
         <thead>
@@ -67,6 +67,9 @@
     </table>
     </div>
     </div>
+
+    <!-- 모바일: 표 대신 카드 목록 -->
+    <div class="list-cards d-md-none" id="cards"></div>
 
     <nav class="pager-bar">
         <div class="page-info" id="pageInfo"></div>
@@ -102,6 +105,24 @@
             <td>${ERP.badge(s.label, s.color)}</td></tr>`;
     }
 
+    // 모바일 카드 — 표의 각 행과 같은 데이터를 카드로 표현(이름·상태 배지·여신한도·부가정보).
+    function cardHtml(c) {
+        const s = STATUS[c.status] || {label: c.status, color: 'secondary'};
+        const zero = Number(c.creditLimit) === 0;
+        return `<div class="lc-card" onclick="location.href='/master/customers/${c.id}'">
+            <div class="lc-top">
+                <span class="lc-num">${ERP.esc(c.name)}</span>
+                <span class="lc-badges">${ERP.badge(s.label, s.color)}</span>
+            </div>
+            <div class="lc-sub"><span class="code">${ERP.esc(c.code)}</span></div>
+            <div class="lc-amt">${zero ? '현금' : ERP.won(c.creditLimit)}</div>
+            <div class="lc-meta">
+                <div>사업자 <b>${ERP.esc(c.businessNo) || '-'}</b></div>
+                <div>결제 <b>${ERP.esc(c.paymentTerms) || '-'}</b></div>
+            </div>
+        </div>`;
+    }
+
     async function load() {
         const tbody = document.getElementById('rows');
         tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">
@@ -114,8 +135,11 @@
             if (list.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">
                     <i class="bi bi-inbox"></i>조건에 맞는 고객이 없습니다.</div></td></tr>`;
+                document.getElementById('cards').innerHTML =
+                    `<div class="empty-state"><i class="bi bi-inbox"></i>조건에 맞는 고객이 없습니다.</div>`;
             } else {
                 tbody.innerHTML = list.map(rowHtml).join('');
+                document.getElementById('cards').innerHTML = list.map(cardHtml).join('');
             }
             ERP.pager({page, size: SIZE, totalPages: data.totalPages || 0, totalElements: data.totalElements || 0,
                        onGo: p => { page = p; load(); }});

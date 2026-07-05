@@ -47,7 +47,7 @@
 
     <div class="table-wrap">
     <div class="table-scroll">
-    <table class="table table-hover align-middle mb-0">
+    <table class="table rtable table-hover align-middle mb-0">
         <thead>
         <tr>
             <th class="text-end" style="width:52px;">No.</th>
@@ -92,14 +92,14 @@
         const clickable = n.linkUrl ? `style="cursor:pointer" onclick='openNotif(${n.id}, ${JSON.stringify(n.linkUrl)})'` : '';
         const dot = n.read ? '' : '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#206bc4;margin-right:6px;vertical-align:middle;"></span>';
         return `<tr ${clickable} class="${n.read ? '' : 'table-active'}">
-            <td class="text-end text-muted">${seq}</td>
-            <td class="text-center"><i class="bi ${t.icon}" style="color:${t.color};font-size:1.2rem"></i></td>
-            <td>
+            <td class="text-end text-muted" data-label="">${seq}</td>
+            <td class="text-center" data-label=""><i class="bi ${t.icon}" style="color:${t.color};font-size:1.2rem"></i></td>
+            <td data-label="내용">
                 <div class="${n.read ? '' : 'fw-bold'}">${dot}${ERP.esc(n.title)} ${n.linkUrl ? '<i class="bi bi-box-arrow-up-right text-muted small"></i>' : ''}</div>
                 <div class="small text-muted">${ERP.esc(n.message)}</div>
             </td>
-            <td class="small">${fmt(n.createdAt)}</td>
-            <td>${n.read ? ERP.badge('읽음', 'secondary') : ERP.badge('새 알림', 'primary')}</td>
+            <td class="small" data-label="받은 시각">${fmt(n.createdAt)}</td>
+            <td data-label="상태">${n.read ? ERP.badge('읽음', 'secondary') : ERP.badge('새 알림', 'primary')}</td>
         </tr>`;
     }
 

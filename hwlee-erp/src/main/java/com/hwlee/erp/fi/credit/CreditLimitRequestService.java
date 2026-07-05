@@ -1,13 +1,13 @@
 package com.hwlee.erp.fi.credit;
 
+import com.hwlee.erp.approval.ApprovalDocType;
+import com.hwlee.erp.approval.ApprovalService;
+import com.hwlee.erp.approval.dto.ApprovalSubmitCommand;
 import com.hwlee.erp.common.code.TransactionNumberGenerator;
-import com.hwlee.erp.fi.credit.dto.CreditLimitDecisionRequest;
 import com.hwlee.erp.fi.credit.dto.CreditLimitRequestCreateRequest;
 import com.hwlee.erp.fi.credit.dto.CreditLimitRequestResponse;
 import com.hwlee.erp.master.customer.Customer;
 import com.hwlee.erp.master.customer.CustomerRepository;
-import com.hwlee.erp.notification.NotificationService;
-import com.hwlee.erp.notification.NotificationType;
 import jakarta.persistence.EntityNotFoundException;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -33,15 +33,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class CreditLimitRequestService {
 
-    static final String LINK = "/fi/credit-limit-requests";
-
     private final CreditLimitRequestRepository repository;
     private final CustomerRepository customerRepository;
-    private final NotificationService notificationService;
+    private final ApprovalService approvalService;
     private final TransactionNumberGenerator numberGenerator;
     private final Clock clock;
 
-    /** 영업이 여신 상향 요청 제출 → 재무팀(FINANCE)에게 알림. */
+    /**
+     * 영업이 여신 상향 요청 제출 → 전자결재로 상신(재무팀장 결재선). 승인/반려는 결재함에서 처리되며,
+     * 그 결과가 {@code CreditApprovalListener} 콜백으로 이 요청의 상태에 반영된다.
+     */
     @Transactional
     public CreditLimitRequestResponse create(CreditLimitRequestCreateRequest req) {
         Customer customer = customerRepository.findById(req.customerId())
@@ -54,46 +55,28 @@ public class CreditLimitRequestService {
         CreditLimitRequest saved = repository.save(CreditLimitRequest.submit(
                 number, customer, customer.getCreditLimit(), req.requestedLimit(), req.reason()));
 
-        notificationService.notifyRole("FINANCE", NotificationType.CREDIT_REQUEST_SUBMITTED,
-                "여신 상향 요청",
-                String.format("%s 고객 한도 상향 요청 (%s → %s). 사유: %s",
-                        customer.getName(), money(saved.getCurrentLimit()),
-                        money(saved.getRequestedLimit()), req.reason()),
-                LINK);
+        approvalService.submit(new ApprovalSubmitCommand(
+                ApprovalDocType.CREDIT_LIMIT, saved.getId(), saved.getNumber(),
+                "여신 상향 · " + customer.getName() + " (" + money(saved.getCurrentLimit())
+                        + " → " + money(saved.getRequestedLimit()) + ")",
+                saved.getRequestedLimit(), saved.getCreatedBy()));
         return toResponse(saved);
     }
 
-    /** 재무 승인 → 고객 한도 상향 + 요청자(영업)에게 알림. */
+    /** 결재 최종 승인 콜백 — 요청을 APPROVED 로 확정하고 고객 한도를 실제로 상향한다. */
     @Transactional
-    public CreditLimitRequestResponse approve(Long id, CreditLimitDecisionRequest decision, String decidedBy) {
+    public void applyApproval(Long id, String decidedBy) {
         CreditLimitRequest r = getOrThrow(id);
-        r.approve(decidedBy, decision == null ? null : decision.note(), LocalDateTime.now(clock));
-        r.getCustomer().changeCreditLimit(r.getRequestedLimit()); // 실제 한도 반영
-
-        notificationService.notifyUser(r.getCreatedBy(), NotificationType.CREDIT_REQUEST_APPROVED,
-                "여신 상향 승인됨",
-                String.format("%s 고객 한도가 %s 로 상향 승인되었습니다.",
-                        r.getCustomer().getName(), money(r.getRequestedLimit())),
-                LINK);
-        log.info("여신 상향 승인: {} {} → {}", r.getCustomer().getName(),
+        r.approve(decidedBy, null, LocalDateTime.now(clock));
+        r.getCustomer().changeCreditLimit(r.getRequestedLimit());
+        log.info("여신 상향 승인(결재): {} {} → {}", r.getCustomer().getName(),
                 money(r.getCurrentLimit()), money(r.getRequestedLimit()));
-        return toResponse(r);
     }
 
-    /** 재무 거부 → 요청자(영업)에게 알림. 고객 한도 변화 없음. */
+    /** 결재 반려 콜백 — 요청을 REJECTED 로 종결한다. 고객 한도 변화 없음. */
     @Transactional
-    public CreditLimitRequestResponse reject(Long id, CreditLimitDecisionRequest decision, String decidedBy) {
-        CreditLimitRequest r = getOrThrow(id);
-        r.reject(decidedBy, decision == null ? null : decision.note(), LocalDateTime.now(clock));
-
-        notificationService.notifyUser(r.getCreatedBy(), NotificationType.CREDIT_REQUEST_REJECTED,
-                "여신 상향 거부됨",
-                String.format("%s 고객 한도 상향 요청이 거부되었습니다.%s",
-                        r.getCustomer().getName(),
-                        (decision != null && decision.note() != null && !decision.note().isBlank())
-                                ? " 사유: " + decision.note() : ""),
-                LINK);
-        return toResponse(r);
+    public void applyRejection(Long id, String decidedBy, String reason) {
+        getOrThrow(id).reject(decidedBy, reason, LocalDateTime.now(clock));
     }
 
     public CreditLimitRequestResponse findById(Long id) {

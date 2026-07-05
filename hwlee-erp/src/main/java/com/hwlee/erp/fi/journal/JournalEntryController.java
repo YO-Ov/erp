@@ -7,10 +7,12 @@ import static com.hwlee.erp.fi.journal.JournalEntrySpecifications.sourceTypeEqua
 import static com.hwlee.erp.fi.journal.JournalEntrySpecifications.statusEquals;
 import static org.springframework.data.jpa.domain.Specification.where;
 
+import com.hwlee.erp.approval.dto.ApprovalResponse;
 import com.hwlee.erp.fi.journal.dto.JournalEntryCreateRequest;
 import com.hwlee.erp.fi.journal.dto.JournalEntryResponse;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.security.Principal;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -37,6 +39,19 @@ public class JournalEntryController {
     public ResponseEntity<JournalEntryResponse> createManual(@Valid @RequestBody JournalEntryCreateRequest req) {
         JournalEntryResponse created = service.createManual(req);
         return ResponseEntity.created(URI.create("/api/journal-entries/" + created.id())).body(created);
+    }
+
+    /** 결재용 초안 등록 — 전기하지 않고 DRAFT 로만 저장(전표 결재 상신 대상). */
+    @PostMapping("/draft")
+    public ResponseEntity<JournalEntryResponse> createManualDraft(@Valid @RequestBody JournalEntryCreateRequest req) {
+        JournalEntryResponse created = service.createManualDraft(req);
+        return ResponseEntity.created(URI.create("/api/journal-entries/" + created.id())).body(created);
+    }
+
+    /** 수동 전표 결재 상신 — 최종 승인 시 자동 전기(POSTED). */
+    @PostMapping("/{id}/submit-approval")
+    public ApprovalResponse submitForApproval(@PathVariable Long id, Principal principal) {
+        return service.submitForApproval(id, principal.getName());
     }
 
     @GetMapping("/{id}")

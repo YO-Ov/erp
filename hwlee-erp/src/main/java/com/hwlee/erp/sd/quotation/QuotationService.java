@@ -1,5 +1,9 @@
 package com.hwlee.erp.sd.quotation;
 
+import com.hwlee.erp.approval.ApprovalDocType;
+import com.hwlee.erp.approval.ApprovalService;
+import com.hwlee.erp.approval.dto.ApprovalResponse;
+import com.hwlee.erp.approval.dto.ApprovalSubmitCommand;
 import com.hwlee.erp.master.customer.Customer;
 import com.hwlee.erp.master.customer.CustomerRepository;
 import com.hwlee.erp.master.item.Item;
@@ -31,6 +35,7 @@ public class QuotationService {
     private final CustomerRepository customerRepository;
     private final ItemRepository itemRepository;
     private final TransactionNumberGenerator numberGenerator;
+    private final ApprovalService approvalService;
 
     @Transactional
     public QuotationResponse create(QuotationCreateRequest req) {
@@ -64,6 +69,23 @@ public class QuotationService {
         Quotation quotation = getOrThrow(id);
         quotation.send();
         return mapper.toResponse(quotation);
+    }
+
+    /**
+     * 견적 발송을 위한 결재 상신 — 작성 중(DRAFT) 견적을 전자결재에 올린다.
+     * 최종 승인되면 {@code QuotationApprovalListener} 가 견적을 SENT 로 전이시킨다.
+     */
+    @Transactional
+    public ApprovalResponse submitForApproval(Long id, String requester) {
+        Quotation q = getOrThrow(id);
+        if (q.getStatus() != QuotationStatus.DRAFT)
+            throw new IllegalStateException("작성 중(DRAFT) 견적만 결재 상신할 수 있습니다. 현재: " + q.getStatus());
+        if (q.getLines().isEmpty())
+            throw new IllegalStateException("품목이 없는 견적은 상신할 수 없습니다.");
+        return approvalService.submit(new ApprovalSubmitCommand(
+                ApprovalDocType.QUOTATION, q.getId(), q.getNumber(),
+                "견적 발송 승인 · " + q.getCustomer().getName() + " (" + q.getNumber() + ")",
+                q.getTotalAmount(), requester));
     }
 
     @Transactional

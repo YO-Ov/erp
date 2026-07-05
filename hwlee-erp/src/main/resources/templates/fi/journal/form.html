@@ -62,7 +62,10 @@
         <div class="form-actions">
             <a href="/fi/journal-entries" class="btn btn-outline-secondary">취소</a>
             <button type="submit" class="btn btn-primary" id="submitBtn">저장(전기)</button>
+            <button type="button" class="btn btn-success" id="approvalBtn">
+                <i class="bi bi-pen"></i> 결재 상신하여 등록</button>
         </div>
+        <div class="form-text mt-1">수동 전표는 전자결재를 거칠 수 있습니다 — 초안 저장 후 결재선에 상신되며, 최종 승인 시 전기(대차 균형 검증)됩니다.</div>
     </form>
 
 <script>
@@ -134,22 +137,38 @@
         return lines;
     }
 
-    async function submit(e) {
-        e.preventDefault();
+    function buildBody() {
         const lines = collectLines();
-        if (lines.length < 2) { ERP.flash('분개 라인을 최소 2개(차변·대변) 입력하세요.', 'warning'); return; }
+        if (lines.length < 2) { ERP.flash('분개 라인을 최소 2개(차변·대변) 입력하세요.', 'warning'); return null; }
         const td = lines.reduce((s, l) => s + l.debit, 0);
         const tc = lines.reduce((s, l) => s + l.credit, 0);
-        if (td !== tc) { ERP.flash(`차변합계(${ERP.won(td)})와 대변합계(${ERP.won(tc)})가 일치해야 합니다.`, 'warning'); return; }
+        if (td !== tc) { ERP.flash(`차변합계(${ERP.won(td)})와 대변합계(${ERP.won(tc)})가 일치해야 합니다.`, 'warning'); return null; }
+        const desc = document.getElementById('description').value.trim();
+        if (!desc) { ERP.flash('적요를 입력하세요.', 'warning'); return null; }
+        return { entryDate: document.getElementById('entryDate').value, description: desc, lines };
+    }
 
-        const body = {
-            entryDate: document.getElementById('entryDate').value,
-            description: document.getElementById('description').value.trim(),
-            lines,
-        };
+    async function submit(e) {
+        e.preventDefault();
+        const body = buildBody();
+        if (!body) return;
         try {
             const saved = await ERP.api('/api/journal-entries', {method: 'POST', body});
             location.href = '/fi/journal-entries/' + saved.id;
+        } catch (err) {
+            ERP.flashError(err);
+        }
+    }
+
+    // 초안 저장 후 결재 상신. 최종 승인 시 전기.
+    async function submitApproval() {
+        const body = buildBody();
+        if (!body) return;
+        try {
+            const draft = await ERP.api('/api/journal-entries/draft', {method: 'POST', body});
+            const a = await ERP.api(`/api/journal-entries/${draft.id}/submit-approval`, {method: 'POST'});
+            ERP.flash(`결재 상신 완료 · ${a.number} (결재선 ${(a.steps || []).length}단계)`, 'success');
+            location.href = '/fi/journal-entries/' + draft.id;
         } catch (err) {
             ERP.flashError(err);
         }
@@ -163,6 +182,7 @@
             ERP.flashError(err);
         }
         document.getElementById('form').addEventListener('submit', submit);
+        document.getElementById('approvalBtn').addEventListener('click', submitApproval);
     }
 
     document.addEventListener('DOMContentLoaded', init);

@@ -48,11 +48,34 @@
                 <label class="form-label small fw-semibold">빠른 선택 <span class="text-muted fw-normal">(시연용)</span></label>
                 <select class="form-select" id="quickPick">
                     <option value="" selected>— 계정을 선택하면 자동 입력 —</option>
-                    <option value="kim@hyunwoo.com">영업 (SALES) · kim@hyunwoo.com</option>
-                    <option value="lee@hyunwoo.com">재무 (FINANCE) · lee@hyunwoo.com</option>
-                    <option value="park@hyunwoo.com">생산 (PRODUCTION) · park@hyunwoo.com</option>
-                    <option value="jung@hyunwoo.com">인사 (HR) · jung@hyunwoo.com</option>
-                    <option value="admin@hyunwoo.com">관리자 (ADMIN) · admin@hyunwoo.com</option>
+                    <optgroup label="영업 (SD)">
+                        <option value="kim@hyunwoo.com">담당 · kim</option>
+                        <option value="sales.global@hyunwoo.com">담당(해외영업팀) · sales.global</option>
+                        <option value="sales.mgr@hyunwoo.com">팀장(국내영업1팀) · sales.mgr</option>
+                        <option value="sales.dir@hyunwoo.com">본부장(영업본부) · sales.dir</option>
+                    </optgroup>
+                    <optgroup label="재무·경영지원 (FI)">
+                        <option value="lee@hyunwoo.com">담당 · lee</option>
+                        <option value="finance.mgr@hyunwoo.com">팀장(재무팀) · finance.mgr</option>
+                        <option value="mgmt.dir@hyunwoo.com">본부장(경영지원본부) · mgmt.dir</option>
+                    </optgroup>
+                    <optgroup label="구매 (MM)">
+                        <option value="purchase@hyunwoo.com">담당 · purchase</option>
+                        <option value="purchase.mgr@hyunwoo.com">팀장(구매팀) · purchase.mgr</option>
+                    </optgroup>
+                    <optgroup label="생산 (PP)">
+                        <option value="park@hyunwoo.com">담당 · park</option>
+                        <option value="prod.sw@hyunwoo.com">팀장(수원생산팀) · prod.sw</option>
+                        <option value="prod.gm@hyunwoo.com">팀장(구미생산팀) · prod.gm</option>
+                        <option value="prod.dir@hyunwoo.com">본부장(생산본부) · prod.dir</option>
+                    </optgroup>
+                    <optgroup label="인사 (HR)">
+                        <option value="jung@hyunwoo.com">담당 · jung</option>
+                        <option value="hr.mgr@hyunwoo.com">팀장(인사팀) · hr.mgr</option>
+                    </optgroup>
+                    <optgroup label="대표·관리자">
+                        <option value="admin@hyunwoo.com">대표/관리자 (ADMIN) · admin</option>
+                    </optgroup>
                 </select>
             </div>
             <div class="mb-3">
@@ -70,6 +93,7 @@
         </form>
         <div class="demo-box mt-3">
             <i class="bi bi-info-circle"></i> 시연 계정 비밀번호는 공통 <code>pass1234</code> 입니다. 위 빠른 선택에서 역할을 고르면 자동 입력됩니다.
+            <div class="mt-1"><i class="bi bi-pen"></i> <b>결재 시연</b>: <b>담당</b>으로 상신 → <b>팀장·본부장</b>으로 다시 로그인해 <b>전자결재 › 결재함</b>에서 승인하세요.</div>
         </div>
     </div>
 </div>

@@ -46,7 +46,11 @@
         <div class="form-actions">
             <a href="/fi/payments" class="btn btn-outline-secondary">취소</a>
             <button type="submit" class="btn btn-primary" id="submitBtn">저장(전기)</button>
+            <button type="button" class="btn btn-success" id="approvalBtn" style="display:none">
+                <i class="bi bi-pen"></i> 결재 상신하여 등록</button>
         </div>
+        <div class="form-text mt-1" id="apvHint" style="display:none">
+            지급(출금)은 전자결재를 거칩니다 — 초안으로 저장 후 결재선(재무팀장 등)에 상신됩니다. 최종 승인 시 전기·분개됩니다.</div>
     </form>
 
 <script>
@@ -76,14 +80,16 @@
         document.getElementById('hint').textContent = isReceipt
             ? '입금: 차)현금 / 대)매출채권 — 고객이 외상값을 갚는 거래입니다.'
             : '출금: 차)매입채무 / 대)현금 — 거래처에 외상대금을 지급하는 거래입니다.';
+        // 출금(지급)일 때만 "결재 상신" 경로 노출.
+        document.getElementById('approvalBtn').style.display = isReceipt ? 'none' : '';
+        document.getElementById('apvHint').style.display = isReceipt ? 'none' : '';
     }
 
-    async function submit(e) {
-        e.preventDefault();
+    function buildBody() {
         const type = document.getElementById('type').value;
         const partyId = Number(document.getElementById('party').value);
-        if (!partyId) { ERP.flash('거래상대를 선택하세요.', 'warning'); return; }
-        const body = {
+        if (!partyId) { ERP.flash('거래상대를 선택하세요.', 'warning'); return null; }
+        return {
             type,
             customerId: type === 'RECEIPT' ? partyId : null,
             vendorId: type === 'DISBURSEMENT' ? partyId : null,
@@ -91,9 +97,30 @@
             paymentDate: document.getElementById('paymentDate').value,
             description: document.getElementById('description').value.trim() || null,
         };
+    }
+
+    async function submit(e) {
+        e.preventDefault();
+        const body = buildBody();
+        if (!body) return;
         try {
             const saved = await ERP.api('/api/payments', {method: 'POST', body});
             location.href = '/fi/payments/' + saved.id;
+        } catch (err) {
+            ERP.flashError(err);
+        }
+    }
+
+    // 초안 저장 후 결재 상신(출금만). 최종 승인 시 전기·분개.
+    async function submitApproval() {
+        const body = buildBody();
+        if (!body) return;
+        if (body.type !== 'DISBURSEMENT') { ERP.flash('결재 상신은 출금(지급)만 가능합니다.', 'warning'); return; }
+        try {
+            const draft = await ERP.api('/api/payments/draft', {method: 'POST', body});
+            const a = await ERP.api(`/api/payments/${draft.id}/submit-approval`, {method: 'POST'});
+            ERP.flash(`결재 상신 완료 · ${a.number} (결재선 ${(a.steps || []).length}단계)`, 'success');
+            location.href = '/fi/payments/' + draft.id;
         } catch (err) {
             ERP.flashError(err);
         }
@@ -107,6 +134,8 @@
         }
         document.getElementById('type').addEventListener('change', syncParty);
         document.getElementById('form').addEventListener('submit', submit);
+        document.getElementById('approvalBtn').addEventListener('click', submitApproval);
+        syncParty();
     }
 
     document.addEventListener('DOMContentLoaded', init);

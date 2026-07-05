@@ -49,7 +49,7 @@
         </div>
     </div>
 
-    <div class="table-wrap">
+    <div class="table-wrap d-none d-md-block">
     <div class="table-scroll">
     <table class="table table-hover align-middle mb-0">
         <thead>
@@ -66,6 +66,9 @@
     </table>
     </div>
     </div>
+
+    <!-- 모바일: 표 대신 카드 목록 -->
+    <div class="list-cards d-md-none" id="cards"></div>
 
     <nav class="pager-bar">
         <div class="page-info" id="pageInfo"></div>
@@ -104,6 +107,21 @@
         };
     }
 
+    // 모바일 카드 — 표의 각 행과 같은 데이터를 카드로 표현(품목·수량 강조·창고/단가/갱신).
+    function cardHtml(s) {
+        return `<div class="lc-card" onclick="location.href='/mm/stocks/${s.id}'">
+            <div class="lc-top">
+                <span class="lc-num">${ERP.esc(s.itemName)} <span class="code">${ERP.esc(s.itemCode)}</span></span>
+            </div>
+            <div class="lc-sub">${ERP.esc(s.warehouseName)} <span class="code">${ERP.esc(s.warehouseCode)}</span></div>
+            <div class="lc-amt">${ERP.num(s.qtyOnHand)}</div>
+            <div class="lc-meta">
+                <div>평균단가 <b>${ERP.won(s.averageCost)}</b></div>
+                <div>갱신 <b>${(s.updatedAt ?? '').replace('T', ' ').slice(0, 16) || '-'}</b></div>
+            </div>
+        </div>`;
+    }
+
     async function load() {
         const tbody = document.getElementById('rows');
         tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">
@@ -115,6 +133,8 @@
             if (list.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state">
                     <i class="bi bi-inbox"></i>조건에 맞는 재고가 없습니다.</div></td></tr>`;
+                document.getElementById('cards').innerHTML =
+                    `<div class="empty-state"><i class="bi bi-inbox"></i>조건에 맞는 재고가 없습니다.</div>`;
             } else {
                 tbody.innerHTML = list.map((s, i) => `<tr style="cursor:pointer" onclick="location.href='/mm/stocks/${s.id}'">
                         <td class="text-end text-muted">${page * SIZE + i + 1}</td>
@@ -123,6 +143,7 @@
                         <td class="text-end">${ERP.num(s.qtyOnHand)}</td>
                         <td class="text-end">${ERP.won(s.averageCost)}</td>
                         <td class="small text-muted">${(s.updatedAt ?? '').replace('T', ' ').slice(0, 16)}</td></tr>`).join('');
+                document.getElementById('cards').innerHTML = list.map(cardHtml).join('');
             }
             ERP.pager({page, size: SIZE, totalPages: data.totalPages || 0, totalElements: data.totalElements || 0,
                        onGo: p => { page = p; load(); }});

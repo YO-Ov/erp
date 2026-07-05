@@ -19,9 +19,49 @@
 
 ## 현재 위치
 
+> **▶▶ 다음에 할 일 (다른 PC에서 여기부터) = 모바일 반응형 실렌더 점검·보정**
+> 2026-07-05 세션에서 목록 20개를 표→카드 반응형으로 만들었으나(커밋 `a725699`), **실제 폰/좁은 폭 렌더는 육안 확인 안 됨**(이 환경은 헤드리스 없음). 다른 PC 브라우저에서 창을 768px 아래로 줄이거나 폰으로 접속해 **카드가 어색하거나 깨지는 화면을 찾아 개별 보정**한다.
+> - 점검 대상: 목록 20개(견적·수주·고객·재고·지급·전표=커스텀 카드 / 나머지 14개=`.rtable` data-label 카드) + **상세·폼 화면**(반응형 미적용, 좁은 폭에서 어색할 수 있음)·필터바·모달·결재함 타임라인.
+> - 흔한 보정 포인트: 카드 안 값이 너무 길어 넘칠 때, 배지 줄바꿈, 금액 정렬, data-label 라벨-값 정렬, 필터바 세로 스택, 상세 dl(정의목록) 2열→1열.
+> - ⚠️ CSS 캐시 때문에 확인 시 **강력새로고침(Cmd+Shift+R)**. 공통 규칙은 `static/css/app.css` 하단(`@media max-767`), 개별은 각 `list.html`.
+
 - **🎉 Phase 0~16 전체 구현 완료·검증.** 이후 hwlee님 요청으로 **실무형 기능을 점진적으로 확장 중**(아래 2026-06-10 항목들). 학습 문서(doc/)는 별도 트랙.
-- **▶ 진행 중 = "실무 리얼리즘 확장" 프로젝트**(2026-06-27 착수, 포트폴리오 외부 공개용). 바로 아래 항목 참조. **STEP 1(KRaft)·2(카테고리 마스터화)·3(Factory)·4(마스터 대량확장)·5(3년치 실거래 백필) 완료. STEP 6은 테스트 정리 완료·`doc/` 학습문서만 남음.** 전체 94개 테스트 그린.
+- **▶ 진행 중 = "실무 리얼리즘 확장" 프로젝트**(2026-06-27 착수, 포트폴리오 외부 공개용). 바로 아래 항목 참조. **STEP 1(KRaft)·2(카테고리 마스터화)·3(Factory)·4(마스터 대량확장)·5(3년치 실거래 백필) 완료. STEP 6은 테스트 정리 완료·`doc/` 학습문서만 남음.**
+- **🆕 전자결재 엔진(전사 횡단) 1~2단계 완료**(2026-07-05, 아래 최신 세션 참조). 범용 결재 엔진 + 견적·지급·전표 연동 + 여신 완전통합. **전체 110개 테스트 그린 + 실 앱(RDS) e2e 검증 완료**.
 - (보류) Phase 17(자연어 데이터 검색, Text-to-SQL + 가드레일) — STUDY-PLAN Part 3 편입 완료, 구현 미착수.
+
+### 🗓 2026-07-05 세션 — 전자결재 엔진(전사 횡단) 1단계: 코어 + 견적 연동
+
+> hwlee님 요청 "전자결재를 실무 방식으로". 설계 검토 후 **범용 결재 엔진**을 신설하고 **견적(Quotation)** 에 첫 적용. 실무 4대 요소(전결 규정·결재 유형·반송 루프·조직도 결재선) 모두 반영.
+
+- **확정 스펙(hwlee님 선택)**: ① 결재선=**금액별 전결 규정 자동**(release strategy식) ② 결재 유형=**승인(순차)+합의(병렬)+참조** ③ 반려=**반송(재상신 루프)+반려종결** ④ 결재자 매핑=**조직도 기반(부서장 FK + 본부장 계정 신설)** ⑤ 착수 범위=**엔진 코어 + 견적 1종**.
+- **조직 정비(Flyway V64)**: `Department` 에 **부서장(`manager_id`) FK 신설** + **본부장 3명 계정 신설**(영업/생산/경영지원=`sales.dir`·`prod.dir`·`mgmt.dir`@hyunwoo.com, DIRECTOR, 비번 pass1234) + 부서장 지정(팀→팀장 6명, 본부→본부장 3명, 회사 DEPT-HQ→admin=대표 대행). `Department.manager` 엔티티 필드 추가.
+- **결재 엔진(`com.hwlee.erp.approval`, Flyway V65)**: 
+  - 엔티티 `Approval`(approval_request, 상태머신 DRAFT/PENDING/APPROVED/REJECTED/WITHDRAWN + 순차승인/병렬합의/반송 로직 캡슐화) · `ApprovalStep`(결재선 단계, 유형 APPROVAL/AGREEMENT/REFERENCE, 결재자 스냅샷) · `ApprovalRule`(전결 규정, 금액구간→레벨+재무합의여부). enum 6종.
+  - `ApprovalLineResolver`: **상신자 부서→조직 트리 상향, 각 노드 부서장을 결재자로**(자기 자신·미지정 노드 skip → 상위로). 전결 레벨(TEAM/DIVISION/COMPANY)이 확보할 결재자 수 결정. 고액이면 재무팀장 **병렬 합의** 추가.
+  - `ApprovalService`(상신/승인/반려/반송/회수/재상신 + 알림 라우팅 + 중복상신 방지) · `ApprovalController`(`/api/approvals` inbox/outbox/처리, `isAuthenticated`) · `ApprovalViewController`(`/approvals`). `NotificationType` 4종 추가, 채번 prefix `APV`.
+  - **전결 규정 시드(견적)**: <1천만=팀장전결(TEAM) / 1천만~5천만=본부장까지(DIVISION) / ≥5천만=대표까지(COMPANY)+재무합의.
+- **견적 연동**: `QuotationService.submitForApproval`(DRAFT 견적→결재 상신, `QuotationController POST /{id}/submit-approval`). 최종 승인→`ApprovalApprovedEvent`(BEFORE_COMMIT)→`QuotationApprovalListener`가 견적 `send()`(SENT) — 결재→문서 역방향 의존을 이벤트로 끊음.
+- **화면**: `approval/list.html`(상신함/결재함 탭 + 결재선 타임라인 + 승인/합의/반려/반송/회수/재상신) · 견적 `detail.html`(직접발송→**결재 상신** 버튼 교체 + 진행상태 배지) · `layout.html`(사이드바 "전자결재" 메뉴 + 알림 아이콘 4종).
+- **검증**: 단위 `ApprovalTest`(상태머신 7건: 순차·반려·반송재상신·병렬합의·회수) + 통합 `ApprovalScenarioTest`(Testcontainers 3건: 전결차등·견적 e2e자동발송·중복상신방지). **전체 107개 테스트 그린**(V64/V65 실제 MySQL 적용 확인).
+#### ➕ 전자결재 2단계 — 타 문서 연동 + 여신 완전통합 + 실앱 검증 (2026-07-05 같은 세션 이어서, hwlee님 "1·2·3 다 해줘")
+
+- **1번 — 타 문서(지급·전표) 결재 연동**: 구매발주는 이 ERP에 문서 자체가 없어 제외(입고 GoodsReceipt만 존재). **지급(Payment 출금)·수동전표(JournalEntry MANUAL)** 에 결재 게이트 추가.
+  - 기존 "생성 즉시 전기(post)" 경로는 **유지**하고(회귀 방지), 결재 경로를 **추가**: `createDraft`/`createManualDraft`(DRAFT 저장) → `submitForApproval`(PAYMENT는 DISBURSEMENT만, JOURNAL은 MANUAL만) → 승인 콜백 리스너(`fi/integration/approval/{Payment,JournalEntry}ApprovalListener`, BEFORE_COMMIT)에서 `post()`(+지급은 출금 자동분개). `JournalEntry.totalDebit()` 추가(전결 금액). 컨트롤러에 `/draft`·`/{id}/submit-approval` 엔드포인트.
+  - **Flyway V66**: PAYMENT·JOURNAL 전결 규정 시드(금액 구간별, 재무 문서라 합의 없음).
+- **2번 — 여신 완전통합(결재함 일원화)**: hwlee님 선택. 여신 상향을 결재 엔진 문서(`CREDIT_LIMIT`)로 편입. **계획오더는 "시스템 자동 제안→전환" 성격이라 결재와 안 맞아 제외**(통보).
+  - 엔진 확장: `ApprovalRule.fixedApproverDeptCode`(고정 결재 부서) — 지정 시 상신자 조직 상향 대신 그 부서장이 결재. 여신=`DEPT-FINANCE`(재무팀장). `ApprovalRejectedEvent` 신설(승인 이벤트와 대칭, 반려 콜백용) + `ApprovalApprovedEvent`에 `decidedBy` 추가. resolver에 고정부서 분기.
+  - 여신 개편: `CreditLimitRequestService.create`가 저장 후 **결재 상신**(재무팀장 결재선), 자체 approve/reject 제거 → `applyApproval`/`applyRejection` 콜백(`CreditApprovalListener`가 APPROVED→한도반영, REJECTED→종결). `CreditLimitRequestController` 승인/거부 엔드포인트 제거(결재함으로 이관). 여신 화면 `fi/credit/list.html` 승인/거부 버튼 → "결재 진행 중"(결재함 링크)로 교체 + `?id=` 딥링크. **Flyway V67**(fixed_approver_dept_code 컬럼 + 여신 규칙).
+- **검증**: 통합테스트 3건 신규(`CreditApprovalIntegrationTest` 여신 승인/반려, `PaymentApprovalIntegrationTest` 지급 전기) → **전체 110개 테스트 그린**(V64~V67 실 MySQL 적용). **+ 실 앱(localhost:8080, AWS RDS, devtools 핫리로드로 반영) HTTP e2e 검증 성공**: ⓐ 견적 상신→영업본부장(서동현) 승인→견적 SENT ⓑ 여신 요청→재무팀장(우태윤) 승인→고객 한도 100M→130M 반영.
+  - ⚠️ **RDS에 검증 데이터 생성됨**: 견적 Q-20260705-001(SENT)·결재 APV-20260705-001(APPROVED), 여신 CLR-20260705-001(APPROVED)·결재 APV-20260705-002(APPROVED), **신원전자(CUST-2026-0001) 한도 1억→1.3억 변경됨**. 결재함 데모용으로 남기거나 원복 가능(hwlee님 판단).
+- **➕ 후속 보강(같은 세션)**:
+  - **결재 상태 목록 가시성**(hwlee님 지적 "초안만 보이면 상신/반려를 모른다"): 배치 조회 API `GET /api/approvals/status?docType=&refIds=`(refId→최신 상태 맵, N+1 없음) + **견적·지급·전표 목록에 결재 상태 배지**(결재중/결재반려/반송/회수) + 견적/지급/전표 **상세에 반려 사유 안내 + "다시 상신"**. (승인=문서 발송/전기와 중복이라 배지 생략)
+  - **지급·전표 화면 결재 경로 완성**: 지급 폼 "결재 상신하여 등록"(출금 전용)·전표 폼 "결재 상신하여 등록"(수동전표) + 상세 진행상태/반려/재상신. 초안 저장(`/draft`)→상신(`/{id}/submit-approval`) 흐름. **실 앱 검증**: 지급 PAY-20260705-001·전표 JE-20260705-001 상신→재무팀장(우태윤) 결재선 자동구성→목록 '결재중' 배지 확인.
+  - **로그인 빠른선택 확장**(`login.html`): 부서별 담당·팀장·본부장 계정 전체(sales.mgr/dir·finance.mgr·mgmt.dir·prod.sw/gm/dir 등) optgroup 그룹핑 + 결재 시연 안내. 결재 흐름별 로그인 전환 용이.
+  - **참조(REFERENCE) 단계 활용**: `ApprovalRule.referenceDeptCode`(참조 부서, V68) + resolver가 참조 단계 생성(결재자·자기 중복 제외) + 상신 시 참조자에게 `APPROVAL_REFERENCED` 통보(딥링크 `/approvals?id=`) + 결재함 타임라인 "참조·열람 대상" 표시 + `?id=` 딥링크로 문서 열람. **견적 본부장 전결(1천만~5천만)에 대표(DEPT-HQ) 참조** 설정. 단위 2건. **실 앱 검증**: kim 2천만 견적→[팀장·본부장 결재 + 대표 참조], 대표에게 참조 알림 전송. (참조는 완료 판정 무관 — 결재만 끝나면 APPROVED.) **전체 112개 테스트 그린.**
+  - **모바일 반응형 — 목록 20개 전부 표→카드 전환**(hwlee님 요청): 공통 CSS 1벌(`app.css` `.lc-*` 커스텀 카드 + `.rtable` data-label 자동변환, `@media max-767`). **핵심 6개는 커스텀 카드**(견적·수주·고객·재고·지급·전표 — 번호+상태/결재 배지 상단, 금액/수량 강조, 메타; 표는 `d-none d-md-block`, 카드는 `list-cards d-md-none`). **나머지 14개는 `.rtable`+`data-label`**(출하·인보이스·계정·여신·직원·급여·알림·출고·입고·창고·BOM·생산지시·계획오더·결재함 — 좁은 폭에서 "라벨: 값" 카드 자동). 순수 프론트(HTML/CSS/JS), 컴파일 무관. ⚠️ CSS 캐시 때문에 브라우저 **강력새로고침(Cmd+Shift+R)** 필요.
+- **▶ 다음 단계(전자결재 3단계~)**: 대결/위임(부재 시 대리 결재), 참조함(참조로 걸린 문서 목록), 구매발주 문서 신설 후 연동. 설계문서 `doc/실무리얼리즘확장-전자결재-설계.md`.
+- ⚠️ **미커밋** — 다른 PC에서 이어가려면 hwlee님이 커밋+푸시. (1단계 신규 approval 패키지 + V64/V65 + approval/list.html / 2단계 추가: V66/V67 + fi/integration/approval/*Listener 3종 + Payment·Journal·Credit 서비스·컨트롤러 변경 + credit/list.html)
 
 ### 🗓 2026-07-04 세션 — 수주 마감(CLOSED) 기능 완성 (백엔드+UI)
 

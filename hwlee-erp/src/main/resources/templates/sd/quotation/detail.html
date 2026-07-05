@@ -40,7 +40,7 @@
     <div class="mb-3" id="actions"></div>
 
     <h6>품목 라인</h6>
-    <table class="table table-bordered align-middle bg-white">
+    <table class="table rtable table-bordered align-middle bg-white">
         <thead class="table-light">
         <tr>
             <th style="width:60px;">#</th>
@@ -91,11 +91,11 @@
 
         document.getElementById('lines').innerHTML = (q.lines || []).map(l => `
             <tr>
-                <td>${l.lineNo}</td>
-                <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
-                <td class="text-end">${ERP.num(l.quantity)}</td>
-                <td class="text-end">${ERP.won(l.unitPrice)}</td>
-                <td class="text-end">${ERP.won(l.lineTotal)}</td>
+                <td data-label="#">${l.lineNo}</td>
+                <td class="rt-wide" data-label="품목">${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
+                <td class="text-end" data-label="수량">${ERP.num(l.quantity)}</td>
+                <td class="text-end" data-label="단가">${ERP.won(l.unitPrice)}</td>
+                <td class="text-end" data-label="라인 합계">${ERP.won(l.lineTotal)}</td>
             </tr>`).join('');
 
         renderActions(q.status);

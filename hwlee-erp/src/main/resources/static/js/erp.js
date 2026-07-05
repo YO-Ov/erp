@@ -173,5 +173,190 @@ const ERP = (() => {
             .finally(() => window.location.href = '/login');
     }
 
-    return {api, ApiError, won, num, badge, esc, flash, flashError, query, param, logout, toCsv, download, today, pager};
+    return {api, ApiError, won, num, badge, esc, flash, flashError, query, param, logout, toCsv, download, today, pager, enhanceSelect};
+
+    /* ────────────────────────────────────────────────────────────────
+     * 검색 가능한 콤보박스 — 네이티브 <select> 를 숨기고 그 위에
+     * "입력해서 거르는" UI 를 씌운다. 선택 시 원래 select 의 value 를
+     * 그대로 세팅 + change 이벤트를 쏘므로, 기존 filters()/폼 submit/reset
+     * 로직은 전혀 바꿀 필요가 없다(점진적 향상). 옵션은 API 로 나중에
+     * 채워지므로 MutationObserver 로 도착을 감지해 다시 동기화한다.
+     * ──────────────────────────────────────────────────────────────── */
+    function enhanceSelect(select) {
+        if (!select || select.dataset.comboReady) return;
+        select.dataset.comboReady = '1';
+
+        const wrap = document.createElement('div');
+        wrap.className = 'erp-combo';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'erp-combo-input form-control form-control-sm';
+        input.setAttribute('role', 'combobox');
+        input.setAttribute('autocomplete', 'off');
+        input.setAttribute('aria-expanded', 'false');
+        input.placeholder = select.dataset.placeholder || '선택 · 검색…';
+        const caret = document.createElement('i');
+        caret.className = 'bi bi-chevron-down erp-combo-caret';
+        const menu = document.createElement('div');
+        menu.className = 'erp-combo-menu';
+        menu.setAttribute('role', 'listbox');
+
+        select.parentNode.insertBefore(wrap, select);
+        wrap.appendChild(select);
+        wrap.appendChild(input);
+        wrap.appendChild(caret);
+        wrap.appendChild(menu);
+        select.classList.add('erp-combo-native');
+
+        let opts = [], filtered = [], activeIdx = -1, open = false;
+
+        const currentLabel = () => {
+            const o = select.options[select.selectedIndex];
+            return o ? o.textContent : '';
+        };
+        function syncFromSelect() {
+            opts = Array.from(select.options).map(o => ({value: o.value, label: o.textContent}));
+            if (!open) input.value = currentLabel();
+            if (open) renderMenu(input.value);
+        }
+        function renderMenu(q) {
+            const query = (q || '').trim().toLowerCase();
+            filtered = query ? opts.filter(o => o.label.toLowerCase().includes(query)) : opts.slice();
+            menu.innerHTML = filtered.length
+                ? filtered.map((o, i) =>
+                    `<div class="erp-combo-opt${o.value === select.value ? ' selected' : ''}" data-i="${i}" role="option">${esc(o.label)}</div>`).join('')
+                : `<div class="erp-combo-empty">검색 결과 없음</div>`;
+            activeIdx = filtered.findIndex(o => o.value === select.value);
+            highlight();
+        }
+        function highlight() {
+            const items = menu.querySelectorAll('.erp-combo-opt');
+            items.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+            if (items[activeIdx]) items[activeIdx].scrollIntoView({block: 'nearest'});
+        }
+        function openMenu() {
+            if (open) return;
+            open = true;
+            wrap.classList.add('open');
+            input.setAttribute('aria-expanded', 'true');
+            input.value = '';
+            renderMenu('');
+        }
+        function closeMenu() {
+            if (!open) return;
+            open = false;
+            wrap.classList.remove('open');
+            input.setAttribute('aria-expanded', 'false');
+            input.value = currentLabel();
+        }
+        function choose(o) {
+            if (!o) { closeMenu(); return; }
+            if (select.value !== o.value) {
+                select.value = o.value;
+                select.dispatchEvent(new Event('change', {bubbles: true}));
+            }
+            closeMenu();
+        }
+
+        input.addEventListener('focus', openMenu);
+        input.addEventListener('click', openMenu);
+        input.addEventListener('input', () => {
+            if (!open) openMenu();
+            renderMenu(input.value);
+            activeIdx = filtered.length ? 0 : -1;
+            highlight();
+        });
+        caret.addEventListener('mousedown', e => {
+            e.preventDefault();
+            if (open) closeMenu(); else { input.focus(); }
+        });
+        input.addEventListener('keydown', e => {
+            if (e.key === 'ArrowDown')      { e.preventDefault(); if (!open) openMenu(); activeIdx = Math.min(activeIdx + 1, filtered.length - 1); highlight(); }
+            else if (e.key === 'ArrowUp')   { e.preventDefault(); activeIdx = Math.max(activeIdx - 1, 0); highlight(); }
+            else if (e.key === 'Enter')     { if (open) { e.preventDefault(); choose(filtered[activeIdx]); } }
+            else if (e.key === 'Escape')    { if (open) { e.preventDefault(); closeMenu(); } }
+        });
+        menu.addEventListener('mousedown', e => {
+            const el = e.target.closest('.erp-combo-opt');
+            if (!el) return;
+            e.preventDefault();
+            choose(filtered[Number(el.dataset.i)]);
+        });
+        document.addEventListener('click', e => { if (!wrap.contains(e.target)) closeMenu(); });
+
+        new MutationObserver(syncFromSelect).observe(select, {childList: true});
+        const form = select.closest('form');
+        if (form) form.addEventListener('reset', () => setTimeout(syncFromSelect, 0));
+        syncFromSelect();
+    }
+})();
+
+/* ══════════════════════════════════════════════════════════════════════
+ * 목록 필터바 자동 향상 — 모든 화면 공통(파일별 수정 불필요).
+ *   ① 모바일: 필터를 "조회조건" 토글로 접기(기본 닫힘) + 활성 조건 개수 배지
+ *   ② 옵션이 많은 셀렉트(고객·영업담당 등)는 검색 가능한 콤보박스로 교체
+ * ════════════════════════════════════════════════════════════════════ */
+(function () {
+    const SEARCH_THRESHOLD = 12; // 이 개수를 넘는 셀렉트만 검색 콤보로(짧은 enum 은 네이티브 유지)
+
+    function considerSelect(select) {
+        if (select.dataset.comboReady || select.dataset.noSearch !== undefined) return;
+        if (select.options.length > SEARCH_THRESHOLD) { ERP.enhanceSelect(select); return; }
+        // 옵션이 API 로 나중에 채워질 수 있으므로 임계치 초과 시점을 관찰
+        const mo = new MutationObserver(() => {
+            if (select.options.length > SEARCH_THRESHOLD) { mo.disconnect(); ERP.enhanceSelect(select); }
+        });
+        mo.observe(select, {childList: true});
+    }
+
+    function setupCollapsibleFilter(form) {
+        if (form.dataset.collapsibleReady) return;
+        form.dataset.collapsibleReady = '1';
+        form.classList.add('is-collapsible');
+
+        const bar = document.createElement('div');
+        bar.className = 'filter-toggle d-md-none';
+        bar.innerHTML =
+            `<button type="button" class="filter-toggle-btn" aria-expanded="false">
+                <span class="ft-label"><i class="bi bi-funnel"></i> 조회조건<span class="ft-count"></span></span>
+                <i class="bi bi-chevron-down ft-caret"></i>
+            </button>`;
+        form.parentNode.insertBefore(bar, form);
+        const btn = bar.querySelector('.filter-toggle-btn');
+
+        const revealOverflow = () => { if (form.classList.contains('open')) form.style.overflow = 'visible'; };
+        btn.addEventListener('click', () => {
+            const isOpen = form.classList.toggle('open');
+            btn.setAttribute('aria-expanded', isOpen);
+            if (!isOpen) form.style.overflow = '';   // 접는 동안은 CSS(hidden) 로
+            else setTimeout(revealOverflow, 320);    // 애니메이션 미동작 환경 폴백
+        });
+        // 펼침 애니메이션이 끝나면 콤보 드롭다운이 잘리지 않게 overflow 해제
+        form.addEventListener('transitionend', e => {
+            if (e.propertyName === 'max-height') revealOverflow();
+        });
+
+        const countBadge = bar.querySelector('.ft-count');
+        function updateCount() {
+            let n = 0;
+            form.querySelectorAll('select, input').forEach(el => {
+                if (['button', 'submit', 'reset'].includes(el.type)) return;
+                if (el.classList.contains('erp-combo-input')) return; // 콤보 표시용 입력은 제외
+                if (el.value) n++;
+            });
+            countBadge.textContent = n ? n : '';
+            countBadge.classList.toggle('on', n > 0);
+        }
+        form.addEventListener('change', updateCount);
+        form.addEventListener('submit', () => setTimeout(updateCount, 0));
+        form.addEventListener('reset', () => setTimeout(updateCount, 0));
+        setTimeout(updateCount, 500); // URL 파라미터 프리필·비동기 로딩 이후 반영
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('form.filter-bar').forEach(form => {
+            setupCollapsibleFilter(form);
+            form.querySelectorAll('select').forEach(considerSelect);
+        });
+    });
 })();

@@ -30,7 +30,7 @@
     <div class="mb-3" id="actions"></div>
 
     <h6>출하 라인</h6>
-    <table class="table table-bordered align-middle bg-white">
+    <table class="table rtable table-bordered align-middle bg-white">
         <thead class="table-light">
         <tr><th style="width:50px;">#</th><th>품목</th><th class="text-end">출하량</th></tr>
         </thead>
@@ -60,9 +60,9 @@
         document.getElementById('d-audit').textContent =
             `${d.createdBy ?? '?'} · ${(d.createdAt ?? '').replace('T', ' ').slice(0, 16)}`;
         document.getElementById('lines').innerHTML = (d.lines || []).map(l => `
-            <tr><td>${l.lineNo}</td>
-                <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
-                <td class="text-end">${ERP.num(l.quantity)}</td></tr>`).join('');
+            <tr><td data-label="#">${l.lineNo}</td>
+                <td class="rt-wide" data-label="품목">${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
+                <td class="text-end" data-label="출하량">${ERP.num(l.quantity)}</td></tr>`).join('');
 
         document.getElementById('actions').innerHTML = (d.status === 'SHIPPED')
             ? `<button class="btn btn-sm btn-outline-danger" onclick="cancel()">출하 취소 (재고 복원)</button>`

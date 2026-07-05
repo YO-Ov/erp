@@ -30,7 +30,7 @@
     <div class="mb-3" id="actions"></div>
 
     <h6>청구 라인</h6>
-    <table class="table table-bordered align-middle bg-white">
+    <table class="table rtable table-bordered align-middle bg-white">
         <thead class="table-light">
         <tr><th style="width:50px;">#</th><th>품목</th><th class="text-end">청구량</th>
             <th class="text-end">단가</th><th class="text-end">라인 합계</th></tr>
@@ -70,11 +70,11 @@
         document.getElementById('d-audit').textContent =
             `${v.createdBy ?? '?'} · ${(v.createdAt ?? '').replace('T', ' ').slice(0, 16)}`;
         document.getElementById('lines').innerHTML = (v.lines || []).map(l => `
-            <tr><td>${l.lineNo}</td>
-                <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
-                <td class="text-end">${ERP.num(l.quantity)}</td>
-                <td class="text-end">${ERP.won(l.unitPrice)}</td>
-                <td class="text-end">${ERP.won(l.lineTotal)}</td></tr>`).join('');
+            <tr><td data-label="#">${l.lineNo}</td>
+                <td class="rt-wide" data-label="품목">${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
+                <td class="text-end" data-label="청구량">${ERP.num(l.quantity)}</td>
+                <td class="text-end" data-label="단가">${ERP.won(l.unitPrice)}</td>
+                <td class="text-end" data-label="라인 합계">${ERP.won(l.lineTotal)}</td></tr>`).join('');
         document.getElementById('d-subtotal').textContent = ERP.won(v.subtotal);
         document.getElementById('d-tax').textContent = ERP.won(v.taxAmount);
         document.getElementById('d-total').textContent = ERP.won(v.totalAmount);

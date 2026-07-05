@@ -30,7 +30,7 @@
     <div class="mb-3" id="actions"></div>
 
     <h6>품목 라인 <span class="text-muted small">(주문량 → 출하량 → 청구량 진행)</span></h6>
-    <table class="table table-bordered align-middle bg-white">
+    <table class="table rtable table-bordered align-middle bg-white">
         <thead class="table-light">
         <tr>
             <th style="width:50px;">#</th><th>품목</th>
@@ -78,14 +78,14 @@
 
         document.getElementById('lines').innerHTML = (o.lines || []).map(l => `
             <tr data-item-id="${l.itemId}" data-order-qty="${l.orderQty}">
-                <td>${l.lineNo}</td>
-                <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span>
+                <td data-label="#">${l.lineNo}</td>
+                <td class="rt-wide" data-label="품목">${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span>
                     <div class="atp-cell small mt-1"></div></td>
-                <td class="text-end">${ERP.num(l.orderQty)}</td>
-                <td class="text-end">${ERP.num(l.shippedQty)}</td>
-                <td class="text-end">${ERP.num(l.invoicedQty)}</td>
-                <td class="text-end">${ERP.won(l.unitPrice)}</td>
-                <td class="text-end">${ERP.won(l.lineTotal)}</td>
+                <td class="text-end" data-label="주문량">${ERP.num(l.orderQty)}</td>
+                <td class="text-end" data-label="출하량">${ERP.num(l.shippedQty)}</td>
+                <td class="text-end" data-label="청구량">${ERP.num(l.invoicedQty)}</td>
+                <td class="text-end" data-label="단가">${ERP.won(l.unitPrice)}</td>
+                <td class="text-end" data-label="라인 합계">${ERP.won(l.lineTotal)}</td>
             </tr>`).join('');
 
         renderActions(o.status);

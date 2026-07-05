@@ -42,7 +42,7 @@
     <div class="card mb-3">
         <div class="card-header">출고 라인</div>
         <div class="card-body">
-            <table class="table line-table align-middle mb-0">
+            <table class="table line-table rtable align-middle mb-0">
                 <thead>
                 <tr><th style="width:60px;">#</th><th>품목</th><th class="text-end">수량</th></tr>
                 </thead>
@@ -90,9 +90,9 @@
 
         document.getElementById('lines').innerHTML = (g.lines || []).map(l => `
             <tr>
-                <td>${l.lineNo}</td>
-                <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
-                <td class="text-end">${ERP.num(l.quantity)}</td>
+                <td data-label="#">${l.lineNo}</td>
+                <td class="rt-wide" data-label="품목">${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
+                <td class="text-end" data-label="수량">${ERP.num(l.quantity)}</td>
             </tr>`).join('');
 
         renderActions(g.status, g.deliveryId);

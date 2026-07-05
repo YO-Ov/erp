@@ -196,9 +196,9 @@
         }
         const after = Number(creditCache.remaining) - grand;
         document.getElementById('credit-info').innerHTML =
-            `신용한도 ${ERP.won(creditCache.creditLimit)} · 사용중 ${ERP.won(creditCache.used)}`
-            + ` · 남은 <strong>${ERP.won(creditCache.remaining)}</strong>`
-            + ` → 이 주문(${ERP.won(grand)}) 포함 시 남은 `
+            `한도 ${ERP.won(creditCache.creditLimit)} · 여신잔액 ${ERP.won(creditCache.used)}`
+            + ` · 가용한도 <strong>${ERP.won(creditCache.remaining)}</strong>`
+            + ` → 이 주문(${ERP.won(grand)}) 포함 시 가용한도 `
             + `<strong class="${after < 0 ? 'text-danger' : 'text-success'}">${ERP.won(after)}</strong>`
             + (after < 0
                 ? ' <span class="badge bg-danger">한도 초과 — 확정 불가</span>'

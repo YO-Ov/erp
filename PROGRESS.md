@@ -19,7 +19,27 @@
 
 ## 현재 위치
 
-> **▶▶ 다음에 할 일 (다른 PC에서 여기부터) = 모바일 반응형 실렌더 점검·보정**
+> ### 🅐 다음에 "가장 먼저" 할 일 (2026-07-06 세션 끝, hwlee님 요청) = **여신관리(신용한도) 개념 정리·학습**
+> hwlee님이 수주 상세의 신용한도 3종 표기(한도/여신잔액/가용한도)의 **의미를 아직 잘 모르겠다**고 함. 다음 세션은 **이 개념부터 워크스루**로 잡는다. AI가 이미 설명한 핵심 요약(재확인용):
+> - **한도**(여신한도) = 재무가 부여한 외상판매 상한 (고객 마스터 `Customer.creditLimit`).
+> - **여신잔액**(=코드상 `used`) = **확정됐지만 아직 거래종료 안 된 수주 금액 합**. 정확히 `SalesOrderRepository.sumActiveOrderAmountByCustomer` = 상태 **CONFIRMED·SHIPPING·SHIPPED·INVOICING·INVOICED** 수주 `totalAmount` 합. DRAFT·CANCELLED·CLOSED 제외(확정 시 +, CLOSED 시 -).
+> - **가용한도**(=코드상 `remaining`) = 한도 − 여신잔액. 새 수주 확정 시 이걸 넘으면 `CreditLimitChecker`가 "한도 초과 — 확정 불가"로 막고 여신 상향 요청 유도.
+> - 계산·API: `SalesOrderService.creditStatus()` → `GET /api/sales-orders/credit-status?customerId=`. 표기 렌더: `sd/order/detail.html`(122~145줄), `sd/order/form.html`(197~207줄).
+> - ⚠️ 실무(SAP)와 차이: 정식 여신공여액 = 미수금(AR)+미출하수주+미청구출하+미회수청구. 이 시스템은 "활성 수주 금액 합" 하나로 단순화한 모델. **다음 세션에 이 갭을 도메인 관점에서 짚어주면 학습 효과 큼.**
+> - (선택) 개념 정리 후 `doc/`에 여신관리 워크스루 글로 남길지 hwlee님과 상의.
+>
+> **✅ 2026-07-06 세션에서 한 것 (미커밋)** — 수주 신용한도 표기를 실무 용어(B안)로 교체:
+> - `sd/order/detail.html`·`sd/order/form.html`: **사용중→여신잔액**, **남은→가용한도**, 폼 첫 항목 신용한도→한도(상세와 통일), 후행 "…시 남은"→"…시 가용한도". 순수 프론트(HTML/JS), 컴파일 무관, **강력새로고침 필요**. (dt 배지 "신용한도"는 유지)
+>
+> **🖥 병행 트랙 — Oracle Cloud Always Free 배포 (진행 중, 앱과 무관)**: hwlee님 개인 Oracle 계정(dev.hwlee@gmail.com)에서 ERP/MES를 무료로 서비스하려는 중. 상태:
+> - **DB 방침 = Oracle VM 안 Docker MySQL로 자립**(회사 RDS 분리). Flyway V1~V67이 스키마+3년치 시드를 다 만들므로 데이터 이전 불필요 = 빈 MySQL만 있으면 됨.
+> - **막힌 지점**: Always Free ARM(A1) 한도가 무료계층에서 0 → A1 생성 불가. → **종량제(Pay As You Go) 업그레이드 진행 중**(카드 등록 완료, "업그레이드 진행 중" 상태, 완료 메일 대기). 업그레이드해도 Always Free 범위(A1 2 OCPU/12GB, 부트 200GB)만 쓰면 요금 0. **완료되면 예산 알림 1$ 설정 → A1 인스턴스(2 OCPU/12GB, Ubuntu 22.04) 생성**.
+> - **다음 배포 작업**: ① A1 VM 생성 ② OCI 보안리스트 + VM iptables로 8080·8082 개방(iptables 잊으면 접속 안 됨-최대함정) ③ Docker 설치 ④ 배포 파일(ERP·MES Dockerfile + `docker-compose.prod.yml`: MySQL2+Kafka+Zipkin+ERP+MES) 작성해 `docker compose up`. **배포 파일은 아직 안 만듦.**
+> - SSH 키는 생성 완료(맥 `~/.ssh/id_ed25519`). 기존 AMD 서버 prod·dev(E2.1.Micro)는 A1과 무관, 건드리지 말 것.
+>
+> ---
+>
+> **▶▶ (이전 항목) 모바일 반응형 실렌더 점검·보정**
 > 2026-07-05 세션에서 목록 20개를 표→카드 반응형으로 만들었으나(커밋 `a725699`), **실제 폰/좁은 폭 렌더는 육안 확인 안 됨**(이 환경은 헤드리스 없음). 다른 PC 브라우저에서 창을 768px 아래로 줄이거나 폰으로 접속해 **카드가 어색하거나 깨지는 화면을 찾아 개별 보정**한다.
 > - 점검 대상: 목록 20개(견적·수주·고객·재고·지급·전표=커스텀 카드 / 나머지 14개=`.rtable` data-label 카드) + 상세·필터바·모달·결재함 타임라인.
 > - 흔한 보정 포인트: 카드 안 값이 너무 길어 넘칠 때, 배지 줄바꿈, 금액 정렬, data-label 라벨-값 정렬, 필터바 세로 스택, 상세 dl(정의목록) 2열→1열.

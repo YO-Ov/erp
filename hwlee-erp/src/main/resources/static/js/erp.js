@@ -207,6 +207,9 @@ const ERP = (() => {
         wrap.appendChild(caret);
         wrap.appendChild(menu);
         select.classList.add('erp-combo-native');
+        // display:none 상태의 required select 은 네이티브 폼 검증에서 "not focusable" 로 제출 자체를 막는다.
+        // 콤보로 바뀐 뒤엔 앱단(JS 수집·서버) 검증에 맡기므로 required 를 해제한다.
+        if (select.required) select.required = false;
 
         let opts = [], filtered = [], activeIdx = -1, open = false;
 
@@ -354,9 +357,18 @@ const ERP = (() => {
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('form.filter-bar').forEach(form => {
-            setupCollapsibleFilter(form);
-            form.querySelectorAll('select').forEach(considerSelect);
-        });
+        // ① 목록 필터바: 모바일 접기 토글
+        document.querySelectorAll('form.filter-bar').forEach(setupCollapsibleFilter);
+        // ② 화면 내 모든 select 을 검색 콤보 후보로 — 목록 필터·작성 폼·모달 공통.
+        //    옵션 12개 초과만 실제 향상(짧은 enum·페이지크기 등은 네이티브 유지, data-no-search 로 opt-out).
+        document.querySelectorAll('select').forEach(considerSelect);
+        // ③ 나중에 DOM 에 추가되는 select(예: 라인 아이템 행, 모달 필드)도 자동 향상.
+        new MutationObserver(muts => {
+            muts.forEach(m => m.addedNodes.forEach(node => {
+                if (node.nodeType !== 1) return;                       // 엘리먼트만
+                if (node.matches('select')) considerSelect(node);
+                node.querySelectorAll('select').forEach(considerSelect);
+            }));
+        }).observe(document.body, {childList: true, subtree: true});
     });
 })();

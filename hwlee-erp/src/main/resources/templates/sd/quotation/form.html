@@ -71,7 +71,8 @@
     let items = [];                 // 품목 마스터 캐시
 
     async function loadItems() {
-        const data = await ERP.api('/api/items' + ERP.query({status: 'ACTIVE', size: 500}));
+        // 판매 대상만 — 완제품(FINISHED)만 조회해 부품(COMPONENT)이 라인 품목에 섞이지 않게 한다.
+        const data = await ERP.api('/api/items' + ERP.query({status: 'ACTIVE', itemType: 'FINISHED', size: 500}));
         items = data.content || [];
     }
 

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('거래처 취급품목', 'vendoritem', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>거래처 취급품목</h1>
+            <div class="crumb">구매정보레코드 · 거래처가 공급하는 품목 + 매입단가/리드타임</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-primary" id="btn-add">
+            <i class="bi bi-plus-lg"></i> 취급품목 등록
+        </button>
+    </div>
+
+    <form id="searchForm" class="filter-bar">
+        <div class="filter-field ff-wide">
+            <label>거래처</label>
+            <select id="f-vendor" class="form-select form-select-sm"><option value="">전체</option></select>
+        </div>
+        <div class="filter-field ff-narrow">
+            <label>상태</label>
+            <select id="f-status" class="form-select form-select-sm">
+                <option value="">전체</option>
+                <option value="ACTIVE">사용</option>
+                <option value="INACTIVE">중지</option>
+            </select>
+        </div>
+    </form>
+
+    <div class="table-wrap mt-3">
+        <table class="table table-hover align-middle rtable">
+            <thead>
+            <tr>
+                <th>거래처</th>
+                <th>품목</th>
+                <th class="text-end">매입단가</th>
+                <th class="text-end">리드타임</th>
+                <th>상태</th>
+                <th style="width:60px;"></th>
+            </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+        </table>
+    </div>
+
+    <!-- 등록 모달 -->
+    <div class="modal fade" id="addModal" tabindex="-1">
+      <div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">취급품목 등록</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="mb-2">
+                <label class="form-label">거래처 <span class="text-danger">*</span></label>
+                <select id="m-vendor" class="form-select"><option value="">선택…</option></select>
+            </div>
+            <div class="mb-2">
+                <label class="form-label">품목(부품) <span class="text-danger">*</span></label>
+                <select id="m-item" class="form-select"><option value="">선택…</option></select>
+            </div>
+            <div class="row">
+                <div class="col-6 mb-2">
+                    <label class="form-label">매입단가 <span class="text-danger">*</span></label>
+                    <input type="number" step="any" min="0" id="m-price" class="form-control">
+                </div>
+                <div class="col-6 mb-2">
+                    <label class="form-label">리드타임(일)</label>
+                    <input type="number" step="1" min="0" id="m-lead" class="form-control" value="7">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">닫기</button>
+            <button type="button" class="btn btn-primary" id="m-save">등록</button>
+        </div>
+      </div></div>
+    </div>
+
+<script th:inline="javascript">
+    const STATUS = {
+        ACTIVE:   {label: '사용', color: 'success'},
+        INACTIVE: {label: '중지', color: 'secondary'},
+    };
+    let addModal;
+
+    async function fillSelect(id, path, query, map) {
+        const data = await ERP.api(path + ERP.query(query));
+        const sel = document.getElementById(id);
+        (data.content || []).forEach(o => {
+            const opt = document.createElement('option');
+            const [v, t] = map(o);
+            opt.value = v; opt.textContent = t;
+            sel.appendChild(opt);
+        });
+    }
+
+    function filters() {
+        return {
+            vendorId: document.getElementById('f-vendor').value || null,
+            status: document.getElementById('f-status').value || null,
+            size: 500,
+        };
+    }
+
+    async function load() {
+        try {
+            const data = await ERP.api('/api/vendor-items' + ERP.query(filters()));
+            const rows = data.content || [];
+            const tbody = document.getElementById('rows');
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">등록된 취급품목이 없습니다.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = rows.map(r => {
+                const s = STATUS[r.status] || {label: r.status, color: 'secondary'};
+                return `<tr>
+                    <td data-label="거래처">${ERP.esc(r.vendorName)} <span class="text-muted small">${ERP.esc(r.vendorCode)}</span></td>
+                    <td data-label="품목">${ERP.esc(r.itemName)} <span class="text-muted small">${ERP.esc(r.itemCode)}</span></td>
+                    <td class="text-end" data-label="매입단가">${ERP.won(r.supplyPrice)}</td>
+                    <td class="text-end" data-label="리드타임">${ERP.num(r.leadTimeDays)}일</td>
+                    <td data-label="상태">${ERP.badge(s.label, s.color)}</td>
+                    <td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="del(${r.id})"><i class="bi bi-trash"></i></button></td>
+                </tr>`;
+            }).join('');
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    async function del(id) {
+        if (!confirm('이 취급품목 매핑을 삭제하시겠습니까?')) return;
+        try {
+            await ERP.api('/api/vendor-items/' + id, {method: 'DELETE'});
+            ERP.flash('삭제했습니다.', 'success');
+            load();
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    async function openAdd() {
+        document.getElementById('m-vendor').value = document.getElementById('f-vendor').value || '';
+        document.getElementById('m-item').value = '';
+        document.getElementById('m-price').value = '';
+        document.getElementById('m-lead').value = '7';
+        addModal.show();
+    }
+
+    async function save() {
+        const vendorId = Number(document.getElementById('m-vendor').value);
+        const itemId = Number(document.getElementById('m-item').value);
+        const supplyPrice = document.getElementById('m-price').value;
+        const leadTimeDays = Number(document.getElementById('m-lead').value) || 0;
+        if (!vendorId || !itemId) { ERP.flash('거래처와 품목을 선택하세요.', 'warning'); return; }
+        if (supplyPrice === '' || Number(supplyPrice) < 0) { ERP.flash('매입단가를 입력하세요.', 'warning'); return; }
+        try {
+            await ERP.api('/api/vendor-items', {method: 'POST',
+                body: {vendorId, itemId, supplyPrice: Number(supplyPrice), leadTimeDays}});
+            addModal.hide();
+            ERP.flash('등록했습니다.', 'success');
+            load();
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        addModal = new bootstrap.Modal(document.getElementById('addModal'));
+        await Promise.all([
+            fillSelect('f-vendor', '/api/vendors', {status: 'ACTIVE', size: 500}, o => [o.id, `${o.name} (${o.code})`]),
+            fillSelect('m-vendor', '/api/vendors', {status: 'ACTIVE', size: 500}, o => [o.id, `${o.name} (${o.code})`]),
+            // 취급품목 후보는 부품(COMPONENT)만 — 완제품은 매입하지 않는다.
+            fillSelect('m-item', '/api/items', {status: 'ACTIVE', itemType: 'COMPONENT', size: 500}, o => [o.id, `${o.name} (${o.code})`]),
+        ]);
+        document.getElementById('searchForm').addEventListener('change', load);
+        document.getElementById('btn-add').addEventListener('click', openAdd);
+        document.getElementById('m-save').addEventListener('click', save);
+        load();
+    });
+</script>
+</div>
+</body>
+</html>

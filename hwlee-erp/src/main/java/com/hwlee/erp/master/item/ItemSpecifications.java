@@ -27,4 +27,12 @@ public final class ItemSpecifications {
         }
         return (root, query, cb) -> cb.equal(root.get("status"), status);
     }
+
+    /** 완제품/부품 역할 필터. 판매 화면(수주·견적)은 FINISHED 만 조회해 부품 노출을 막는다. */
+    public static Specification<Item> itemTypeEquals(ItemType itemType) {
+        if (itemType == null) {
+            return null;
+        }
+        return (root, query, cb) -> cb.equal(root.get("itemType"), itemType);
+    }
 }

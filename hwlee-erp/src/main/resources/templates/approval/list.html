@@ -70,11 +70,12 @@
 
     <!-- 결재 상세 + 결재선 타임라인 + 처리 -->
     <div class="modal fade" id="detailModal" tabindex="-1">
-      <div class="modal-dialog modal-lg"><div class="modal-content">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
         <div class="modal-header"><h5 class="modal-title" id="dt-title">결재 상세</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
             <div class="mb-3" id="dt-summary"></div>
+            <div id="dt-preview"></div>
             <h6 class="text-muted small mb-2"><i class="bi bi-diagram-3"></i> 결재선</h6>
             <ul class="cl-timeline" id="dt-timeline"></ul>
             <div class="mt-3" id="dt-actionArea" style="display:none">
@@ -124,7 +125,7 @@
         document.getElementById('dt-summary').innerHTML =
             `<div class="d-flex justify-content-between align-items-start">
                 <div><div class="fw-semibold">${ERP.esc(r.title)}</div>
-                <div class="small text-muted mt-1">원본: <a href="${r.docLink}">${ERP.esc(r.refNo || '-')}</a>
+                <div class="small text-muted mt-1">원본: <a href="${r.docLink}" target="_blank" rel="noopener">${ERP.esc(r.refNo || '-')} <i class="bi bi-box-arrow-up-right"></i></a>
                  · 금액 <strong>${ERP.won(r.amount)}</strong></div>
                 <div class="small text-muted">상신 ${ERP.esc(r.requester)} · ${fmtTime(r.requestedAt)}</div></div>
                 <div>${ERP.badge(st.label, st.color)}</div></div>`
@@ -148,8 +149,92 @@
                 <div class="tl-meta">${ERP.esc(s.deptName || '')} · ${meta}</div></li>`;
         }).join('');
 
+        loadPreview(r);   // 원본 문서를 모달 안에서 바로 미리보기(페이지 이동 없이 결재)
         renderActions(r);
         detailModal.show();
+    }
+
+    /* ── 문서 미리보기(결재 본문 임베드) — 실무 전자결재처럼 결재창 안에서 원본 내용을 바로 본다. ── */
+    function docCard(title, inner) {
+        return `<div class="card border-0 bg-light mb-3"><div class="card-body py-2 px-3">
+            <div class="text-muted small mb-2"><i class="bi bi-file-earmark-text"></i> 문서 미리보기 · ${ERP.esc(title)}</div>
+            ${inner}</div></div>`;
+    }
+    function previewFallback(r) {
+        return `<div class="alert alert-light border py-2 px-3 small mb-3">
+            문서 미리보기를 표시할 수 없습니다.
+            <a href="${r.docLink}" target="_blank" rel="noopener">원본 새 탭으로 열기 <i class="bi bi-box-arrow-up-right"></i></a></div>`;
+    }
+    async function previewQuotation(id) {
+        const q = await ERP.api('/api/quotations/' + id);
+        const rows = (q.lines || []).map(l =>
+            `<tr><td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
+             <td class="text-end">${ERP.num(l.quantity)}</td>
+             <td class="text-end">${ERP.won(l.unitPrice)}</td>
+             <td class="text-end">${ERP.won(l.lineTotal)}</td></tr>`).join('');
+        return docCard('견적서', `
+            <div class="small mb-2">고객 <strong>${ERP.esc(q.customerName)}</strong>
+                <span class="text-muted">${ERP.esc(q.customerCode || '')}</span>
+                · 발행 ${q.issuedDate ?? '-'} · 유효기한 ${q.validUntil ?? '-'}
+                <span class="text-muted">· 품목 ${(q.lines || []).length}건</span></div>
+            <div class="doc-preview-scroll">
+              <table class="table table-sm align-middle mb-0">
+                <thead><tr><th>품목</th><th class="text-end">수량</th><th class="text-end">단가</th><th class="text-end">합계</th></tr></thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+            <div class="d-flex justify-content-between border-top pt-2 mt-1 small fw-semibold">
+              <span>합계</span><span>${ERP.won(q.totalAmount)}</span></div>`);
+    }
+    async function previewPayment(id) {
+        const p = await ERP.api('/api/payments/' + id);
+        const party = p.type === 'RECEIPT' ? `고객 ${p.customerCode ?? '-'}` : `거래처 ${p.vendorCode ?? '-'}`;
+        const typeLabel = p.type === 'RECEIPT' ? '입금(수금)' : '출금(지급)';
+        return docCard('지급결의', `<div class="small">
+            <div>유형 <strong>${typeLabel}</strong> · ${ERP.esc(party)} · 일자 ${p.paymentDate ?? '-'}</div>
+            <div class="mt-1">금액 <strong>${ERP.won(p.amount)}</strong></div></div>`);
+    }
+    async function previewJournal(id) {
+        const j = await ERP.api('/api/journal-entries/' + id);
+        const rows = (j.lines || []).map(l =>
+            `<tr><td>${ERP.esc(l.accountName)} <span class="text-muted small">${ERP.esc(l.accountCode)}</span></td>
+             <td class="text-end">${Number(l.debit) > 0 ? ERP.won(l.debit) : '<span class="text-muted">-</span>'}</td>
+             <td class="text-end">${Number(l.credit) > 0 ? ERP.won(l.credit) : '<span class="text-muted">-</span>'}</td></tr>`).join('');
+        return docCard('전표', `
+            <div class="small mb-2">일자 ${j.entryDate ?? '-'} · 적요 ${ERP.esc(j.description ?? '-')}
+                <span class="text-muted">· ${(j.lines || []).length}줄</span></div>
+            <div class="doc-preview-scroll">
+              <table class="table table-sm align-middle mb-0">
+                <thead><tr><th>계정</th><th class="text-end">차변</th><th class="text-end">대변</th></tr></thead>
+                <tbody>${rows}</tbody></table>
+            </div>`);
+    }
+    async function previewCredit(id) {
+        const c = await ERP.api('/api/credit-limit-requests/' + id);
+        return docCard('여신 상향 요청', `<div class="small">
+            <div>고객 <strong>${ERP.esc(c.customerName)}</strong></div>
+            <div class="mt-1">여신한도 <strong>${ERP.won(c.currentLimit)}</strong>
+                → <strong class="text-primary">${ERP.won(c.requestedLimit)}</strong></div>
+            <div class="text-muted mt-1">사유: ${ERP.esc(c.reason ?? '-')}</div></div>`);
+    }
+    async function loadPreview(r) {
+        const box = document.getElementById('dt-preview');
+        if (!r.refId || !r.docType) { box.innerHTML = ''; return; }
+        box.innerHTML = '<div class="text-muted small py-2 mb-3"><span class="spinner-border spinner-border-sm"></span> 문서 불러오는 중…</div>';
+        try {
+            let html = null;
+            switch (r.docType) {
+                case 'QUOTATION':    html = await previewQuotation(r.refId); break;
+                case 'PAYMENT':      html = await previewPayment(r.refId); break;
+                case 'JOURNAL':      html = await previewJournal(r.refId); break;
+                case 'CREDIT_LIMIT': html = await previewCredit(r.refId); break;
+            }
+            if (cur !== r) return;   // 그 사이 다른 결재를 열었으면 무시
+            box.innerHTML = html || previewFallback(r);
+        } catch (e) {
+            if (cur !== r) return;
+            box.innerHTML = previewFallback(r);
+        }
     }
 
     /** 상세 모달의 액션 버튼과 의견 입력창을 상황에 맞게 구성. */

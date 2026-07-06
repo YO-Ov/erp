@@ -72,8 +72,19 @@ public class QuotationService {
     }
 
     /**
+     * 전자결재 최종 승인 콜백 — 견적을 APPROVED(발송대기)로 전이시킨다.
+     * 실제 고객 발송은 담당자가 별도로 {@link #send(Long)} 한다(승인과 발송 분리).
+     */
+    @Transactional
+    public QuotationResponse approve(Long id) {
+        Quotation quotation = getOrThrow(id);
+        quotation.approve();
+        return mapper.toResponse(quotation);
+    }
+
+    /**
      * 견적 발송을 위한 결재 상신 — 작성 중(DRAFT) 견적을 전자결재에 올린다.
-     * 최종 승인되면 {@code QuotationApprovalListener} 가 견적을 SENT 로 전이시킨다.
+     * 최종 승인되면 {@code QuotationApprovalListener} 가 견적을 APPROVED(발송대기)로 전이시킨다.
      */
     @Transactional
     public ApprovalResponse submitForApproval(Long id, String requester) {

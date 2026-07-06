@@ -75,7 +75,8 @@
     let creditCache = null;       // 선택된 고객의 신용한도 현황 캐시(라인 변경 시 재계산만)
 
     async function loadItems() {
-        const data = await ERP.api('/api/items' + ERP.query({status: 'ACTIVE', size: 500}));
+        // 판매 대상만 — 완제품(FINISHED)만 조회해 부품(COMPONENT)이 라인 품목에 섞이지 않게 한다.
+        const data = await ERP.api('/api/items' + ERP.query({status: 'ACTIVE', itemType: 'FINISHED', size: 500}));
         items = data.content || [];
     }
     async function loadCustomers() {
@@ -196,7 +197,8 @@
         }
         const after = Number(creditCache.remaining) - grand;
         document.getElementById('credit-info').innerHTML =
-            `한도 ${ERP.won(creditCache.creditLimit)} · 여신잔액 ${ERP.won(creditCache.used)}`
+            `여신한도 ${ERP.won(creditCache.creditLimit)} · 여신잔액 ${ERP.won(creditCache.used)}`
+            + ` <span class="text-muted small">(미청구수주 ${ERP.won(creditCache.orderBacklog)} + 미수금 ${ERP.won(creditCache.receivable)})</span>`
             + ` · 가용한도 <strong>${ERP.won(creditCache.remaining)}</strong>`
             + ` → 이 주문(${ERP.won(grand)}) 포함 시 가용한도 `
             + `<strong class="${after < 0 ? 'text-danger' : 'text-success'}">${ERP.won(after)}</strong>`

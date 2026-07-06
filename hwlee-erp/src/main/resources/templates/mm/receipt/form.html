@@ -63,11 +63,24 @@
 <script th:inline="javascript">
     const ID = [[${id}]];
     const isEdit = ID != null;
-    let items = [];
+    let items = [];   // 선택된 거래처의 취급품목(구매정보레코드)만 담긴다.
 
-    async function loadItems() {
-        const data = await ERP.api('/api/items' + ERP.query({status: 'ACTIVE', size: 500}));
-        items = data.content || [];
+    // 거래처를 고르면 그 거래처가 취급하는 품목만 불러온다(단가는 구매정보레코드의 매입단가).
+    async function loadVendorItems(vendorId) {
+        if (!vendorId) { items = []; return; }
+        const data = await ERP.api('/api/vendor-items'
+            + ERP.query({vendorId, status: 'ACTIVE', size: 500}));
+        items = (data.content || []).map(vi => ({
+            id: vi.itemId, name: vi.itemName, code: vi.itemCode, cost: vi.supplyPrice,
+        }));
+    }
+
+    // 거래처 변경 시: 취급품목을 다시 불러오고 라인을 초기화(이전 거래처 품목이 남지 않게).
+    async function onVendorChange() {
+        const vid = Number(document.getElementById('vendor').value) || null;
+        try { await loadVendorItems(vid); } catch (e) { items = []; ERP.flashError(e); }
+        document.getElementById('lines').innerHTML = '';
+        addLine();
     }
     async function loadSelect(id, path, query, selectedId) {
         const data = await ERP.api(path + ERP.query(query));
@@ -81,9 +94,10 @@
     }
 
     function itemOptions(selectedId) {
-        return ['<option value="">선택…</option>']
+        const placeholder = items.length ? '선택…' : '거래처를 먼저 선택하세요';
+        return [`<option value="">${placeholder}</option>`]
             .concat(items.map(i =>
-                `<option value="${i.id}" data-cost="${i.standardCost ?? 0}"
+                `<option value="${i.id}" data-cost="${i.cost ?? 0}"
                     ${selectedId === i.id ? 'selected' : ''}>${ERP.esc(i.name)} (${ERP.esc(i.code)})</option>`))
             .join('');
     }
@@ -105,7 +119,7 @@
         recalc();
     }
 
-    // 품목 선택 시 단가가 비어 있으면 표준원가로 자동 채움(수정 가능)
+    // 품목 선택 시 단가가 비어 있으면 그 거래처의 매입단가로 자동 채움(수정 가능)
     function onItemChange(sel) {
         const opt = sel.selectedOptions[0];
         const costInput = sel.closest('tr').querySelector('.line-cost');
@@ -159,20 +173,25 @@
 
     async function init() {
         try {
-            await Promise.all([
-                loadItems(),
-                loadSelect('vendor', '/api/vendors', {status: 'ACTIVE', size: 500}),
-                loadSelect('warehouse', '/api/warehouses', {status: 'ACTIVE', size: 200}),
-            ]);
             if (isEdit) {
                 document.getElementById('title').textContent = '입고 수정';
                 const r = await ERP.api('/api/goods-receipts/' + ID);
-                document.getElementById('vendor').value = r.vendorId;
-                document.getElementById('warehouse').value = r.warehouseId;
+                // 저장된 거래처·창고를 미리 선택 상태로 로드(콤보 라벨도 그 시점에 동기화됨)
+                await Promise.all([
+                    loadSelect('vendor', '/api/vendors', {status: 'ACTIVE', size: 500}, r.vendorId),
+                    loadSelect('warehouse', '/api/warehouses', {status: 'ACTIVE', size: 200}, r.warehouseId),
+                ]);
+                document.getElementById('vendor').addEventListener('change', onVendorChange);
+                await loadVendorItems(r.vendorId);         // 저장된 거래처의 취급품목 로드
                 document.getElementById('receiptDate').value = r.receiptDate ?? '';
                 (r.lines || []).forEach(addLine);
             } else {
-                addLine();
+                await Promise.all([
+                    loadSelect('vendor', '/api/vendors', {status: 'ACTIVE', size: 500}),
+                    loadSelect('warehouse', '/api/warehouses', {status: 'ACTIVE', size: 200}),
+                ]);
+                document.getElementById('vendor').addEventListener('change', onVendorChange);
+                addLine();   // 거래처 선택 전이라 품목 드롭다운은 "거래처를 먼저 선택하세요"
             }
             recalc();
         } catch (err) {

@@ -19,17 +19,29 @@
 
 ## 현재 위치
 
-> ### 🅐 다음에 "가장 먼저" 할 일 (2026-07-06 세션 끝, hwlee님 요청) = **여신관리(신용한도) 개념 정리·학습**
-> hwlee님이 수주 상세의 신용한도 3종 표기(한도/여신잔액/가용한도)의 **의미를 아직 잘 모르겠다**고 함. 다음 세션은 **이 개념부터 워크스루**로 잡는다. AI가 이미 설명한 핵심 요약(재확인용):
-> - **한도**(여신한도) = 재무가 부여한 외상판매 상한 (고객 마스터 `Customer.creditLimit`).
-> - **여신잔액**(=코드상 `used`) = **확정됐지만 아직 거래종료 안 된 수주 금액 합**. 정확히 `SalesOrderRepository.sumActiveOrderAmountByCustomer` = 상태 **CONFIRMED·SHIPPING·SHIPPED·INVOICING·INVOICED** 수주 `totalAmount` 합. DRAFT·CANCELLED·CLOSED 제외(확정 시 +, CLOSED 시 -).
-> - **가용한도**(=코드상 `remaining`) = 한도 − 여신잔액. 새 수주 확정 시 이걸 넘으면 `CreditLimitChecker`가 "한도 초과 — 확정 불가"로 막고 여신 상향 요청 유도.
-> - 계산·API: `SalesOrderService.creditStatus()` → `GET /api/sales-orders/credit-status?customerId=`. 표기 렌더: `sd/order/detail.html`(122~145줄), `sd/order/form.html`(197~207줄).
-> - ⚠️ 실무(SAP)와 차이: 정식 여신공여액 = 미수금(AR)+미출하수주+미청구출하+미회수청구. 이 시스템은 "활성 수주 금액 합" 하나로 단순화한 모델. **다음 세션에 이 갭을 도메인 관점에서 짚어주면 학습 효과 큼.**
-> - (선택) 개념 정리 후 `doc/`에 여신관리 워크스루 글로 남길지 hwlee님과 상의.
+> ### 🅐 여신관리 = 개념 워크스루 + 용어 통일 + 모델 개선(입금 시 여신 자동 해제) 완료 (2026-07-06 세션)
+> hwlee님과 신용한도 3종 표기 워크스루를 채팅으로 진행하고, 이어서 **여신 계산 모델을 실무형으로 개선**했다. 요약:
+> - **개념 정리(워크스루, doc 미작성)**: 여신한도=외상 상한(`Customer.creditLimit`, 여신 상향 결재로만 변경) / 여신잔액=사용 중인 신용 / 가용한도=한도−여신잔액. hwlee님 오해 지점 교정 = "입금하면 자동으로 여신이 풀리는 게 아니라, (기존 모델은) CLOSED 마감 시에만 풀린다"였고, 이를 **아래 모델 개선으로 실무처럼 바꿈**.
+> - **① 용어 통일(순수 프론트, 미커밋)**: 수주 화면 첫 항목 `한도`→**여신한도**(`detail.html`128·`form.html`199), 고객 마스터 `신용한도`→**여신한도** 5곳(`customer/list·form·detail.html`, dt 배지 포함). `가용한도`/`한도 초과`는 유지. 여신 상향 요청 화면(`fi/credit`)은 맥락상 명확해 미변경(원하면 후속).
+> - **② 여신사용액 산식 재정의 = "입금 시 여신 자동 해제"(백엔드, 미커밋)**: 되돌리기 어려운 갈림길이라 AI가 AR 기반으로 확정. **여신사용액 = ① 미청구 활성수주(CONFIRMED·SHIPPING·SHIPPED) + ② 미수금(고객 ISSUED 인보이스 합 − POSTED 입금 합, 하한 0)**. 입금(POSTED RECEIPT)이 들어오면 ②가 줄어 여신사용액 자동 감소·가용한도 회복. 과거 3년치 CLOSED 거래는 인보이스↔입금 상쇄로 ②에 0 기여(naive 전체입금 차감이 음수로 깨지는 문제 회피). 부수효과로 "CLOSED인데 미입금"이면 미수 잔존 = 개선.
+>   - 신규: `sd/order/creditcheck/CreditExposureCalculator`(3 repo 주입, `CreditExposure(orderBacklog, receivable)` record). `CreditLimitChecker`·`SalesOrderService.creditStatus` 둘 다 이걸 공유(단일 산식).
+>   - repo 쿼리: `SalesOrderRepository.sumActiveOrderAmountByCustomer`→**`sumUninvoicedActiveOrderAmount`(INVOICING·INVOICED 제외)** / `InvoiceRepository.sumIssuedInvoiceTotalByCustomer` 신규 / `PaymentRepository.sumPostedReceiptAmountByCustomer` 신규. `CreditStatusResponse`에 `orderBacklog`·`receivable` 추가.
+>   - UI: `detail.html`·`form.html` 여신잔액 옆에 `(미청구수주 X + 미수금 Y)` 분해 표시(입금으로 미수금 주는 걸 눈으로 확인).
+>   - **정합성**: `InvoiceService.create()`가 `invoice.issue()`+`order.recordInvoicing()`을 한 트랜잭션에 묶어 INVOICED=전량 ISSUED 인보이스 존재 → 백로그에서 빠진 금액이 미수금에 정확히 잡힘(여신 안 샘). 단순화=부분청구(INVOICING) 잔량은 잠시 과소집계(javadoc 명시).
+>   - **검증**: 단위 `CreditExposureCalculatorTest` 5건 그린(Docker 불필요). ⚠️ **Testcontainers 통합테스트는 이 세션에 Docker 꺼져 있어 미실행** — hwlee님이 Docker 켜고 `./gradlew test`로 회귀 확인 권장(기존 여신 테스트는 CONFIRMED 단계까지만 단언·한도 1억이라 회귀 위험 낮게 분석됨).
+> - **▶ 남은 후속(선택)**: 실 앱 e2e(입금→여신잔액 감소 육안), 통합테스트 1건 추가(수주→인보이스→입금→creditStatus 감소), `doc/` 여신관리 워크스루 글, 여신 상향 요청 화면 용어 통일(B).
 >
-> **✅ 2026-07-06 세션에서 한 것 (미커밋)** — 수주 신용한도 표기를 실무 용어(B안)로 교체:
-> - `sd/order/detail.html`·`sd/order/form.html`: **사용중→여신잔액**, **남은→가용한도**, 폼 첫 항목 신용한도→한도(상세와 통일), 후행 "…시 남은"→"…시 가용한도". 순수 프론트(HTML/JS), 컴파일 무관, **강력새로고침 필요**. (dt 배지 "신용한도"는 유지)
+> **(이전) ✅ 2026-07-06 초 — 표기 실무 용어(B안) 1차 교체**: `사용중→여신잔액`, `남은→가용한도` 등(위 ①에서 여신한도까지 확장 완료).
+>
+> **✅ 2026-07-06 세션 추가 — 거래처 취급품목(구매정보레코드) 신설 + 입고 제약(미커밋)**: hwlee님 "거래처가 취급하는 품목이 정해져 있어야 실무 맞다"(정석형 선택). 신규 마스터 **`VendorItem`**(거래처↔품목 N:M, 유니크(vendor,item), 필드=매입단가·리드타임·상태) = SAP 구매정보레코드. 신설: `master/vendoritem/`(엔티티·Repository·Service·Controller·ViewController·Mapper·DTO 3종) + **Flyway V69**(테이블 + 부품(COMPONENT)↔거래처 결정론적 시드, 부품마다 ≥1 공급처). **입고 제약**: `GoodsReceiptService.addLines`가 `vendorItemRepository.existsByVendorIdAndItemIdAndStatus(ACTIVE)` 검증 → 취급품목 아니면 입고 거부. **입고 폼**(`mm/receipt/form.html`): 거래처 선택 시 `/api/vendor-items?vendorId=`로 그 거래처 취급품목만 드롭다운 + 매입단가 자동채움 + 거래처 변경 시 라인 초기화(편집모드는 저장 거래처의 취급품목 로드). **관리 화면** `master/vendoritem/list.html`(거래처·상태 필터 + 등록 모달 + 삭제) + 사이드바 MM에 "거래처 취급품목" 메뉴(PURCHASING/ADMIN). **테스트 영향**: 입고 만드는 통합테스트 5개(Mm·SdMm·PartialDelivery·ConcurrentGoodsIssue·FiAccounting) setup에 vendor-item 매핑 추가 + Mm에 거부 케이스 테스트 1건 신규(ProductionScenario는 생산완료 입고라 무관). `compileJava`·`compileTestJava` 그린. ⚠️ Testcontainers는 Docker로 회귀 확인 권장, 프론트 강력새로고침. **미구현(선택 후속)**: 구매발주(PO) 문서, 취급품목 수정 UI(현재 등록/삭제만), 편집 화면(1:N 상세).
+>
+> **✅ 2026-07-06 세션 추가 — 견적 승인과 발송 분리(미커밋)**: hwlee님 "결재 승인=즉시 발송은 실무와 안 맞다, 분리". 견적 상태에 **`APPROVED`(승인됨·발송대기)** 신설. 흐름 `DRAFT →상신→ (결재중) →최종승인→ APPROVED →담당자 발송→ SENT`. 변경: `QuotationStatus` enum에 APPROVED / `Quotation.approve()`(DRAFT→APPROVED) 신설·`send()`는 APPROVED→SENT로 가드 변경 / `QuotationService.approve(id)` 추가 / `QuotationApprovalListener`가 승인 콜백에서 `send()`→`approve()` 호출 / 견적 상세 renderActions에 APPROVED 시 **발송 버튼**(`act('send','발송')`) + 상태배지 `승인됨(발송대기)` / 목록 상태배지·필터 옵션 추가. **부수효과(개선)**: 목록 일괄발송이 이제 APPROVED에만 적용 → 예전 DRAFT 직접발송으로 결재 우회하던 구멍이 막힘. 테스트 `ApprovalScenarioTest.소액_견적_e2e` 수정(승인→APPROVED, 이어 send()→SENT). `compileJava`·`compileTestJava` 그린. DB 마이그레이션 불필요(status varchar에 enum name 저장). ⚠️ 프론트 강력새로고침 + Testcontainers 통합테스트는 Docker로 회귀 확인 권장.
+>
+> **✅ 2026-07-06 세션 추가 — 결재 모달에 원본 문서 미리보기 임베드(순수 프론트, 미커밋)**: hwlee님 지적 "결재함에서 원본 클릭하면 페이지 이동→결재함 복귀→재선택이라 불편". 실무 전자결재처럼 **결재창 안에서 원본 내용을 바로** 보게 함. `approval/list.html` 상세 모달에 `#dt-preview` 추가 + `loadPreview(r)`가 `r.docType`+`refId`로 원본 API를 불러 읽기전용 카드 렌더(견적=품목라인/합계, 지급=유형·거래처·금액, 전표=차대 라인, 여신=한도 현재→요청). 모달 `modal-dialog-scrollable`(본문 스크롤·처리버튼 고정), 원본 링크는 `target="_blank"`(보조 참조, 컨텍스트 유지). 권한/실패 시 previewFallback(새 탭 링크)로 graceful. JS 문법 그린. ⚠️ 강력새로고침.
+>
+> **✅ 2026-07-06 세션 추가 — 판매 품목 드롭다운 완제품 한정(미커밋)**: hwlee님 지적 "수주/견적 품목에 부품이 섞여 나온다". 원인=`GET /api/items`에 `item_type` 필터가 없어 판매 폼이 COMPONENT까지 조회(도메인상 판매대상=`item_type=FINISHED`인데 화면이 안 걸렀음. 실제 시드 판매라인엔 부품 0건이라 데이터 오염은 없음). 수정: `ItemSpecifications.itemTypeEquals` + `ItemController` `itemType` 파라미터 추가(백엔드), 수주·견적 폼 `loadItems()`를 `?itemType=FINISHED`로 호출(프론트 각 1줄). `compileJava` 그린. ⚠️ 프론트는 강력새로고침.
+>
+> **✅ 2026-07-06 세션 추가 — 검색 콤보박스 전역 확장(순수 프론트, 미커밋)**: hwlee님 요청 "데이터 많은 select 전부 검색형으로". 기존 자동향상은 목록 필터바(`form.filter-bar`)만 덮었는데, `erp.js` 스캔 범위를 **화면 내 모든 `select` + 동적 추가 select(라인 아이템 행·모달)**로 확장(DOMContentLoaded 전체 스캔 + `document.body` childList MutationObserver). 옵션 12개 초과만 콤보화(짧은 enum·페이지크기는 네이티브, `data-no-search` opt-out). 이제 **작성 폼(견적·수주 등)의 고객·품목·거래처·직원·계정 select까지 한 번에** 검색형. `enhanceSelect`에 **required 해제** 추가(display:none 된 required select 이 네이티브 검증에서 "not focusable"로 제출을 막는 문제 → 앱/서버 검증에 위임). **템플릿 무수정 — erp.js 1파일만**. ⚠️ 강력새로고침 필요. 라인테이블 셀 안 콤보 메뉴 클리핑은 실렌더 육안 확인 권장.
 >
 > **🖥 병행 트랙 — Oracle Cloud Always Free 배포 (진행 중, 앱과 무관)**: hwlee님 개인 Oracle 계정(dev.hwlee@gmail.com)에서 ERP/MES를 무료로 서비스하려는 중. 상태:
 > - **DB 방침 = Oracle VM 안 Docker MySQL로 자립**(회사 RDS 분리). Flyway V1~V67이 스키마+3년치 시드를 다 만들므로 데이터 이전 불필요 = 빈 MySQL만 있으면 됨.

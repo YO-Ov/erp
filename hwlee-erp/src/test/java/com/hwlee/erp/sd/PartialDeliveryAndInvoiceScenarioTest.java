@@ -58,6 +58,7 @@ class PartialDeliveryAndInvoiceScenarioTest {
     @Autowired CustomerRepository customerRepository;
     @Autowired ItemService itemService;
     @Autowired VendorService vendorService;
+    @Autowired com.hwlee.erp.master.vendoritem.VendorItemService vendorItemService;
     @Autowired WarehouseService warehouseService;
     @Autowired GoodsReceiptService goodsReceiptService;
     @Autowired SalesOrderService salesOrderService;
@@ -215,6 +216,8 @@ class PartialDeliveryAndInvoiceScenarioTest {
     private void stockUp(Long itemId, Long warehouseId, int qty) {
         var vendor = vendorService.create(new VendorCreateRequest(
                 "거래처-" + System.nanoTime(), uniqueBusinessNo(), "인천시", PaymentTerms.NET30));
+        vendorItemService.create(new com.hwlee.erp.master.vendoritem.dto.VendorItemCreateRequest(
+                vendor.id(), itemId, new BigDecimal("1000"), 7));   // 입고 검증용 취급품목 매핑
         var gr = goodsReceiptService.create(new GoodsReceiptCreateRequest(
                 vendor.id(), warehouseId, LocalDate.now(),
                 List.of(new GoodsReceiptLineRequest(itemId, new BigDecimal(qty), new BigDecimal("1000")))));

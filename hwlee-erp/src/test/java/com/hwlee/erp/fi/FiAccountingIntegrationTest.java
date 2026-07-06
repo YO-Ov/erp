@@ -72,6 +72,7 @@ class FiAccountingIntegrationTest {
     @Autowired CustomerRepository customerRepository;
     @Autowired ItemService itemService;
     @Autowired VendorService vendorService;
+    @Autowired com.hwlee.erp.master.vendoritem.VendorItemService vendorItemService;
     @Autowired WarehouseService warehouseService;
     @Autowired GoodsReceiptService goodsReceiptService;
     @Autowired SalesOrderService salesOrderService;
@@ -319,6 +320,8 @@ class FiAccountingIntegrationTest {
                 "WH-" + whSuffix(), "본사창고", "서울시"));
         var vendor = vendorService.create(new VendorCreateRequest(
                 "거래처-" + nano, uniqueBusinessNo(), "인천시", PaymentTerms.NET30));
+        vendorItemService.create(new com.hwlee.erp.master.vendoritem.dto.VendorItemCreateRequest(
+                vendor.id(), item.id(), bd(800000), 7));   // 입고 검증용 취급품목 매핑
         return new TestContext(customer.id(), item.id(), warehouse.id(), vendor.id());
     }
 

@@ -26,6 +26,7 @@
             <select id="f-status" class="form-select form-select-sm">
                 <option value="">전체</option>
                 <option value="DRAFT">초안</option>
+                <option value="APPROVED">승인됨(발송대기)</option>
                 <option value="SENT">발송됨</option>
                 <option value="ACCEPTED">수락됨</option>
                 <option value="EXPIRED">만료</option>
@@ -108,6 +109,7 @@
     // 상태값 → 한글 라벨 + 뱃지 색상
     const STATUS = {
         DRAFT:     {label: '초안',   color: 'secondary'},
+        APPROVED:  {label: '승인됨(발송대기)', color: 'info'},
         SENT:      {label: '발송됨', color: 'primary'},
         ACCEPTED:  {label: '수락됨', color: 'success'},
         CONVERTED: {label: '수주전환', color: 'info'},

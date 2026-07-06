@@ -53,7 +53,7 @@ class ApprovalScenarioTest {
     }
 
     @Test
-    @DisplayName("소액 견적: 팀장 전결(결재선 1단계) → 승인하면 견적이 자동 발송(SENT)된다")
+    @DisplayName("소액 견적: 팀장 전결(결재선 1단계) → 승인하면 견적이 APPROVED(발송대기), 담당자 발송 시 SENT")
     void 소액_견적_e2e() {
         authenticate(REQUESTER);
         Long qid = createQuotation(new BigDecimal("1000000"), new BigDecimal("5")); // 500만 < 1천만 = TEAM
@@ -65,7 +65,11 @@ class ApprovalScenarioTest {
 
         ApprovalResponse done = approveAll(a.id());
         assertThat(done.status()).isEqualTo(ApprovalStatus.APPROVED);
-        // 최종 승인 → 이벤트 콜백으로 견적 발송
+        // 최종 승인 → 이벤트 콜백으로 견적은 APPROVED(발송대기)까지만. 발송은 분리.
+        assertThat(quotationService.findById(qid).status()).isEqualTo(QuotationStatus.APPROVED);
+
+        // 담당자가 별도로 발송해야 SENT 로 넘어간다.
+        quotationService.send(qid);
         assertThat(quotationService.findById(qid).status()).isEqualTo(QuotationStatus.SENT);
     }
 

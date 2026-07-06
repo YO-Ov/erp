@@ -46,6 +46,7 @@ class MmScenarioTest {
 
     @Autowired ItemService itemService;
     @Autowired VendorService vendorService;
+    @Autowired com.hwlee.erp.master.vendoritem.VendorItemService vendorItemService;
     @Autowired WarehouseService warehouseService;
     @Autowired GoodsReceiptService goodsReceiptService;
     @Autowired GoodsIssueService goodsIssueService;
@@ -187,6 +188,21 @@ class MmScenarioTest {
         assertThat(stock.getAverageCost()).isEqualByComparingTo(bd(1000));
     }
 
+    @Test
+    @DisplayName("거래처 취급품목이 아닌 조합은 입고가 거부된다 (구매정보레코드 검증)")
+    void 취급품목_아니면_입고_거부() {
+        var ctx = setup();   // ctx.itemId 만 거래처에 매핑됨
+        // 이 거래처가 취급하지 않는 다른 품목
+        var other = itemService.create(new ItemCreateRequest(
+                "모니터-" + System.nanoTime(), "MONITOR", ItemUnit.EA, bd(300000), bd(450000)));
+
+        assertThatThrownBy(() -> goodsReceiptService.create(new GoodsReceiptCreateRequest(
+                ctx.vendorId, ctx.warehouseId, LocalDate.now(),
+                List.of(new GoodsReceiptLineRequest(other.id(), bd(1), bd(300000))))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("취급품목이 아닙니다");
+    }
+
     // === helpers ===
 
     private void post(Long grId) {
@@ -202,6 +218,9 @@ class MmScenarioTest {
                 com.hwlee.erp.master.customer.PaymentTerms.NET30));
         WarehouseResponse wh = warehouseService.create(new WarehouseCreateRequest(
                 "WH-" + uniqueWhSuffix(), "테스트창고", "서울시"));
+        // 입고는 거래처 취급품목(구매정보레코드)에 등록된 조합만 허용 — 테스트 데이터도 매핑해 둔다.
+        vendorItemService.create(new com.hwlee.erp.master.vendoritem.dto.VendorItemCreateRequest(
+                vendor.id(), item.id(), bd(800000), 7));
         return new TestContext(item.id(), vendor.id(), wh.id());
     }
 

@@ -57,6 +57,7 @@
     const ID = [[${id}]];
     const STATUS = {
         DRAFT:     {label: '초안',   color: 'secondary'},
+        APPROVED:  {label: '승인됨(발송대기)', color: 'info'},
         SENT:      {label: '발송됨', color: 'primary'},
         ACCEPTED:  {label: '수락됨', color: 'success'},
         CONVERTED: {label: '수주전환', color: 'info'},
@@ -101,8 +102,8 @@
         renderActions(q.status);
     }
 
-    // 상태머신: DRAFT(수정/결재상신/취소), SENT(승인/취소), 그 외(읽기전용)
-    // 발송은 전자결재를 거친다 — 결재 최종 승인 시 자동으로 SENT 전이.
+    // 상태머신: DRAFT(수정/결재상신/취소), APPROVED(발송/취소), SENT(승인/취소), 그 외(읽기전용)
+    // 발송은 전자결재를 거친다 — 최종 승인 시 APPROVED(발송대기), 담당자가 발송하면 SENT.
     function renderActions(status) {
         const box = document.getElementById('actions');
         const a = approvalState;
@@ -131,6 +132,10 @@
             }
             btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소</button>`);
             box.innerHTML = banner + btns.join(' ');
+        } else if (status === 'APPROVED') {
+            box.innerHTML = `<span class="badge badge-soft badge-soft-info me-2"><i class="bi bi-check2-circle"></i> 결재 승인됨 · 발송 대기</span>
+                <button class="btn btn-sm btn-primary" onclick="act('send','발송')"><i class="bi bi-send"></i> 발송</button>
+                <button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소</button>`;
         } else if (status === 'SENT') {
             box.innerHTML = `<button class="btn btn-sm btn-success" onclick="act('accept','승인')">승인</button>
                 <button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소</button>`;

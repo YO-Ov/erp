@@ -125,8 +125,9 @@
         try {
             const c = await ERP.api('/api/sales-orders/credit-status?customerId=' + customerId);
             const overNow = Number(c.remaining) < 0;
-            let html = `한도 ${ERP.won(c.creditLimit)}`
+            let html = `여신한도 ${ERP.won(c.creditLimit)}`
                 + ` · 여신잔액 ${ERP.won(c.used)}`
+                + ` <span class="text-muted small">(미청구수주 ${ERP.won(c.orderBacklog)} + 미수금 ${ERP.won(c.receivable)})</span>`
                 + ` · 가용한도 <strong class="${overNow ? 'text-danger' : 'text-success'}">${ERP.won(c.remaining)}</strong>`;
             if (status === 'DRAFT') {
                 const after = Number(c.remaining) - Number(orderTotal);   // 이 수주는 아직 used 에 미포함

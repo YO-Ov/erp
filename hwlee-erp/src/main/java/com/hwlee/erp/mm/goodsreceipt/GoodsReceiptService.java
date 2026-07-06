@@ -1,10 +1,12 @@
 package com.hwlee.erp.mm.goodsreceipt;
 
 import com.hwlee.erp.common.code.TransactionNumberGenerator;
+import com.hwlee.erp.common.entity.MasterStatus;
 import com.hwlee.erp.master.item.Item;
 import com.hwlee.erp.master.item.ItemRepository;
 import com.hwlee.erp.master.vendor.Vendor;
 import com.hwlee.erp.master.vendor.VendorRepository;
+import com.hwlee.erp.master.vendoritem.VendorItemRepository;
 import com.hwlee.erp.mm.goodsreceipt.dto.GoodsReceiptCreateRequest;
 import com.hwlee.erp.mm.goodsreceipt.dto.GoodsReceiptLineRequest;
 import com.hwlee.erp.mm.goodsreceipt.dto.GoodsReceiptResponse;
@@ -44,6 +46,7 @@ public class GoodsReceiptService {
     private final GoodsReceiptRepository repository;
     private final GoodsReceiptMapper mapper;
     private final VendorRepository vendorRepository;
+    private final VendorItemRepository vendorItemRepository;
     private final WarehouseRepository warehouseRepository;
     private final ItemRepository itemRepository;
     private final StockRepository stockRepository;
@@ -152,9 +155,17 @@ public class GoodsReceiptService {
     }
 
     private void addLines(GoodsReceipt gr, List<GoodsReceiptLineRequest> lineReqs) {
+        Vendor vendor = gr.getVendor();
         for (GoodsReceiptLineRequest lineReq : lineReqs) {
             Item item = itemRepository.findById(lineReq.itemId())
                     .orElseThrow(() -> new EntityNotFoundException("Item not found: id=" + lineReq.itemId()));
+            // 구매정보레코드 검증 — 이 거래처가 현재 취급(ACTIVE)하는 품목만 입고 가능.
+            if (!vendorItemRepository.existsByVendorIdAndItemIdAndStatus(
+                    vendor.getId(), item.getId(), MasterStatus.ACTIVE)) {
+                throw new IllegalStateException(
+                        "거래처 '" + vendor.getName() + "' 의 취급품목이 아닙니다: " + item.getName()
+                                + " — 거래처 취급품목(구매정보레코드)에 먼저 등록하세요.");
+            }
             gr.addLine(item, lineReq.quantity(), lineReq.unitCost());
         }
     }

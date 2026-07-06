@@ -2,7 +2,6 @@ package com.hwlee.erp.sd.order.creditcheck;
 
 import com.hwlee.erp.common.entity.MasterStatus;
 import com.hwlee.erp.master.customer.Customer;
-import com.hwlee.erp.sd.order.SalesOrderRepository;
 import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -22,14 +21,13 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class CreditLimitChecker {
 
-    private final SalesOrderRepository repository;
+    private final CreditExposureCalculator exposureCalculator;
 
     public void check(Customer customer, BigDecimal orderTotal, Long excludeOrderId) {
         if (customer.getStatus() != MasterStatus.ACTIVE) {
             throw new IllegalStateException("거래 불가 고객입니다 (status=" + customer.getStatus() + ").");
         }
-        BigDecimal used = repository.sumActiveOrderAmountByCustomer(customer.getId(), excludeOrderId);
-        if (used == null) used = BigDecimal.ZERO;
+        BigDecimal used = exposureCalculator.compute(customer.getId(), excludeOrderId).used();
         BigDecimal remaining = customer.getCreditLimit().subtract(used);
         if (orderTotal.compareTo(remaining) > 0) {
             throw new IllegalStateException(

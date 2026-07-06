@@ -58,7 +58,7 @@
             <th class="sortable" data-sort="code">코드<span class="sort-ind"></span></th>
             <th class="sortable" data-sort="name">고객명<span class="sort-ind"></span></th>
             <th>사업자번호</th>
-            <th class="sortable text-end" data-sort="creditLimit">신용한도<span class="sort-ind"></span></th>
+            <th class="sortable text-end" data-sort="creditLimit">여신한도<span class="sort-ind"></span></th>
             <th>결제조건</th>
             <th class="sortable" data-sort="status">상태<span class="sort-ind"></span></th>
         </tr>
@@ -190,7 +190,7 @@
                 {label: '코드', value: c => c.code},
                 {label: '고객명', value: c => c.name},
                 {label: '사업자번호', value: c => c.businessNo},
-                {label: '신용한도', value: c => c.creditLimit ?? 0},
+                {label: '여신한도', value: c => c.creditLimit ?? 0},
                 {label: '결제조건', value: c => c.paymentTerms},
                 {label: '상태', value: c => (STATUS[c.status]?.label ?? c.status)},
             ]);

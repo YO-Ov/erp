@@ -1,6 +1,7 @@
 package com.hwlee.erp.master.item;
 
 import static com.hwlee.erp.master.item.ItemSpecifications.categoryEquals;
+import static com.hwlee.erp.master.item.ItemSpecifications.itemTypeEquals;
 import static com.hwlee.erp.master.item.ItemSpecifications.nameContains;
 import static com.hwlee.erp.master.item.ItemSpecifications.statusEquals;
 import static org.springframework.data.jpa.domain.Specification.where;
@@ -56,10 +57,12 @@ public class ItemController {
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) MasterStatus status,
+            @RequestParam(required = false) ItemType itemType,
             Pageable pageable
     ) {
         return service.search(
-                where(nameContains(name)).and(categoryEquals(category)).and(statusEquals(status)),
+                where(nameContains(name)).and(categoryEquals(category))
+                        .and(statusEquals(status)).and(itemTypeEquals(itemType)),
                 pageable
         );
     }

@@ -96,9 +96,21 @@ public class Quotation extends BaseEntity {
         this.validUntil = validUntil;
     }
 
-    public void send() {
+    /**
+     * 전자결재 최종 승인 → APPROVED. 아직 고객 발송 전(발송대기).
+     * 승인과 발송을 분리해, 승인 즉시 고객에 나가지 않고 담당자가 별도로 {@link #send()} 한다.
+     */
+    public void approve() {
         if (status != QuotationStatus.DRAFT)
-            throw new IllegalStateException("DRAFT 견적만 발송 가능합니다. 현재: " + status);
+            throw new IllegalStateException("DRAFT 견적만 승인할 수 있습니다. 현재: " + status);
+        if (lines.isEmpty())
+            throw new IllegalStateException("라인이 비어 있는 견적은 승인할 수 없습니다.");
+        this.status = QuotationStatus.APPROVED;
+    }
+
+    public void send() {
+        if (status != QuotationStatus.APPROVED)
+            throw new IllegalStateException("승인된(APPROVED) 견적만 발송 가능합니다. 현재: " + status);
         if (lines.isEmpty())
             throw new IllegalStateException("라인이 비어 있는 견적은 발송할 수 없습니다.");
         this.status = QuotationStatus.SENT;

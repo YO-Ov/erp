@@ -7,6 +7,7 @@ import com.hwlee.erp.master.employee.EmployeeRepository;
 import com.hwlee.erp.master.item.Item;
 import com.hwlee.erp.master.item.ItemRepository;
 import com.hwlee.erp.common.code.TransactionNumberGenerator;
+import com.hwlee.erp.sd.order.creditcheck.CreditExposureCalculator;
 import com.hwlee.erp.sd.order.creditcheck.CreditLimitChecker;
 import com.hwlee.erp.sd.order.event.SalesOrderConfirmedEvent;
 import com.hwlee.erp.sd.order.dto.CreditStatusResponse;
@@ -43,6 +44,7 @@ public class SalesOrderService {
     private final QuotationRepository quotationRepository;
     private final TransactionNumberGenerator numberGenerator;
     private final CreditLimitChecker creditLimitChecker;
+    private final CreditExposureCalculator creditExposureCalculator;
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
@@ -67,16 +69,17 @@ public class SalesOrderService {
     }
 
     /**
-     * 고객 신용한도 현황 — 수주 화면이 확정 전에 "남은 한도" 를 미리 보여주기 위해 호출한다.
-     * 검증({@link CreditLimitChecker})과 같은 산식(creditLimit - 활성 수주 합계)을 조회용으로 노출한다.
+     * 고객 신용한도 현황 — 수주 화면이 확정 전에 "가용한도" 를 미리 보여주기 위해 호출한다.
+     * 검증({@link CreditLimitChecker})과 같은 산식(여신사용액 = 미청구 활성수주 + 미수금)을 조회용으로 노출한다.
      */
     public CreditStatusResponse creditStatus(Long customerId) {
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new EntityNotFoundException("Customer not found: id=" + customerId));
-        BigDecimal used = repository.sumActiveOrderAmountByCustomer(customerId, null);
-        if (used == null) used = BigDecimal.ZERO;
+        CreditExposureCalculator.CreditExposure exposure = creditExposureCalculator.compute(customerId, null);
+        BigDecimal used = exposure.used();
         BigDecimal remaining = customer.getCreditLimit().subtract(used);
-        return new CreditStatusResponse(customerId, customer.getCreditLimit(), used, remaining);
+        return new CreditStatusResponse(customerId, customer.getCreditLimit(),
+                used, exposure.orderBacklog(), exposure.receivable(), remaining);
     }
 
     public Page<SalesOrderResponse> search(Specification<SalesOrder> spec, Pageable pageable) {

@@ -49,6 +49,7 @@ class ConcurrentGoodsIssueTest {
 
     @Autowired ItemService itemService;
     @Autowired VendorService vendorService;
+    @Autowired com.hwlee.erp.master.vendoritem.VendorItemService vendorItemService;
     @Autowired WarehouseService warehouseService;
     @Autowired GoodsReceiptService goodsReceiptService;
     @Autowired GoodsIssueService goodsIssueService;
@@ -66,6 +67,8 @@ class ConcurrentGoodsIssueTest {
                 com.hwlee.erp.master.customer.PaymentTerms.NET30));
         var warehouse = warehouseService.create(new WarehouseCreateRequest(
                 "WH-" + uniqueWhSuffix(), "동시성테스트창고", "서울시"));
+        vendorItemService.create(new com.hwlee.erp.master.vendoritem.dto.VendorItemCreateRequest(
+                vendor.id(), item.id(), new BigDecimal("1000"), 7));   // 입고 검증용 취급품목 매핑
 
         // 시작 재고 10대
         var gr = goodsReceiptService.create(new GoodsReceiptCreateRequest(

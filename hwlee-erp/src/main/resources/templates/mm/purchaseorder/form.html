@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('구매발주 작성', 'purchaseorder', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1 id="title">신규 발주</h1>
+            <div class="crumb">자재 (MM) · Purchase Order</div>
+        </div>
+        <a href="/mm/purchase-orders" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <form id="form">
+        <div class="card form-card mb-3"><div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">거래처 <span class="text-danger">*</span></label>
+                    <select id="vendor" class="form-select" required><option value="">선택…</option></select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">입고 예정 창고 <span class="text-danger">*</span></label>
+                    <select id="warehouse" class="form-select" required><option value="">선택…</option></select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">발주일 <span class="text-danger">*</span></label>
+                    <input type="date" id="orderDate" class="form-control" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">입고 예정일</label>
+                    <input type="date" id="expectedDate" class="form-control">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">비고</label>
+                    <input type="text" id="remark" class="form-control" maxlength="500" placeholder="발주 관련 메모(선택)">
+                </div>
+            </div>
+        </div></div>
+
+        <div class="card mb-3">
+            <div class="card-header">발주 라인 <span class="text-danger">*</span></div>
+            <div class="card-body">
+                <table class="table line-table align-middle mb-0">
+                    <thead>
+                    <tr>
+                        <th>품목</th>
+                        <th style="width:140px;" class="text-end">수량</th>
+                        <th style="width:160px;" class="text-end">매입단가</th>
+                        <th style="width:160px;" class="text-end">라인 합계</th>
+                        <th style="width:50px;"></th>
+                    </tr>
+                    </thead>
+                    <tbody id="lines"></tbody>
+                    <tfoot>
+                    <tr><td colspan="3" class="text-end fw-bold">합계</td>
+                        <td class="text-end fw-bold" id="grandTotal">₩0</td><td></td></tr>
+                    </tfoot>
+                </table>
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-3" onclick="addLine()">＋ 라인 추가</button>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="/mm/purchase-orders" class="btn btn-outline-secondary">취소</a>
+            <button type="submit" class="btn btn-primary" id="submitBtn">저장</button>
+        </div>
+    </form>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const isEdit = ID != null;
+    let items = [];   // 선택된 거래처의 취급품목(구매정보레코드)만 담긴다.
+
+    // 거래처를 고르면 그 거래처가 취급하는 품목만 불러온다(단가는 구매정보레코드의 매입단가).
+    async function loadVendorItems(vendorId) {
+        if (!vendorId) { items = []; return; }
+        const data = await ERP.api('/api/vendor-items'
+            + ERP.query({vendorId, status: 'ACTIVE', size: 500}));
+        items = (data.content || []).map(vi => ({
+            id: vi.itemId, name: vi.itemName, code: vi.itemCode, price: vi.supplyPrice,
+        }));
+    }
+
+    // 거래처 변경 시: 취급품목을 다시 불러오고 라인을 초기화(이전 거래처 품목이 남지 않게).
+    async function onVendorChange() {
+        const vid = Number(document.getElementById('vendor').value) || null;
+        try { await loadVendorItems(vid); } catch (e) { items = []; ERP.flashError(e); }
+        document.getElementById('lines').innerHTML = '';
+        addLine();
+    }
+    async function loadSelect(id, path, query, selectedId) {
+        const data = await ERP.api(path + ERP.query(query));
+        const sel = document.getElementById(id);
+        (data.content || []).forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o.id; opt.textContent = `${o.name} (${o.code})`;
+            if (selectedId && o.id === selectedId) opt.selected = true;
+            sel.appendChild(opt);
+        });
+    }
+
+    function itemOptions(selectedId) {
+        const placeholder = items.length ? '선택…' : '거래처를 먼저 선택하세요';
+        return [`<option value="">${placeholder}</option>`]
+            .concat(items.map(i =>
+                `<option value="${i.id}" data-price="${i.price ?? 0}"
+                    ${selectedId === i.id ? 'selected' : ''}>${ERP.esc(i.name)} (${ERP.esc(i.code)})</option>`))
+            .join('');
+    }
+
+    function addLine(line) {
+        const tbody = document.getElementById('lines');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><select class="form-select form-select-sm line-item" onchange="onItemChange(this)">
+                ${itemOptions(line?.itemId)}</select></td>
+            <td><input type="number" step="any" min="0" class="form-control form-control-sm text-end line-qty"
+                       value="${line?.quantity ?? ''}" oninput="recalc()"></td>
+            <td><input type="number" step="any" min="0" class="form-control form-control-sm text-end line-price"
+                       value="${line?.unitPrice ?? ''}" oninput="recalc()"></td>
+            <td class="text-end line-total">₩0</td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger"
+                        onclick="this.closest('tr').remove();recalc()">✕</button></td>`;
+        tbody.appendChild(tr);
+        recalc();
+    }
+
+    // 품목 선택 시 단가가 비어 있으면 그 거래처의 매입단가로 자동 채움(수정 가능)
+    function onItemChange(sel) {
+        const opt = sel.selectedOptions[0];
+        const priceInput = sel.closest('tr').querySelector('.line-price');
+        if (opt && opt.dataset.price && !priceInput.value) priceInput.value = opt.dataset.price;
+        recalc();
+    }
+
+    function recalc() {
+        let grand = 0;
+        document.querySelectorAll('#lines tr').forEach(tr => {
+            const qty = parseFloat(tr.querySelector('.line-qty').value) || 0;
+            const price = parseFloat(tr.querySelector('.line-price').value) || 0;
+            const total = qty * price;
+            tr.querySelector('.line-total').textContent = ERP.won(total);
+            grand += total;
+        });
+        document.getElementById('grandTotal').textContent = ERP.won(grand);
+    }
+
+    function collectLines() {
+        const lines = [];
+        document.querySelectorAll('#lines tr').forEach(tr => {
+            const itemId = tr.querySelector('.line-item').value;
+            const quantity = tr.querySelector('.line-qty').value;
+            const unitPrice = tr.querySelector('.line-price').value;
+            if (itemId) lines.push({itemId: Number(itemId), quantity, unitPrice});
+        });
+        return lines;
+    }
+
+    async function submit(e) {
+        e.preventDefault();
+        const lines = collectLines();
+        if (lines.length === 0) { ERP.flash('발주 라인을 최소 1개 입력하세요.', 'warning'); return; }
+
+        const body = {
+            vendorId: Number(document.getElementById('vendor').value),
+            warehouseId: Number(document.getElementById('warehouse').value),
+            orderDate: document.getElementById('orderDate').value,
+            expectedDate: document.getElementById('expectedDate').value || null,
+            remark: document.getElementById('remark').value || null,
+            lines,
+        };
+        try {
+            const saved = isEdit
+                ? await ERP.api('/api/purchase-orders/' + ID, {method: 'PUT', body})
+                : await ERP.api('/api/purchase-orders', {method: 'POST', body});
+            location.href = '/mm/purchase-orders/' + saved.id;
+        } catch (err) {
+            ERP.flashError(err);
+        }
+    }
+
+    async function init() {
+        try {
+            if (isEdit) {
+                document.getElementById('title').textContent = '발주 수정';
+                const r = await ERP.api('/api/purchase-orders/' + ID);
+                await Promise.all([
+                    loadSelect('vendor', '/api/vendors', {status: 'ACTIVE', size: 500}, r.vendorId),
+                    loadSelect('warehouse', '/api/warehouses', {status: 'ACTIVE', size: 200}, r.warehouseId),
+                ]);
+                document.getElementById('vendor').addEventListener('change', onVendorChange);
+                await loadVendorItems(r.vendorId);         // 저장된 거래처의 취급품목 로드
+                document.getElementById('orderDate').value = r.orderDate ?? '';
+                document.getElementById('expectedDate').value = r.expectedDate ?? '';
+                document.getElementById('remark').value = r.remark ?? '';
+                (r.lines || []).forEach(addLine);
+            } else {
+                await Promise.all([
+                    loadSelect('vendor', '/api/vendors', {status: 'ACTIVE', size: 500}),
+                    loadSelect('warehouse', '/api/warehouses', {status: 'ACTIVE', size: 200}),
+                ]);
+                document.getElementById('vendor').addEventListener('change', onVendorChange);
+                document.getElementById('orderDate').value = ERP.today();
+                addLine();   // 거래처 선택 전이라 품목 드롭다운은 "거래처를 먼저 선택하세요"
+            }
+            recalc();
+        } catch (err) {
+            ERP.flashError(err);
+        }
+        document.getElementById('form').addEventListener('submit', submit);
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+</script>
+</div>
+</body>
+</html>

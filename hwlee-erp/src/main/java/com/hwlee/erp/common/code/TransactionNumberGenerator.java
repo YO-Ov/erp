@@ -28,6 +28,7 @@ public class TransactionNumberGenerator {
     static final String PREFIX_PAYMENT = "PAY";
     static final String PREFIX_PAYROLL_RUN = "PR";
     static final String PREFIX_PRODUCTION_ORDER = "PO";
+    static final String PREFIX_PURCHASE_ORDER = "PORD";
     static final String PREFIX_PLANNED_ORDER = "PLO";
     static final String PREFIX_CREDIT_REQUEST = "CLR";
     static final String PREFIX_APPROVAL = "APV";
@@ -72,6 +73,14 @@ public class TransactionNumberGenerator {
     /** 생산지시 번호 — 일 단위. 예: {@code PO-20260604-001}. */
     public String nextProductionOrderNumber(LocalDate orderDate) {
         return codeGenerator.nextTransactionCode(PREFIX_PRODUCTION_ORDER, periodKey(orderDate));
+    }
+
+    /**
+     * 구매발주(PO) 번호 — 일 단위. 예: {@code PORD-20260706-001}.
+     * prefix {@code PO} 는 생산지시가 선점하고 있어 구매발주는 {@code PORD} 를 쓴다.
+     */
+    public String nextPurchaseOrderNumber(LocalDate orderDate) {
+        return codeGenerator.nextTransactionCode(PREFIX_PURCHASE_ORDER, periodKey(orderDate));
     }
 
     /** 계획오더(MRP 제안) 번호 — 일 단위. 예: {@code PLO-20260610-001}. */

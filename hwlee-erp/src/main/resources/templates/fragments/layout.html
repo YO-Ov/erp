@@ -93,6 +93,9 @@
                 <a class="nav-link" th:classappend="${active == 'stock'} ? 'active'" href="/mm/stocks">
                     <i class="bi bi-boxes"></i> 재고
                 </a>
+                <a class="nav-link" th:classappend="${active == 'purchaseorder'} ? 'active'" href="/mm/purchase-orders">
+                    <i class="bi bi-cart-plus"></i> 구매발주
+                </a>
                 <a class="nav-link" th:classappend="${active == 'receipt'} ? 'active'" href="/mm/goods-receipts">
                     <i class="bi bi-box-arrow-in-down"></i> 입고
                 </a>

@@ -186,6 +186,28 @@
             <div class="d-flex justify-content-between border-top pt-2 mt-1 small fw-semibold">
               <span>합계</span><span>${ERP.won(q.totalAmount)}</span></div>`);
     }
+    async function previewPurchaseOrder(id) {
+        const po = await ERP.api('/api/purchase-orders/' + id);
+        const rows = (po.lines || []).map(l =>
+            `<tr><td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
+             <td class="text-end">${ERP.num(l.quantity)}</td>
+             <td class="text-end">${ERP.won(l.unitPrice)}</td>
+             <td class="text-end">${ERP.won(l.lineTotal)}</td></tr>`).join('');
+        return docCard('구매발주서', `
+            <div class="small mb-2">거래처 <strong>${ERP.esc(po.vendorName)}</strong>
+                <span class="text-muted">${ERP.esc(po.vendorCode || '')}</span>
+                · 발주 ${po.orderDate ?? '-'} · 입고예정 ${po.expectedDate ?? '-'}
+                · 창고 ${ERP.esc(po.warehouseName || '-')}
+                <span class="text-muted">· 품목 ${(po.lines || []).length}건</span></div>
+            <div class="doc-preview-scroll">
+              <table class="table table-sm align-middle mb-0">
+                <thead><tr><th>품목</th><th class="text-end">수량</th><th class="text-end">매입단가</th><th class="text-end">합계</th></tr></thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+            <div class="d-flex justify-content-between border-top pt-2 mt-1 small fw-semibold">
+              <span>발주 합계</span><span>${ERP.won(po.totalAmount)}</span></div>`);
+    }
     async function previewPayment(id) {
         const p = await ERP.api('/api/payments/' + id);
         const party = p.type === 'RECEIPT' ? `고객 ${p.customerCode ?? '-'}` : `거래처 ${p.vendorCode ?? '-'}`;
@@ -224,10 +246,11 @@
         try {
             let html = null;
             switch (r.docType) {
-                case 'QUOTATION':    html = await previewQuotation(r.refId); break;
-                case 'PAYMENT':      html = await previewPayment(r.refId); break;
-                case 'JOURNAL':      html = await previewJournal(r.refId); break;
-                case 'CREDIT_LIMIT': html = await previewCredit(r.refId); break;
+                case 'QUOTATION':      html = await previewQuotation(r.refId); break;
+                case 'PURCHASE_ORDER': html = await previewPurchaseOrder(r.refId); break;
+                case 'PAYMENT':        html = await previewPayment(r.refId); break;
+                case 'JOURNAL':        html = await previewJournal(r.refId); break;
+                case 'CREDIT_LIMIT':   html = await previewCredit(r.refId); break;
             }
             if (cur !== r) return;   // 그 사이 다른 결재를 열었으면 무시
             box.innerHTML = html || previewFallback(r);

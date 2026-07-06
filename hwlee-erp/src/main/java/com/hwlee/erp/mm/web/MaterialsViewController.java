@@ -52,6 +52,29 @@ public class MaterialsViewController {
         return "mm/receipt/detail";
     }
 
+    // ── 구매발주(PurchaseOrder) ─────────────────────────────────
+    @GetMapping("/mm/purchase-orders")
+    public String purchaseOrderList() {
+        return "mm/purchaseorder/list";
+    }
+
+    @GetMapping("/mm/purchase-orders/new")
+    public String purchaseOrderNew() {
+        return "mm/purchaseorder/form";
+    }
+
+    @GetMapping("/mm/purchase-orders/{id}/edit")
+    public String purchaseOrderEdit(@PathVariable Long id, Model model) {
+        model.addAttribute("id", id);
+        return "mm/purchaseorder/form";
+    }
+
+    @GetMapping("/mm/purchase-orders/{id}")
+    public String purchaseOrderDetail(@PathVariable Long id, Model model) {
+        model.addAttribute("id", id);
+        return "mm/purchaseorder/detail";
+    }
+
     // ── 출고(GoodsIssue) ────────────────────────────────────────
     @GetMapping("/mm/goods-issues")
     public String issueList() {

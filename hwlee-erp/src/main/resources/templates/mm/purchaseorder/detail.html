@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('구매발주 상세', 'purchaseorder', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>구매발주 상세 <span id="h-number" class="text-muted fs-6 fw-normal"></span></h1>
+            <div class="crumb">자재 (MM) · Purchase Order</div>
+        </div>
+        <a href="/mm/purchase-orders" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 목록</a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-2">상태</dt>
+                <dd class="col-sm-4" id="d-status">-</dd>
+                <dt class="col-sm-2">발주금액</dt>
+                <dd class="col-sm-4 fw-bold" id="d-amount">-</dd>
+
+                <dt class="col-sm-2">거래처</dt>
+                <dd class="col-sm-4" id="d-vendor">-</dd>
+                <dt class="col-sm-2">입고 예정 창고</dt>
+                <dd class="col-sm-4" id="d-warehouse">-</dd>
+
+                <dt class="col-sm-2">발주일</dt>
+                <dd class="col-sm-4" id="d-orderdate">-</dd>
+                <dt class="col-sm-2">입고 예정일</dt>
+                <dd class="col-sm-4" id="d-expected">-</dd>
+
+                <dt class="col-sm-2">비고</dt>
+                <dd class="col-sm-10" id="d-remark">-</dd>
+
+                <dt class="col-sm-2">등록</dt>
+                <dd class="col-sm-10 small text-muted" id="d-audit">-</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="mb-3" id="actions"></div>
+
+    <div class="card mb-3">
+        <div class="card-header">발주 라인</div>
+        <div class="card-body">
+            <table class="table line-table align-middle mb-0">
+                <thead>
+                <tr>
+                    <th style="width:60px;">#</th><th>품목</th>
+                    <th class="text-end">수량</th><th class="text-end">매입단가</th><th class="text-end">라인 합계</th>
+                </tr>
+                </thead>
+                <tbody id="lines"></tbody>
+                <tfoot>
+                <tr><td colspan="4" class="text-end fw-bold">합계</td>
+                    <td class="text-end fw-bold" id="grandTotal">₩0</td></tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+<script th:inline="javascript">
+    const ID = [[${id}]];
+    const STATUS = {
+        DRAFT:     {label: '작성 중',  color: 'secondary'},
+        CONFIRMED: {label: '발주확정', color: 'primary'},
+        CLOSED:    {label: '종료',     color: 'success'},
+        CANCELLED: {label: '취소됨',   color: 'dark'},
+    };
+    let approvalState = null; // 이 발주에 걸린 최신 결재(없으면 null)
+
+    async function load() {
+        try {
+            try {
+                approvalState = await ERP.api(`/api/approvals/for?docType=PURCHASE_ORDER&refId=${ID}`);
+            } catch (e) { approvalState = null; } // 204 = 결재 없음
+            render(await ERP.api('/api/purchase-orders/' + ID));
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    function render(r) {
+        const s = STATUS[r.status] || {label: r.status, color: 'secondary'};
+        document.getElementById('h-number').textContent = r.number;
+        document.getElementById('d-status').innerHTML = ERP.badge(s.label, s.color);
+        document.getElementById('d-amount').textContent = ERP.won(r.totalAmount);
+        document.getElementById('d-vendor').textContent = `${r.vendorName} (${r.vendorCode})`;
+        document.getElementById('d-warehouse').textContent = `${r.warehouseName} (${r.warehouseCode})`;
+        document.getElementById('d-orderdate').textContent = r.orderDate ?? '-';
+        document.getElementById('d-expected').textContent = r.expectedDate ?? '-';
+        document.getElementById('d-remark').textContent = r.remark || '-';
+        document.getElementById('d-audit').textContent =
+            `${r.createdBy ?? '?'} · ${(r.createdAt ?? '').replace('T', ' ').slice(0, 16)}`;
+
+        let grand = 0;
+        document.getElementById('lines').innerHTML = (r.lines || []).map(l => {
+            grand += Number(l.lineTotal) || 0;
+            return `<tr>
+                <td>${l.lineNo}</td>
+                <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
+                <td class="text-end">${ERP.num(l.quantity)}</td>
+                <td class="text-end">${ERP.won(l.unitPrice)}</td>
+                <td class="text-end">${ERP.won(l.lineTotal)}</td></tr>`;
+        }).join('');
+        document.getElementById('grandTotal').textContent = ERP.won(grand);
+
+        renderActions(r.status);
+    }
+
+    // 상태머신: DRAFT(수정/결재상신/취소), CONFIRMED(입고 처리/종료/취소), 그 외 읽기전용
+    // 발주 확정은 전자결재를 거친다 — 최종 승인 시 CONFIRMED(발주확정).
+    function renderActions(status) {
+        const box = document.getElementById('actions');
+        const a = approvalState;
+        if (status === 'DRAFT') {
+            if (a && a.status === 'PENDING') {
+                box.innerHTML = `<span class="badge badge-soft badge-soft-warning me-2">
+                        <i class="bi bi-pen"></i> 결재 진행 중 · ${ERP.esc(a.number)}</span>
+                    <a href="/approvals" class="btn btn-sm btn-outline-secondary">결재함에서 보기</a>`;
+                return;
+            }
+            let banner = '';
+            if (a && a.status === 'REJECTED') {
+                const reason = (a.steps || []).filter(s => s.status === 'REJECTED')
+                    .map(s => s.comment).find(c => c) || '';
+                banner = `<div class="alert alert-danger py-2 px-3 small mb-2">
+                    <i class="bi bi-x-circle"></i> 결재 반려됨 (${ERP.esc(a.number)})${reason ? ' · 사유: ' + ERP.esc(reason) : ''}
+                    — 발주를 수정한 뒤 다시 상신하세요.</div>`;
+            }
+            const btns = [`<a href="/mm/purchase-orders/${ID}/edit" class="btn btn-sm btn-outline-primary">수정</a>`];
+            if (a && a.status === 'DRAFT') {
+                btns.push(`<a href="/approvals" class="btn btn-sm btn-warning"><i class="bi bi-arrow-return-left"></i> 반송됨 · 결재함에서 재상신</a>`);
+            } else {
+                const label = (a && a.status === 'REJECTED') ? '수정 후 다시 상신' : '결재 상신';
+                btns.push(`<button class="btn btn-sm btn-primary" onclick="submitApproval()"><i class="bi bi-pen"></i> ${label}</button>`);
+            }
+            btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소</button>`);
+            box.innerHTML = banner + btns.join(' ');
+        } else if (status === 'CONFIRMED') {
+            box.innerHTML = `<span class="badge badge-soft badge-soft-info me-2"><i class="bi bi-check2-circle"></i> 발주 확정됨</span>
+                <a href="/mm/goods-receipts/new" class="btn btn-sm btn-primary"><i class="bi bi-box-arrow-in-down"></i> 입고 처리</a>
+                <button class="btn btn-sm btn-outline-secondary" onclick="act('close','종료')">발주 종료</button>
+                <button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소</button>`;
+        } else {
+            box.innerHTML = '<span class="text-muted small">최종 상태입니다(읽기 전용).</span>';
+        }
+    }
+
+    async function submitApproval() {
+        if (!confirm('이 발주를 결재 상신하시겠습니까? 전결 규정에 따라 결재선이 자동 구성됩니다.')) return;
+        try {
+            const a = await ERP.api(`/api/purchase-orders/${ID}/submit-approval`, {method: 'POST'});
+            ERP.flash(`결재 상신 완료 · ${a.number} (결재선 ${(a.steps || []).length}단계)`, 'success');
+            load();
+        } catch (e) { ERP.flashError(e); }
+    }
+
+    async function act(action, label) {
+        if (!confirm(`이 발주를 ${label}하시겠습니까?`)) return;
+        try {
+            render(await ERP.api(`/api/purchase-orders/${ID}/${action}`, {method: 'POST'}));
+            ERP.flash(`${label} 완료`, 'success');
+        } catch (e) {
+            ERP.flashError(e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', load);
+</script>
+</div>
+</body>
+</html>

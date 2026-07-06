@@ -19,6 +19,19 @@
 
 ## 현재 위치
 
+> ### 🆕 전자결재 3단계 — 구매발주(PO) 문서 신설 + 결재 연동 (2026-07-06 세션, 미커밋)
+> hwlee님이 "다음 진도"로 **구매발주(PO) 신설**을 선택. 그동안 이 ERP는 매입 쪽에 PO 문서가 없어 입고(GoodsReceipt)만 독립 생성됐는데, 직전 세션에 깔아둔 거래처 취급품목(VendorItem)을 게이트로 재사용해 **매입 사이드의 상위 발주 문서**를 신설했다. 입고(MM)·수주(SD)·결재(견적/지급) 패턴을 그대로 본뜸.
+> - **상태머신**: `DRAFT →(전자결재 상신·최종 승인)→ CONFIRMED(발주확정) →(입고 완료)→ CLOSED`, `CANCELLED`(DRAFT/CONFIRMED에서). **결재 없이는 확정 불가**(지출 통제) — 견적/지급처럼 승인 콜백(`PurchaseOrderApprovalListener`, BEFORE_COMMIT)이 `confirmByApproval`로 CONFIRMED 전이. `ApprovalDocType.PURCHASE_ORDER`는 이미 enum에 있었고 전결 규정 시드만 없어서 그것만 추가.
+> - **채번**: prefix `PO`는 **생산지시(ProductionOrder)가 선점** → 구매발주는 **`PORD`**(`PORD-20260706-001`). `TransactionNumberGenerator`에 `PREFIX_PURCHASE_ORDER`+`nextPurchaseOrderNumber` 추가.
+> - **신설 파일**(`mm/purchaseorder/`): `PurchaseOrder`(헤더: vendor·warehouse·orderDate·expectedDate·remark·lines) / `PurchaseOrderLine`(item·quantity·unitPrice·lineTotal) / `PurchaseOrderStatus` / Service · Controller(`/api/purchase-orders`, `@PreAuthorize PURCHASING/ADMIN`) · Mapper · Repository · Specifications · DTO 5종 + `mm/integration/approval/PurchaseOrderApprovalListener`. **라인 검증**은 입고와 동일 게이트 = `vendorItemRepository.existsByVendorIdAndItemIdAndStatus(ACTIVE)`(취급품목 아니면 발주 거부), 매입단가는 VendorItem.supplyPrice에서 폼이 자동채움.
+> - **Flyway V70**: `purchase_order`·`purchase_order_line` 테이블 + `approval_rule` PURCHASE_ORDER 시드(<1천만 팀장 / 1천만~5천만 본부장 / ≥5천만 대표+재무합의 — 지급과 유사).
+> - **화면**(`templates/mm/purchaseorder/` 신설 3종): `list.html`(발주금액·상태 + **작성중 발주엔 결재상태 배지** `/api/approvals/status` 병기) / `form.html`(입고 폼 재활용 — 거래처 선택 시 취급품목만 드롭다운 + 매입단가 프리필 + expectedDate·remark) / `detail.html`(견적 상세식 결재 연동: 상신 버튼·결재 진행중/반려 배지·재상신, CONFIRMED 시 **입고 처리 딥링크**+종료+취소). `MaterialsViewController`에 라우팅 4개 + 사이드바 MM에 "구매발주"(입고 위) 메뉴.
+> - **➕ 결재 모달 미리보기 연동(hwlee님 실사용 발견, 미커밋)**: 결재함에서 구매발주 열면 "문서 미리보기를 표시할 수 없습니다" fallback이 뜨던 문제 = `approval/list.html` `loadPreview` switch에 **PURCHASE_ORDER 케이스가 없었음**. `previewPurchaseOrder()` 신설(거래처·발주일·입고예정·창고·품목라인/매입단가/발주합계, 견적서 미리보기 본뜸) + switch 연결. **부수 개선 = 타 부서 결재자 열람**: `PurchaseOrderController` 조회(GET)를 `SALES,PURCHASING,PRODUCTION,FINANCE,DIRECTOR,ADMIN`으로 넓히고(결재선의 팀장·본부장·재무합의자가 원본 미리보기 가능) 쓰기·상신·종료·취소는 메서드 단위 `PURCHASING/ADMIN`으로 좁힘(WarehouseController "조회 넓게·변경 좁게" 패턴). ⚠️ 견적(SALES만)·지급(FINANCE만)은 여전히 자기부서만 열람 = 동일 한계 잔존(전 문서 일괄 개선은 후속). `compileJava` 그린, 프론트 강력새로고침.
+> - **검증**: 도메인 단위 `PurchaseOrderTest` **6건 그린**(확정/라인편집동결/종료/취소/합계). 통합 `MmScenarioTest`(Testcontainers) **BUILD SUCCESSFUL** = V70 테이블+시드가 실 MySQL에 정상 적용·기존 시나리오 무회귀. `compileJava` 그린(신규 deprecation 경고만).
+> - ⚠️ **1차 슬라이스 범위**(큰 갈림길 통보): **입고 역참조 연동(발주 대비 입고수량 집계 → RECEIVED 자동전이)은 2차로 분리**. 기존 3년치 시드(V60~V63)·입고 통합테스트 5개를 건드릴 위험이 커서 1차는 PO 문서+결재+CRUD까지만. 현재 PO→입고는 상세의 "입고 처리" 딥링크(입고 폼 이동)로만 이음.
+> - **▶ 남은 후속(선택)**: ① PO 결재 e2e 통합테스트 1건(`PaymentApprovalIntegrationTest` 패턴 — 생성→상신→승인→CONFIRMED) ② 입고에 `purchase_order_id` nullable 참조 + 발주 대비 입고 집계(2차) ③ 실 앱 육안 e2e(구매 담당 로그인→발주 작성→상신→결재→확정) ④ 구매요청(PR) 상위 문서.
+> - ⚠️ **미커밋** — 다른 PC에서 이어가려면 hwlee님이 커밋+푸시. ⚠️ 프론트 **강력새로고침**(CSS/JS 캐시).
+>
 > ### 🅐 여신관리 = 개념 워크스루 + 용어 통일 + 모델 개선(입금 시 여신 자동 해제) 완료 (2026-07-06 세션)
 > hwlee님과 신용한도 3종 표기 워크스루를 채팅으로 진행하고, 이어서 **여신 계산 모델을 실무형으로 개선**했다. 요약:
 > - **개념 정리(워크스루, doc 미작성)**: 여신한도=외상 상한(`Customer.creditLimit`, 여신 상향 결재로만 변경) / 여신잔액=사용 중인 신용 / 가용한도=한도−여신잔액. hwlee님 오해 지점 교정 = "입금하면 자동으로 여신이 풀리는 게 아니라, (기존 모델은) CLOSED 마감 시에만 풀린다"였고, 이를 **아래 모델 개선으로 실무처럼 바꿈**.
@@ -69,7 +82,7 @@
 
 - **🎉 Phase 0~16 전체 구현 완료·검증.** 이후 hwlee님 요청으로 **실무형 기능을 점진적으로 확장 중**(아래 2026-06-10 항목들). 학습 문서(doc/)는 별도 트랙.
 - **▶ 진행 중 = "실무 리얼리즘 확장" 프로젝트**(2026-06-27 착수, 포트폴리오 외부 공개용). 바로 아래 항목 참조. **STEP 1(KRaft)·2(카테고리 마스터화)·3(Factory)·4(마스터 대량확장)·5(3년치 실거래 백필) 완료. STEP 6은 테스트 정리 완료·`doc/` 학습문서만 남음.**
-- **🆕 전자결재 엔진(전사 횡단) 1~2단계 완료**(2026-07-05, 아래 최신 세션 참조). 범용 결재 엔진 + 견적·지급·전표 연동 + 여신 완전통합. **전체 110개 테스트 그린 + 실 앱(RDS) e2e 검증 완료**.
+- **🆕 전자결재 엔진(전사 횡단) 1~3단계 진행 중**(2026-07-05~06). 1~2단계=범용 결재 엔진 + 견적·지급·전표 연동 + 여신 완전통합(전체 112개 테스트 그린 + 실 앱 RDS e2e). **3단계=구매발주(PO) 문서 신설 + 결재 연동**(2026-07-06, 위 최상단 🆕 항목 참조, 미커밋).
 - (보류) Phase 17(자연어 데이터 검색, Text-to-SQL + 가드레일) — STUDY-PLAN Part 3 편입 완료, 구현 미착수.
 
 ### 🗓 2026-07-05 세션 — 전자결재 엔진(전사 횡단) 1단계: 코어 + 견적 연동

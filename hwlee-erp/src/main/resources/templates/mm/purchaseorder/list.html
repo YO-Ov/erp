@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html th:replace="~{fragments/layout :: document('구매발주 목록', 'purchaseorder', ~{::content})}"
+      lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <div id="flash"></div>
+
+    <div class="page-head">
+        <div>
+            <h1>구매발주</h1>
+            <div class="crumb">자재 (MM) · Purchase Order</div>
+        </div>
+        <a href="/mm/purchase-orders/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 신규 발주</a>
+    </div>
+
+    <form id="searchForm" class="filter-bar">
+        <div class="filter-field ff-wide">
+            <label>거래처</label>
+            <select id="f-vendor" class="form-select form-select-sm"><option value="">전체</option></select>
+        </div>
+        <div class="filter-field">
+            <label>창고</label>
+            <select id="f-warehouse" class="form-select form-select-sm"><option value="">전체</option></select>
+        </div>
+        <div class="filter-field ff-narrow">
+            <label>상태</label>
+            <select id="f-status" class="form-select form-select-sm">
+                <option value="">전체</option>
+                <option value="DRAFT">작성 중</option>
+                <option value="CONFIRMED">발주확정</option>
+                <option value="CLOSED">종료</option>
+                <option value="CANCELLED">취소됨</option>
+            </select>
+        </div>
+        <div class="filter-field ff-range">
+            <label>발주일</label>
+            <div class="date-range">
+                <input type="date" id="f-from" class="form-control form-control-sm">
+                <span class="tilde">~</span>
+                <input type="date" id="f-to" class="form-control form-control-sm">
+            </div>
+        </div>
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> 검색</button>
+            <button type="button" id="btn-reset" class="btn btn-sm btn-outline-secondary btn-icon" title="초기화"><i class="bi bi-arrow-counterclockwise"></i></button>
+        </div>
+    </form>
+
+    <div class="list-toolbar">
+        <div class="result-count">조회 <b id="totalCount">0</b>건</div>
+        <div class="toolbar-right">
+            <label class="page-size">표시
+                <select id="pageSize" class="form-select form-select-sm">
+                    <option value="20">20</option><option value="50">50</option><option value="100">100</option>
+                </select>
+            </label>
+            <button type="button" id="btn-excel" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-file-earmark-excel"></i> Excel 다운로드
+            </button>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+    <div class="table-scroll">
+    <table class="table rtable table-hover align-middle mb-0">
+        <thead>
+        <tr>
+            <th class="text-end" style="width:52px;">No.</th>
+            <th class="sortable" data-sort="number">번호<span class="sort-ind"></span></th>
+            <th>거래처</th>
+            <th>창고</th>
+            <th class="sortable" data-sort="orderDate">발주일<span class="sort-ind"></span></th>
+            <th class="text-end">발주금액</th>
+            <th class="sortable" data-sort="status">상태<span class="sort-ind"></span></th>
+        </tr>
+        </thead>
+        <tbody id="rows"><tr><td colspan="7" class="text-center text-muted py-4">
+            <span class="spinner-border spinner-border-sm me-1"></span> 불러오는 중…</td></tr></tbody>
+    </table>
+    </div>
+    </div>
+
+    <nav class="pager-bar">
+        <div class="page-info" id="pageInfo"></div>
+        <ul class="pagination pagination-sm mb-0" id="pager"></ul>
+    </nav>
+
+<script>
+    const STATUS = {
+        DRAFT:     {label: '작성 중',  color: 'secondary'},
+        CONFIRMED: {label: '발주확정', color: 'primary'},
+        CLOSED:    {label: '종료',     color: 'success'},
+        CANCELLED: {label: '취소됨',   color: 'dark'},
+    };
+    // 작성 중(DRAFT) 문서에 걸린 결재 진행 상태 배지 — 견적·지급과 동일.
+    const APPROVAL = {
+        PENDING:  {label: '결재중',   color: 'warning'},
+        REJECTED: {label: '결재반려', color: 'danger'},
+        DRAFT:    {label: '반송',     color: 'warning'},
+    };
+    let page = 0;
+    let SIZE = 20;
+    let sortKey = 'id', sortDir = 'desc';
+    const sortParam = () => `${sortKey},${sortDir}`;
+
+    async function loadVendors() {
+        try {
+            const data = await ERP.api('/api/vendors' + ERP.query({status: 'ACTIVE', size: 500}));
+            fill('f-vendor', (data.content || []).map(v => [v.id, `${v.name} (${v.code})`]));
+        } catch (e) {}
+    }
+    async function loadWarehouses() {
+        try {
+            const data = await ERP.api('/api/warehouses' + ERP.query({status: 'ACTIVE', size: 200}));
+            fill('f-warehouse', (data.content || []).map(w => [w.id, `${w.name} (${w.code})`]));
+        } catch (e) {}
+    }
+    function fill(id, pairs) {
+        const sel = document.getElementById(id);
+        pairs.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); });
+    }
+
+    function filters() {
+        return {
+            vendorId: document.getElementById('f-vendor').value,
+            warehouseId: document.getElementById('f-warehouse').value,
+            status: document.getElementById('f-status').value,
+            dateFrom: document.getElementById('f-from').value,
+            dateTo: document.getElementById('f-to').value,
+        };
+    }
+
+    // 작성 중 발주들의 결재 상태를 한 번에 조회해 배지로 병기.
+    async function fetchApprovalStatuses(list) {
+        const draftIds = list.filter(r => r.status === 'DRAFT').map(r => r.id);
+        if (draftIds.length === 0) return {};
+        try {
+            return await ERP.api('/api/approvals/status'
+                + ERP.query({docType: 'PURCHASE_ORDER', refIds: draftIds.join(',')}));
+        } catch (e) { return {}; }
+    }
+
+    async function load() {
+        const tbody = document.getElementById('rows');
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">
+            <span class="spinner-border spinner-border-sm me-1"></span> 불러오는 중…</td></tr>`;
+        try {
+            const data = await ERP.api('/api/purchase-orders' + ERP.query({...filters(), page, size: SIZE, sort: sortParam()}));
+            const list = data.content || [];
+            document.getElementById('totalCount').textContent = (data.totalElements ?? list.length).toLocaleString('ko-KR');
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">
+                    <i class="bi bi-inbox"></i>조건에 맞는 발주가 없습니다.</div></td></tr>`;
+            } else {
+                const appr = await fetchApprovalStatuses(list);
+                tbody.innerHTML = list.map((r, i) => {
+                    const s = STATUS[r.status] || {label: r.status, color: 'secondary'};
+                    let badge = ERP.badge(s.label, s.color);
+                    const a = APPROVAL[appr[r.id]];
+                    if (r.status === 'DRAFT' && a) badge += ' ' + ERP.badge(a.label, a.color);
+                    return `<tr style="cursor:pointer" onclick="location.href='/mm/purchase-orders/${r.id}'">
+                        <td class="text-end text-muted" data-label="">${page * SIZE + i + 1}</td>
+                        <td data-label="번호">${ERP.esc(r.number)}</td>
+                        <td data-label="거래처">${ERP.esc(r.vendorName)} <span class="text-muted small">${ERP.esc(r.vendorCode)}</span></td>
+                        <td data-label="창고">${ERP.esc(r.warehouseName)} <span class="text-muted small">${ERP.esc(r.warehouseCode)}</span></td>
+                        <td data-label="발주일">${r.orderDate ?? ''}</td>
+                        <td data-label="발주금액" class="text-end">${ERP.won(r.totalAmount)}</td>
+                        <td data-label="상태">${badge}</td></tr>`;
+                }).join('');
+            }
+            ERP.pager({page, size: SIZE, totalPages: data.totalPages || 0, totalElements: data.totalElements || 0,
+                       onGo: p => { page = p; load(); }});
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-4">불러오기 실패</td></tr>';
+            ERP.flashError(e);
+        }
+    }
+
+    function updateSortIndicators() {
+        document.querySelectorAll('th.sortable').forEach(th => {
+            const ind = th.querySelector('.sort-ind');
+            th.classList.remove('asc', 'desc');
+            if (th.dataset.sort === sortKey) {
+                th.classList.add(sortDir);
+                ind.textContent = sortDir === 'asc' ? '▲' : '▼';
+            } else {
+                ind.textContent = '↕';
+            }
+        });
+    }
+
+    function onSortClick(th) {
+        const key = th.dataset.sort;
+        if (sortKey === key) {
+            sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortKey = key;
+            sortDir = 'asc';
+        }
+        page = 0;
+        updateSortIndicators();
+        load();
+    }
+
+    async function exportExcel() {
+        const btn = document.getElementById('btn-excel');
+        btn.disabled = true;
+        try {
+            const data = await ERP.api('/api/purchase-orders' + ERP.query({...filters(), page: 0, size: 10000, sort: sortParam()}));
+            const list = data.content || [];
+            if (list.length === 0) { ERP.flash('내보낼 발주가 없습니다.', 'warning'); return; }
+            const csv = ERP.toCsv(list, [
+                {label: '번호', value: r => r.number},
+                {label: '거래처코드', value: r => r.vendorCode},
+                {label: '거래처명', value: r => r.vendorName},
+                {label: '창고명', value: r => r.warehouseName},
+                {label: '발주일', value: r => r.orderDate ?? ''},
+                {label: '입고예정일', value: r => r.expectedDate ?? ''},
+                {label: '발주금액', value: r => r.totalAmount ?? 0},
+                {label: '상태', value: r => (STATUS[r.status]?.label ?? r.status)},
+            ]);
+            ERP.download(`구매발주목록_${ERP.today()}.csv`, csv);
+        } catch (e) {
+            ERP.flashError(e);
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadVendors(); loadWarehouses();
+        updateSortIndicators();
+        load();
+        document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); page = 0; load(); });
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            document.getElementById('searchForm').reset(); page = 0; load();
+        });
+        document.getElementById('btn-excel').addEventListener('click', exportExcel);
+        document.querySelectorAll('th.sortable').forEach(th =>
+            th.addEventListener('click', () => onSortClick(th)));
+        document.getElementById('pageSize').addEventListener('change', e => {
+            SIZE = Number(e.target.value); page = 0; load();
+        });
+    });
+</script>
+</div>
+</body>
+</html>

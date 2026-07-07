@@ -3,6 +3,7 @@ package com.hwlee.erp.mm.goodsreceipt;
 import com.hwlee.erp.common.entity.BaseEntity;
 import com.hwlee.erp.master.item.Item;
 import com.hwlee.erp.master.vendor.Vendor;
+import com.hwlee.erp.mm.purchaseorder.PurchaseOrder;
 import com.hwlee.erp.mm.warehouse.Warehouse;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -48,6 +49,14 @@ public class GoodsReceipt extends BaseEntity {
     @JoinColumn(name = "warehouse_id", nullable = false)
     private Warehouse warehouse;
 
+    /**
+     * 발주 참조(nullable) — 이 입고가 어떤 구매발주에 대한 것인지. 발주 없이 들어온 입고(예: 과거 시드
+     * 데이터, 무발주 긴급 입고)는 {@code null}. 발주 대비 입고 진행은 이 참조를 역집계해 계산한다.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "purchase_order_id")
+    private PurchaseOrder purchaseOrder;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 16)
     private GoodsReceiptStatus status = GoodsReceiptStatus.DRAFT;
@@ -85,6 +94,12 @@ public class GoodsReceipt extends BaseEntity {
     public void clearLines() {
         ensureEditable();
         lines.clear();
+    }
+
+    /** 발주 참조를 지정한다(입고 생성 시, 발주로부터 입고 처리하는 경우). */
+    public void assignPurchaseOrder(PurchaseOrder purchaseOrder) {
+        ensureEditable();
+        this.purchaseOrder = purchaseOrder;
     }
 
     public void updateHeader(Vendor vendor, Warehouse warehouse, LocalDate receiptDate) {

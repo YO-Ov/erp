@@ -11,6 +11,8 @@ import com.hwlee.erp.master.item.ItemRepository;
 import com.hwlee.erp.master.vendor.Vendor;
 import com.hwlee.erp.master.vendor.VendorRepository;
 import com.hwlee.erp.master.vendoritem.VendorItemRepository;
+import com.hwlee.erp.mm.goodsreceipt.GoodsReceiptRepository;
+import com.hwlee.erp.mm.goodsreceipt.GoodsReceiptRepository.ReceivedQtyRow;
 import com.hwlee.erp.mm.purchaseorder.dto.PurchaseOrderCreateRequest;
 import com.hwlee.erp.mm.purchaseorder.dto.PurchaseOrderLineRequest;
 import com.hwlee.erp.mm.purchaseorder.dto.PurchaseOrderResponse;
@@ -18,7 +20,10 @@ import com.hwlee.erp.mm.purchaseorder.dto.PurchaseOrderUpdateRequest;
 import com.hwlee.erp.mm.warehouse.Warehouse;
 import com.hwlee.erp.mm.warehouse.WarehouseRepository;
 import jakarta.persistence.EntityNotFoundException;
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -45,6 +50,7 @@ public class PurchaseOrderService {
     private final VendorItemRepository vendorItemRepository;
     private final WarehouseRepository warehouseRepository;
     private final ItemRepository itemRepository;
+    private final GoodsReceiptRepository goodsReceiptRepository;
     private final TransactionNumberGenerator numberGenerator;
     private final ApprovalService approvalService;
 
@@ -58,15 +64,18 @@ public class PurchaseOrderService {
         PurchaseOrder po = PurchaseOrder.draft(
                 number, vendor, warehouse, req.orderDate(), req.expectedDate(), req.remark());
         addLines(po, req.lines());
-        return mapper.toResponse(repository.save(po));
+        // 신규 발주는 입고 이력이 없으므로 집계 불필요.
+        return mapper.toResponse(repository.save(po), Map.of());
     }
 
     public PurchaseOrderResponse findById(Long id) {
-        return mapper.toResponse(getOrThrow(id));
+        PurchaseOrder po = getOrThrow(id);
+        return mapper.toResponse(po, receivedByItem(po.getId()));
     }
 
     public Page<PurchaseOrderResponse> search(Specification<PurchaseOrder> spec, Pageable pageable) {
-        return repository.findAll(spec, pageable).map(mapper::toResponse);
+        // 목록은 라인 입고 집계를 쓰지 않으므로 PO 마다 집계 쿼리를 돌리지 않는다(N+1 방지).
+        return repository.findAll(spec, pageable).map(po -> mapper.toResponse(po, Map.of()));
     }
 
     @Transactional
@@ -79,7 +88,8 @@ public class PurchaseOrderService {
         po.updateHeader(vendor, warehouse, req.orderDate(), req.expectedDate(), req.remark());
         po.clearLines();
         addLines(po, req.lines());
-        return mapper.toResponse(po);
+        // 수정은 DRAFT 상태에서만 가능(입고 이전)하므로 집계 불필요.
+        return mapper.toResponse(po, Map.of());
     }
 
     /**
@@ -106,18 +116,42 @@ public class PurchaseOrderService {
         po.confirm();
     }
 
+    /**
+     * 발주 대비 입고 진행을 재집계해 상태를 동기화한다(입고 확정/취소 콜백에서 호출).
+     * 전량 입고면 CONFIRMED→RECEIVED, 입고 취소로 미달되면 RECEIVED→CONFIRMED.
+     */
+    @Transactional
+    public void syncReceiptStatus(Long id) {
+        PurchaseOrder po = getOrThrow(id);
+        Map<Long, BigDecimal> received = receivedByItem(po.getId());
+        po.syncReceiptStatus(isFullyReceived(po, received));
+    }
+
     @Transactional
     public PurchaseOrderResponse close(Long id) {
         PurchaseOrder po = getOrThrow(id);
         po.close();
-        return mapper.toResponse(po);
+        return mapper.toResponse(po, receivedByItem(po.getId()));
     }
 
     @Transactional
     public PurchaseOrderResponse cancel(Long id) {
         PurchaseOrder po = getOrThrow(id);
         po.cancel();
-        return mapper.toResponse(po);
+        return mapper.toResponse(po, receivedByItem(po.getId()));
+    }
+
+    /** 발주 참조로 역집계한 품목별 입고 누계(POSTED 입고 기준). */
+    private Map<Long, BigDecimal> receivedByItem(Long purchaseOrderId) {
+        return goodsReceiptRepository.sumReceivedQuantityByPurchaseOrder(purchaseOrderId).stream()
+                .collect(Collectors.toMap(ReceivedQtyRow::getItemId, ReceivedQtyRow::getQuantity));
+    }
+
+    /** 발주 전 라인이 전량 입고되었는지(라인별 입고누계 ≥ 발주수량). */
+    private boolean isFullyReceived(PurchaseOrder po, Map<Long, BigDecimal> received) {
+        return po.getLines().stream().allMatch(l ->
+                received.getOrDefault(l.getItem().getId(), BigDecimal.ZERO)
+                        .compareTo(l.getQuantity()) >= 0);
     }
 
     private void addLines(PurchaseOrder po, List<PurchaseOrderLineRequest> lineReqs) {

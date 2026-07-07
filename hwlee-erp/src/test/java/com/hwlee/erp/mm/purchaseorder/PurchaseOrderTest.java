@@ -85,6 +85,48 @@ class PurchaseOrderTest {
     }
 
     @Test
+    @DisplayName("전량 입고되면 CONFIRMED→RECEIVED, 입고 취소로 미달되면 다시 CONFIRMED")
+    void syncReceiptStatus_전량입고면_RECEIVED_미달되면_CONFIRMED() {
+        PurchaseOrder po = poWith2Lines();
+        po.confirm();
+
+        // 부분 입고(미달) — 여전히 CONFIRMED
+        po.syncReceiptStatus(false);
+        assertThat(po.getStatus()).isEqualTo(PurchaseOrderStatus.CONFIRMED);
+
+        // 전량 입고 — RECEIVED 로 전이
+        po.syncReceiptStatus(true);
+        assertThat(po.getStatus()).isEqualTo(PurchaseOrderStatus.RECEIVED);
+
+        // 입고 취소로 다시 미달 — CONFIRMED 로 복귀
+        po.syncReceiptStatus(false);
+        assertThat(po.getStatus()).isEqualTo(PurchaseOrderStatus.CONFIRMED);
+    }
+
+    @Test
+    @DisplayName("DRAFT 발주는 입고 동기화의 영향을 받지 않는다")
+    void syncReceiptStatus_DRAFT는_무시된다() {
+        PurchaseOrder po = poWith2Lines();   // DRAFT
+        po.syncReceiptStatus(true);
+        assertThat(po.getStatus()).isEqualTo(PurchaseOrderStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("RECEIVED(입고완료) 발주도 close 로 종료 가능하고, 취소는 거부된다")
+    void received_발주는_close가능_cancel거부() {
+        PurchaseOrder received = poWith2Lines();
+        received.confirm();
+        received.syncReceiptStatus(true);
+        assertThat(received.getStatus()).isEqualTo(PurchaseOrderStatus.RECEIVED);
+
+        assertThatThrownBy(received::cancel)
+                .isInstanceOf(IllegalStateException.class);
+
+        received.close();
+        assertThat(received.getStatus()).isEqualTo(PurchaseOrderStatus.CLOSED);
+    }
+
+    @Test
     @DisplayName("totalAmount 는 라인(수량×매입단가) 합계로 집계된다")
     void totalAmount는_라인_합계로_집계된다() {
         PurchaseOrder po = PurchaseOrder.draft("PORD-20260706-001", vendor(), warehouse(),

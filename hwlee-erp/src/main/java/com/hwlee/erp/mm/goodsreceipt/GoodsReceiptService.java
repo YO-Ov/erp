@@ -12,6 +12,10 @@ import com.hwlee.erp.mm.goodsreceipt.dto.GoodsReceiptLineRequest;
 import com.hwlee.erp.mm.goodsreceipt.dto.GoodsReceiptResponse;
 import com.hwlee.erp.mm.goodsreceipt.dto.GoodsReceiptUpdateRequest;
 import com.hwlee.erp.mm.goodsreceipt.event.GoodsReceiptPostedEvent;
+import com.hwlee.erp.mm.purchaseorder.PurchaseOrder;
+import com.hwlee.erp.mm.purchaseorder.PurchaseOrderRepository;
+import com.hwlee.erp.mm.purchaseorder.PurchaseOrderService;
+import com.hwlee.erp.mm.purchaseorder.PurchaseOrderStatus;
 import com.hwlee.erp.mm.stock.MovementReason;
 import com.hwlee.erp.mm.stock.Stock;
 import com.hwlee.erp.mm.stock.StockMovement;
@@ -51,6 +55,8 @@ public class GoodsReceiptService {
     private final ItemRepository itemRepository;
     private final StockRepository stockRepository;
     private final StockMovementRepository stockMovementRepository;
+    private final PurchaseOrderRepository purchaseOrderRepository;
+    private final PurchaseOrderService purchaseOrderService;
     private final TransactionNumberGenerator numberGenerator;
     private final ApplicationEventPublisher events;
     private final Clock clock;
@@ -63,8 +69,25 @@ public class GoodsReceiptService {
                 .orElseThrow(() -> new EntityNotFoundException("Warehouse not found: id=" + req.warehouseId()));
         String number = numberGenerator.nextGoodsReceiptNumber(req.receiptDate());
         GoodsReceipt gr = GoodsReceipt.draft(number, vendor, warehouse, req.receiptDate());
+        if (req.purchaseOrderId() != null) {
+            gr.assignPurchaseOrder(resolvePurchaseOrder(req.purchaseOrderId(), vendor.getId()));
+        }
         addLines(gr, req.lines());
         return mapper.toResponse(repository.save(gr));
+    }
+
+    /** 발주 참조를 확정된(CONFIRMED/RECEIVED) 발주로만 허용하고, 거래처가 일치하는지 검증한다. */
+    private PurchaseOrder resolvePurchaseOrder(Long purchaseOrderId, Long vendorId) {
+        PurchaseOrder po = purchaseOrderRepository.findById(purchaseOrderId)
+                .orElseThrow(() -> new EntityNotFoundException("PurchaseOrder not found: id=" + purchaseOrderId));
+        if (po.getStatus() != PurchaseOrderStatus.CONFIRMED && po.getStatus() != PurchaseOrderStatus.RECEIVED) {
+            throw new IllegalStateException(
+                    "확정(CONFIRMED)·입고완료(RECEIVED) 발주에만 입고할 수 있습니다. 현재: " + po.getStatus());
+        }
+        if (!po.getVendor().getId().equals(vendorId)) {
+            throw new IllegalStateException("입고 거래처가 발주 거래처와 다릅니다.");
+        }
+        return po;
     }
 
     public GoodsReceiptResponse findById(Long id) {
@@ -124,6 +147,11 @@ public class GoodsReceiptService {
                                 l.getItem().getId(), l.getQuantity(), l.getUnitCost()))
                         .toList()));
 
+        // 발주로부터의 입고면 발주 대비 입고 진행을 재집계 → 전량 입고 시 CONFIRMED→RECEIVED 전이.
+        if (gr.getPurchaseOrder() != null) {
+            purchaseOrderService.syncReceiptStatus(gr.getPurchaseOrder().getId());
+        }
+
         return mapper.toResponse(gr);
     }
 
@@ -150,6 +178,11 @@ public class GoodsReceiptService {
             stockMovementRepository.save(StockMovement.of(
                     item, warehouse, line.getQuantity().negate(), appliedCost,
                     MovementReason.ADJUSTMENT_MINUS, "GR", gr.getId(), now));
+        }
+
+        // 취소로 이 입고가 집계에서 빠지면 발주가 다시 미달될 수 있다 → RECEIVED→CONFIRMED 복귀.
+        if (gr.getPurchaseOrder() != null) {
+            purchaseOrderService.syncReceiptStatus(gr.getPurchaseOrder().getId());
         }
         return mapper.toResponse(gr);
     }

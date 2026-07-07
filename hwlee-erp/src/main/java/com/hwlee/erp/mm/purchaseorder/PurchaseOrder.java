@@ -28,8 +28,10 @@ import lombok.NoArgsConstructor;
  * 구매발주(Purchase Order) 헤더 — 거래처에 자재/부품 매입을 발주하는 문서.
  *
  * <p>실무 흐름: 구매 담당이 {@code DRAFT} 로 작성 → 전자결재 상신 → 최종 승인 시
- * {@link #confirm()} 로 {@code CONFIRMED}(발주 확정) → 입고가 끝나면 {@link #close()} 로 종료.
- * 결재 없이는 확정할 수 없다(지출 통제). 입고(GoodsReceipt) 연동(발주 대비 입고 집계)은 후속 단계.
+ * {@link #confirm()} 로 {@code CONFIRMED}(발주 확정) → 입고가 진행되어 전량 입고되면
+ * {@link #syncReceiptStatus} 로 {@code RECEIVED}(입고 완료) → {@link #close()} 로 마감.
+ * 결재 없이는 확정할 수 없다(지출 통제). 입고(GoodsReceipt)는 이 발주를 참조하며, 라인별
+ * 입고 누계는 그 참조를 역집계해 계산한다(발주 라인에 동일 품목이 중복되지 않는다는 전제).
  */
 @Entity
 @Getter
@@ -126,10 +128,32 @@ public class PurchaseOrder extends BaseEntity {
         this.status = PurchaseOrderStatus.CONFIRMED;
     }
 
-    /** CONFIRMED → CLOSED. 입고 완료 후 발주를 마감. */
+    /**
+     * 발주 대비 입고 진행에 따라 CONFIRMED ↔ RECEIVED 를 동기화한다(입고 확정/취소 콜백에서 호출).
+     *
+     * <ul>
+     *   <li>CONFIRMED + 전량 입고 → RECEIVED</li>
+     *   <li>RECEIVED + 입고 취소로 미달 → CONFIRMED 로 복귀</li>
+     *   <li>그 외(DRAFT/CLOSED/CANCELLED)는 무시 — 이미 종결됐거나 발주 전이라 입고 진행과 무관</li>
+     * </ul>
+     *
+     * @param fullyReceived 발주 전 라인이 전량 입고되었는지(라인별 입고누계 ≥ 발주수량)
+     */
+    public void syncReceiptStatus(boolean fullyReceived) {
+        if (status == PurchaseOrderStatus.CONFIRMED && fullyReceived) {
+            this.status = PurchaseOrderStatus.RECEIVED;
+        } else if (status == PurchaseOrderStatus.RECEIVED && !fullyReceived) {
+            this.status = PurchaseOrderStatus.CONFIRMED;
+        }
+    }
+
+    /**
+     * CONFIRMED/RECEIVED → CLOSED. 발주를 마감한다.
+     * 전량 입고(RECEIVED)뿐 아니라 부분 입고 상태(CONFIRMED)에서도 잔량을 포기하고 강제 종결할 수 있다.
+     */
     public void close() {
-        if (status != PurchaseOrderStatus.CONFIRMED)
-            throw new IllegalStateException("확정(CONFIRMED) 발주만 종료 가능합니다. 현재: " + status);
+        if (status != PurchaseOrderStatus.CONFIRMED && status != PurchaseOrderStatus.RECEIVED)
+            throw new IllegalStateException("확정(CONFIRMED)·입고완료(RECEIVED) 발주만 종료 가능합니다. 현재: " + status);
         this.status = PurchaseOrderStatus.CLOSED;
     }
 

@@ -14,6 +14,8 @@ public record GoodsReceiptResponse(
         Long warehouseId,
         String warehouseCode,
         String warehouseName,
+        Long purchaseOrderId,
+        String purchaseOrderNumber,
         GoodsReceiptStatus status,
         LocalDate receiptDate,
         LocalDateTime postedAt,

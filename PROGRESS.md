@@ -19,6 +19,25 @@
 
 ## 현재 위치
 
+> ### 🧠 로컬 LLM ERP 에이전트 — 1단계 프로토타입 구현·검증 완료 (2026-07-07 세션, 미커밋)
+> hwlee님이 "AI로 ERP 업무 자동화"를 논의 → **행동형 에이전트**(견적/수주/재고→생산→발주까지)로 확장 아이디어. 로컬 7B(Ollama)는 다단계 판단이 불안정하고, 유료 API(Claude 등)는 비용 발생. **결론 = 역할을 쪼개는 "방식 2" 채택**: **AI는 자연어→구조화 JSON 추출만, 비즈니스 흐름 판단은 파이썬 코드가** 결정론적으로. 완전 무료(로컬)이고 실무의 안전한 AI 패턴이며 이 프로젝트의 "도메인 흐름 직접 설계" 목적과 일치.
+> - **위치**: 자바 ERP 저장소와 **분리된 별도 폴더 `erp-agent/`**(`/Users/hwlee/IdeaProjects/my-app/erp-agent`, 이 맥미니 전용). ⚠️ **이건 erp 저장소 밖이라 erp git에 안 잡힘** — 별도 관리/백업 필요.
+> - **물리 배치**: AI 계층(Ollama+파이썬)은 **이 맥미니에만**, ERP/MES 웹서비스는 **Oracle Cloud**. HTTP 통신. (Oracle Cloud 배포는 병행 트랙, 하단 참조)
+> - **아키텍처 3계층**: ① 의도추출기(`extractor.py`, Ollama+LangChain `with_structured_output`, Pydantic 스키마 강제, 실패 시 UNKNOWN 안전복귀) → ② 오케스트레이터(`orchestrator.py`, 순수 파이썬 if/else = "두뇌", 재고→생산→MRP 분기) → ③ ERP 클라이언트(`erp_client.py`, 지금은 Mock, 나중에 requests로 Oracle Cloud 연결). **의도적으로 LangChain Agent(자율루프)는 안 씀** — 판단을 AI에 다시 넘기는 것이라 목적에 반함.
+> - **환경**: Ollama(brew 설치, `brew services`로 상시 실행) + `qwen2.5:7b`(4.7GB) + Python 3.14 venv(`langchain-ollama 1.1.0`·`langchain-core 1.4.8`·`pydantic 2.13.4`). **실행**: `cd erp-agent && .venv/bin/python main.py`.
+> - **✅ 검증(쓰기)**: `"신원전자 노트북 100대 수주해줘"` → 추출 `{ORDER,노트북,100,신원전자}` → 수주생성→재고부족(100/30)→생산지시(70)→자재부족 CPU→구매발주(50) **전체 분기 정상**. **LLM은 JSON 추출만, 분기는 전부 파이썬**이 판단(설계 의도 달성).
+> - **✅ 조회형(읽기) 액션 3종 추가·검증**: `CHECK_APPROVAL`("내가 상신한 결재 어때?"→상신함 상태: 승인/결재중/반려+사유, 상태코드 한글변환) · `CHECK_ORDER`("신원전자 수주 보여줘"→고객필터 or 전체, 상태 한글) · `CHECK_STOCK`. **읽기라 확인 없이 즉시 응답** → hwlee님이 원한 "조회페이지 대신 채팅으로 업무" 첫 실현. 실 ERP의 `/api/approvals/outbox`·`/api/sales-orders`를 Mock으로 흉내(나중에 requests 교체).
+> - **✅ 2단계 휴먼 인 더 루프(plan-then-apply) 추가·검증**: 쓰기 액션(ORDER)은 즉시 실행 안 하고 **① 계획 수립(읽기만으로 재고→생산→발주 분기 전부 미리 계산) → ② 미리보기 → ③ y/n → ④ 승인 시에만 실제 쓰기(apply)**. 오케스트레이터에 `Plan(summary, apply)` 도입, `_order`→`_plan_order`로 "읽기 계획 / 쓰기 실행" 분리, `main.py`가 Plan이면 확인 게이트. **검증**: 수주 100대+y→계획대로 생성 / 10대+n→"취소(아무것도 생성 안 됨)" / 읽기→확인없이 즉시. 잘못 알아들어도 n으로 차단 가능 = 쓰기 안전장치 확보. (실무 전자결재·Terraform 패턴)
+> - **✅ 결재 상신(SUBMIT_APPROVAL) 액션 추가·검증**: "PAY-2026-0015 상신해줘"→`{SUBMIT_APPROVAL, ref_no}`(스키마에 `ref_no` 필드 추가). 쓰기라 확인게이트 자동 적용. **계획 미리보기에 실 ERP 전결 규정 재현**: 금액별 결재선 자동 계산(<1천만=팀장 / 1천만~5천만=팀장→본부장 / ≥5천만=팀장→본부장→대표→재무합의). **검증**: 300만→팀장, 9천만→4단계, 없는문서/이미상신은 코드가 차단. "채팅으로 결재 올리기" 실현. Mock: `_drafts`+`get_document`/`resolve_approval_line`/`submit_for_approval`(실 ERP `submitForApproval`+`approval_rule` 흉내).
+> - **🐞 구현 중 함정 2개(해결)**: ① few-shot JSON 중괄호를 LangChain이 템플릿 변수로 오인 → `KeyError`(전부 UNKNOWN) → **`AIMessage` 메시지 객체로 넣어 해결**. ② Qwen2.5가 한국어를 중국어로 번역(`노트북→笔记本电脑`) → Mock 재고키 불일치 → **시스템프롬프트 "번역금지" + few-shot 한국어 앵커로 해결**.
+> - **✅ 환경별 ERP 연결 계층(config-by-env) 추가·검증**: hwlee님 질문 "로컬/클라우드/외부 어디서든 연결" → **"코드는 하나, 대상은 환경변수로"**(기존 Spring `aws` 프로파일+`ERP_DB_PASSWORD`와 동일 철학). 신규 `config.py`(env: `ERP_MODE`=mock|http, `ERP_BASE_URL`, `ERP_USER/PASSWORD`, python-dotenv로 `.env` 로드) + `.env.example` + `.gitignore`. `erp_client.py`에 **`HttpERPClient`(실 ERP HTTP 연결 골격: requests.Session 폼로그인→JSESSIONID, `_get`/`_post` 헬퍼, Mock과 동일 메서드계약)** + **`make_erp_client()` 팩토리**(env로 Mock/Http 자동선택). `main.py`가 팩토리 사용. **`ERP_MODE=mock` 기본이라 기존 동작 무회귀 확인.** ⭐**추천 = Oracle Cloud에 공개 URL 하나 → 외부·에이전트 전부 그 URL, 환경마다 `.env` 한 줄만 다름.** requirements에 requests·python-dotenv 추가.
+> - **⏳ 실 연결 남은 일**: ① `HttpERPClient` 메서드의 **엔드포인트/스키마를 실 `hwlee-erp` 컨트롤러에 맞게 확정**(현재 예시/일부 NotImplementedError) ② ERP 로그인 성공판정 실 설정 확인 ③ Oracle Cloud면 **보안리스트+VM iptables 포트개방** ④ 실행 중·접근가능한 ERP 인스턴스 필요. 확정 전까지 `ERP_MODE=mock`으로 개발.
+> - **산출물**: 코드 = `erp-agent/`(액션 6종 + Plan 확인게이트 + config/factory/HttpERPClient 골격 + venv), 문서 = **`doc/AI에이전트-로컬LLM-업무자동화-설계.md`**.
+> - **▶ 다음 단계**: ① 쓰기 액션 더 확장(QUOTE 견적생성·결재 승인/반려·취소·다품목) ② 실 ERP 연결(`erp_client.py`→Oracle Cloud API+인증) ③ 정확도 보강(Qwen vs Llama3·품목명→코드 매핑) ④ (선택) 구 Phase 17 Text-to-SQL 읽기 접목(자유 조회) ⑤ (선택) 대화 맥락·웹UI. (미세: CHECK_APPROVAL은 아직 정적 mock이라 방금 상신한 건 반영 안 됨 — 실 ERP 연결 시 자연 해소)
+> - **미결정**: 실 ERP API 매핑표(엔드포인트·스키마, `hwlee-erp` 컨트롤러서 확정), 인증방식(세션/토큰), 품목명→품목코드 변환, UI(현재 CLI).
+> - **🧭 방향 결정(2026-07-07 세션 말, hwlee님 선택)**: ⓐ **배치** = 맥미니에서 **ERP + 에이전트 함께** 구동(로컬 개발은 agent→`localhost:8080`). 외부(집/회사) 접속용은 **Oracle Cloud 공개 URL 하나로 통일**. ⓑ **다음 트랙 = 에이전트 실 연결보다 "Oracle Cloud 배포"를 먼저** 진행하기로. → **에이전트 트랙은 여기서 일시 정지**(액션6종+확인게이트+연결계층까지 완성·검증됨, Mock 모드로 동작). 이후 Oracle Cloud에 ERP 배포 완료되면 그 URL로 `.env` 설정 후 HttpERPClient 엔드포인트 매핑하면 실 연결.
+> - **➡ 다음 세션 시작점**: Oracle Cloud 배포 트랙(하단 "🖥 병행 트랙 — Oracle Cloud Always Free 배포" 참조). 착수 시 배포파일(ERP·MES Dockerfile + `docker-compose.prod.yml`) 작성부터. 배포 전 Oracle Cloud 계정 상태(종량제 업그레이드 완료 여부·A1 인스턴스 생성 여부) 먼저 확인 필요. 참고: 로컬 `docker-compose.yml`은 이미 KRaft Kafka + ERP/MES MySQL 2개 + Zipkin 구성(단, 앱 컨테이너는 없음 — prod compose에 ERP/MES 앱 서비스 추가 필요).
+>
 > ### 🆕 전자결재 3단계 — 구매발주(PO) 문서 신설 + 결재 연동 (2026-07-06 세션, 미커밋)
 > hwlee님이 "다음 진도"로 **구매발주(PO) 신설**을 선택. 그동안 이 ERP는 매입 쪽에 PO 문서가 없어 입고(GoodsReceipt)만 독립 생성됐는데, 직전 세션에 깔아둔 거래처 취급품목(VendorItem)을 게이트로 재사용해 **매입 사이드의 상위 발주 문서**를 신설했다. 입고(MM)·수주(SD)·결재(견적/지급) 패턴을 그대로 본뜸.
 > - **상태머신**: `DRAFT →(전자결재 상신·최종 승인)→ CONFIRMED(발주확정) →(입고 완료)→ CLOSED`, `CANCELLED`(DRAFT/CONFIRMED에서). **결재 없이는 확정 불가**(지출 통제) — 견적/지급처럼 승인 콜백(`PurchaseOrderApprovalListener`, BEFORE_COMMIT)이 `confirmByApproval`로 CONFIRMED 전이. `ApprovalDocType.PURCHASE_ORDER`는 이미 enum에 있었고 전결 규정 시드만 없어서 그것만 추가.
@@ -83,7 +102,8 @@
 - **🎉 Phase 0~16 전체 구현 완료·검증.** 이후 hwlee님 요청으로 **실무형 기능을 점진적으로 확장 중**(아래 2026-06-10 항목들). 학습 문서(doc/)는 별도 트랙.
 - **▶ 진행 중 = "실무 리얼리즘 확장" 프로젝트**(2026-06-27 착수, 포트폴리오 외부 공개용). 바로 아래 항목 참조. **STEP 1(KRaft)·2(카테고리 마스터화)·3(Factory)·4(마스터 대량확장)·5(3년치 실거래 백필) 완료. STEP 6은 테스트 정리 완료·`doc/` 학습문서만 남음.**
 - **🆕 전자결재 엔진(전사 횡단) 1~3단계 진행 중**(2026-07-05~06). 1~2단계=범용 결재 엔진 + 견적·지급·전표 연동 + 여신 완전통합(전체 112개 테스트 그린 + 실 앱 RDS e2e). **3단계=구매발주(PO) 문서 신설 + 결재 연동**(2026-07-06, 위 최상단 🆕 항목 참조, 미커밋).
-- (보류) Phase 17(자연어 데이터 검색, Text-to-SQL + 가드레일) — STUDY-PLAN Part 3 편입 완료, 구현 미착수.
+- **🧠 로컬 LLM ERP 에이전트(방식 2 = AI는 추출·파이썬이 판단) — 1단계 프로토타입 구현·검증 완료**(2026-07-07). 코드=`erp-agent/`(저장소 밖 별도 폴더), 설계=`doc/AI에이전트-로컬LLM-업무자동화-설계.md`. Ollama `qwen2.5:7b`로 수주→생산→발주 분기 정상. 최상단 🧠 항목 참조.
+- (보류) Phase 17(자연어 데이터 검색, Text-to-SQL + 가드레일) — STUDY-PLAN Part 3 편입 완료, 구현 미착수. **행동형 에이전트(위 🧠)와는 별개 기술**(읽기 vs 쓰기), 후에 조회 액션에 접목 가능.
 
 ### 🗓 2026-07-05 세션 — 전자결재 엔진(전사 횡단) 1단계: 코어 + 견적 연동
 

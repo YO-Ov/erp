@@ -14,6 +14,7 @@
     </div>
 
     <form id="form">
+        <div id="poBanner"></div>
         <div class="card form-card mb-3"><div class="card-body">
             <div class="row g-3">
                 <div class="col-md-4">
@@ -63,6 +64,7 @@
 <script th:inline="javascript">
     const ID = [[${id}]];
     const isEdit = ID != null;
+    const poId = new URLSearchParams(location.search).get('poId');  // 발주로부터 입고 처리 시
     let items = [];   // 선택된 거래처의 취급품목(구매정보레코드)만 담긴다.
 
     // 거래처를 고르면 그 거래처가 취급하는 품목만 불러온다(단가는 구매정보레코드의 매입단가).
@@ -159,6 +161,7 @@
             vendorId: Number(document.getElementById('vendor').value),
             warehouseId: Number(document.getElementById('warehouse').value),
             receiptDate: document.getElementById('receiptDate').value,
+            purchaseOrderId: poId ? Number(poId) : null,   // 발주로부터 입고면 그 발주에 귀속
             lines,
         };
         try {
@@ -169,6 +172,17 @@
         } catch (err) {
             ERP.flashError(err);
         }
+    }
+
+    // 발주로부터 입고 시 상단 안내 배너 — 어떤 발주에 귀속되는지, 거래처·창고 고정 안내.
+    function renderPoBanner(po) {
+        document.getElementById('poBanner').innerHTML = `
+            <div class="alert alert-info py-2 px-3 small mb-3">
+                <i class="bi bi-link-45deg"></i> 구매발주
+                <a href="/mm/purchase-orders/${po.id}" class="fw-semibold">${ERP.esc(po.number)}</a>
+                에 대한 입고입니다 — 미납 수량이 기본 채워졌습니다.
+                거래처·창고는 발주와 동일해야 하며(변경 시 저장이 거부됩니다), 실제 입고 수량은 조정할 수 있습니다.
+            </div>`;
     }
 
     async function init() {
@@ -185,6 +199,26 @@
                 await loadVendorItems(r.vendorId);         // 저장된 거래처의 취급품목 로드
                 document.getElementById('receiptDate').value = r.receiptDate ?? '';
                 (r.lines || []).forEach(addLine);
+            } else if (poId) {
+                // 발주로부터 입고 — 거래처·창고·미납 라인을 발주값으로 자동 채운다.
+                document.getElementById('title').textContent = '발주로부터 입고';
+                const po = await ERP.api('/api/purchase-orders/' + poId);
+                await Promise.all([
+                    loadSelect('vendor', '/api/vendors', {status: 'ACTIVE', size: 500}, po.vendorId),
+                    loadSelect('warehouse', '/api/warehouses', {status: 'ACTIVE', size: 200}, po.warehouseId),
+                ]);
+                await loadVendorItems(po.vendorId);          // 발주 거래처의 취급품목
+                document.getElementById('receiptDate').value = new Date().toISOString().slice(0, 10);
+                // 미납(openQuantity>0) 라인만 그 잔량·매입단가로 프리필. 전량 입고됐으면 빈 라인 1개.
+                const openLines = (po.lines || []).filter(l => Number(l.openQuantity) > 0);
+                if (openLines.length === 0) {
+                    ERP.flash('이 발주는 이미 전량 입고되었습니다. 추가 입고할 수량을 직접 입력하세요.', 'info');
+                    addLine();
+                } else {
+                    openLines.forEach(l => addLine(
+                        {itemId: l.itemId, quantity: l.openQuantity, unitCost: l.unitPrice}));
+                }
+                renderPoBanner(po);
             } else {
                 await Promise.all([
                     loadSelect('vendor', '/api/vendors', {status: 'ACTIVE', size: 500}),

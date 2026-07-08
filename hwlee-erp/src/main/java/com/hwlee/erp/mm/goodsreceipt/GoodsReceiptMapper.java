@@ -8,12 +8,14 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface GoodsReceiptMapper {
 
-    @Mapping(source = "vendor.id",      target = "vendorId")
-    @Mapping(source = "vendor.code",    target = "vendorCode")
-    @Mapping(source = "vendor.name",    target = "vendorName")
-    @Mapping(source = "warehouse.id",   target = "warehouseId")
-    @Mapping(source = "warehouse.code", target = "warehouseCode")
-    @Mapping(source = "warehouse.name", target = "warehouseName")
+    @Mapping(source = "vendor.id",             target = "vendorId")
+    @Mapping(source = "vendor.code",           target = "vendorCode")
+    @Mapping(source = "vendor.name",           target = "vendorName")
+    @Mapping(source = "warehouse.id",          target = "warehouseId")
+    @Mapping(source = "warehouse.code",        target = "warehouseCode")
+    @Mapping(source = "warehouse.name",        target = "warehouseName")
+    @Mapping(source = "purchaseOrder.id",      target = "purchaseOrderId")
+    @Mapping(source = "purchaseOrder.number",  target = "purchaseOrderNumber")
     GoodsReceiptResponse toResponse(GoodsReceipt entity);
 
     @Mapping(source = "item.id",   target = "itemId")

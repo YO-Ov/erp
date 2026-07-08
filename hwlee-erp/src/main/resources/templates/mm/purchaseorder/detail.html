@@ -49,12 +49,13 @@
                 <thead>
                 <tr>
                     <th style="width:60px;">#</th><th>품목</th>
-                    <th class="text-end">수량</th><th class="text-end">매입단가</th><th class="text-end">라인 합계</th>
+                    <th class="text-end">발주수량</th><th class="text-end">입고</th><th class="text-end">미납</th>
+                    <th class="text-end">매입단가</th><th class="text-end">라인 합계</th>
                 </tr>
                 </thead>
                 <tbody id="lines"></tbody>
                 <tfoot>
-                <tr><td colspan="4" class="text-end fw-bold">합계</td>
+                <tr><td colspan="6" class="text-end fw-bold">합계</td>
                     <td class="text-end fw-bold" id="grandTotal">₩0</td></tr>
                 </tfoot>
             </table>
@@ -66,6 +67,7 @@
     const STATUS = {
         DRAFT:     {label: '작성 중',  color: 'secondary'},
         CONFIRMED: {label: '발주확정', color: 'primary'},
+        RECEIVED:  {label: '입고완료', color: 'info'},
         CLOSED:    {label: '종료',     color: 'success'},
         CANCELLED: {label: '취소됨',   color: 'dark'},
     };
@@ -96,12 +98,22 @@
             `${r.createdBy ?? '?'} · ${(r.createdAt ?? '').replace('T', ' ').slice(0, 16)}`;
 
         let grand = 0;
+        // 발주 확정 이후에만 입고/미납 진행을 보여준다(DRAFT 는 아직 발주 전이라 의미 없음).
+        const showReceipt = r.status === 'CONFIRMED' || r.status === 'RECEIVED' || r.status === 'CLOSED';
         document.getElementById('lines').innerHTML = (r.lines || []).map(l => {
             grand += Number(l.lineTotal) || 0;
+            const recv = Number(l.receivedQuantity) || 0;
+            const open = Number(l.openQuantity) || 0;
+            const recvCell = showReceipt ? ERP.num(recv) : '<span class="text-muted">-</span>';
+            const openCell = !showReceipt ? '<span class="text-muted">-</span>'
+                : (open > 0 ? `<span class="text-warning fw-semibold">${ERP.num(open)}</span>`
+                            : '<span class="text-success"><i class="bi bi-check-lg"></i> 완료</span>');
             return `<tr>
                 <td>${l.lineNo}</td>
                 <td>${ERP.esc(l.itemName)} <span class="text-muted small">${ERP.esc(l.itemCode)}</span></td>
                 <td class="text-end">${ERP.num(l.quantity)}</td>
+                <td class="text-end">${recvCell}</td>
+                <td class="text-end">${openCell}</td>
                 <td class="text-end">${ERP.won(l.unitPrice)}</td>
                 <td class="text-end">${ERP.won(l.lineTotal)}</td></tr>`;
         }).join('');
@@ -140,10 +152,14 @@
             btns.push(`<button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소</button>`);
             box.innerHTML = banner + btns.join(' ');
         } else if (status === 'CONFIRMED') {
-            box.innerHTML = `<span class="badge badge-soft badge-soft-info me-2"><i class="bi bi-check2-circle"></i> 발주 확정됨</span>
-                <a href="/mm/goods-receipts/new" class="btn btn-sm btn-primary"><i class="bi bi-box-arrow-in-down"></i> 입고 처리</a>
+            box.innerHTML = `<span class="badge badge-soft badge-soft-info me-2"><i class="bi bi-check2-circle"></i> 발주 확정됨 · 입고 대기</span>
+                <a href="/mm/goods-receipts/new?poId=${ID}" class="btn btn-sm btn-primary"><i class="bi bi-box-arrow-in-down"></i> 입고 처리</a>
                 <button class="btn btn-sm btn-outline-secondary" onclick="act('close','종료')">발주 종료</button>
                 <button class="btn btn-sm btn-outline-danger" onclick="act('cancel','취소')">취소</button>`;
+        } else if (status === 'RECEIVED') {
+            box.innerHTML = `<span class="badge badge-soft badge-soft-success me-2"><i class="bi bi-box-seam"></i> 전량 입고 완료</span>
+                <a href="/mm/goods-receipts/new?poId=${ID}" class="btn btn-sm btn-outline-primary"><i class="bi bi-box-arrow-in-down"></i> 추가 입고</a>
+                <button class="btn btn-sm btn-primary" onclick="act('close','종료')">발주 종료</button>`;
         } else {
             box.innerHTML = '<span class="text-muted small">최종 상태입니다(읽기 전용).</span>';
         }

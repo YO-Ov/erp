@@ -26,6 +26,9 @@
                 <dt class="col-sm-2">창고</dt>
                 <dd class="col-sm-4" id="d-warehouse">-</dd>
 
+                <dt class="col-sm-2">구매발주</dt>
+                <dd class="col-sm-10" id="d-po">-</dd>
+
                 <dt class="col-sm-2">전기 일시</dt>
                 <dd class="col-sm-4" id="d-posted">-</dd>
                 <dt class="col-sm-2">등록</dt>
@@ -78,6 +81,9 @@
         document.getElementById('d-date').textContent = r.receiptDate ?? '-';
         document.getElementById('d-vendor').textContent = `${r.vendorName} (${r.vendorCode})`;
         document.getElementById('d-warehouse').textContent = `${r.warehouseName} (${r.warehouseCode})`;
+        document.getElementById('d-po').innerHTML = r.purchaseOrderId
+            ? `<a href="/mm/purchase-orders/${r.purchaseOrderId}">${ERP.esc(r.purchaseOrderNumber)}</a>`
+            : '<span class="text-muted">무발주 입고</span>';
         document.getElementById('d-posted').textContent =
             r.postedAt ? r.postedAt.replace('T', ' ').slice(0, 16) : '-';
         document.getElementById('d-audit').textContent =

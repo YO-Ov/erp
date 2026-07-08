@@ -38,7 +38,18 @@
 > - **🧭 방향 결정(2026-07-07 세션 말, hwlee님 선택)**: ⓐ **배치** = 맥미니에서 **ERP + 에이전트 함께** 구동(로컬 개발은 agent→`localhost:8080`). 외부(집/회사) 접속용은 **Oracle Cloud 공개 URL 하나로 통일**. ⓑ **다음 트랙 = 에이전트 실 연결보다 "Oracle Cloud 배포"를 먼저** 진행하기로. → **에이전트 트랙은 여기서 일시 정지**(액션6종+확인게이트+연결계층까지 완성·검증됨, Mock 모드로 동작). 이후 Oracle Cloud에 ERP 배포 완료되면 그 URL로 `.env` 설정 후 HttpERPClient 엔드포인트 매핑하면 실 연결.
 > - **➡ 다음 세션 시작점**: Oracle Cloud 배포 트랙(하단 "🖥 병행 트랙 — Oracle Cloud Always Free 배포" 참조). 착수 시 배포파일(ERP·MES Dockerfile + `docker-compose.prod.yml`) 작성부터. 배포 전 Oracle Cloud 계정 상태(종량제 업그레이드 완료 여부·A1 인스턴스 생성 여부) 먼저 확인 필요. 참고: 로컬 `docker-compose.yml`은 이미 KRaft Kafka + ERP/MES MySQL 2개 + Zipkin 구성(단, 앱 컨테이너는 없음 — prod compose에 ERP/MES 앱 서비스 추가 필요).
 >
-> ### 🆕 전자결재 3단계 — 구매발주(PO) 문서 신설 + 결재 연동 (2026-07-06 세션, 미커밋)
+> ### 🆕 구매발주(PO) ↔ 입고(GR) 연동 = 2차 (발주 대비 입고 집계·RECEIVED 자동전이) 완료 (2026-07-07 세션, 미커밋)
+> 직전 커밋(`8b610ed` PO 신설)에서 **의도적으로 2차로 분리**했던 "입고 역참조 연동"을 구현. 이제 발주와 입고가 데이터로 이어지고 **발주수량 / 입고누계 / 미납**을 라인별로 추적한다.
+> - **상태 확장**: `PurchaseOrderStatus`에 **`RECEIVED`(입고완료)** 신설 → `DRAFT→CONFIRMED→RECEIVED→CLOSED`. 부분입고 중엔 CONFIRMED 유지, **전 라인 입고누계 ≥ 발주수량이면 자동 CONFIRMED→RECEIVED**(입고 취소로 미달되면 RECEIVED→CONFIRMED 복귀). `PurchaseOrder.syncReceiptStatus(boolean)` + `close()`를 CONFIRMED·RECEIVED 양쪽 허용으로 확장(부분입고 강제종결 가능). status가 varchar(enum name)라 **DB 마이그레이션 불필요**.
+> - **GR→PO 참조**: `GoodsReceipt`에 `@ManyToOne PurchaseOrder purchaseOrder` **nullable** FK + `assignPurchaseOrder()`. 무발주 입고(과거 3년치 시드 V60~V63, 긴급 입고)는 그대로 NULL. **Flyway V71**(`goods_receipt.purchase_order_id` nullable 컬럼+FK+인덱스).
+> - **집계**: `GoodsReceiptRepository.sumReceivedQuantityByPurchaseOrder(poId)`(POSTED 입고만, 품목별 SUM, projection `ReceivedQtyRow`). `GoodsReceiptService.post/cancel` 끝에서 PO 참조 있으면 `purchaseOrderService.syncReceiptStatus(poId)` 호출(auto-flush로 방금 POSTED/CANCELLED 반영). `PurchaseOrderService.findById`는 이 집계를 `@Context Map`으로 mapper에 넘겨 **라인별 receivedQuantity·openQuantity** 채움(목록/생성/수정은 빈 맵 = N+1 방지). ⚠️ **단순화**: PO 라인에 동일 품목 중복 없음 전제(item별 집계를 라인에 귀속) — javadoc 명시.
+> - **입고 생성 검증**: `GoodsReceiptCreateRequest`에 `purchaseOrderId`(nullable) 추가 + **기존 4-arg 보조 생성자 유지**(테스트 14곳+ 무수정). create 시 발주 상태(CONFIRMED/RECEIVED)·거래처 일치 검증(`resolvePurchaseOrder`). `GoodsReceiptResponse`에 purchaseOrderId·number 노출.
+> - **화면**: ① PO 상세 라인에 **발주/입고/미납 컬럼**(미납>0 주황, 0이면 초록 완료 체크, DRAFT는 '-') + RECEIVED 배지·"입고 처리" 딥링크 **`/mm/goods-receipts/new?poId=`** + RECEIVED 시 발주종료 버튼. ② 입고 폼이 `?poId=`면 **발주로부터 입고 모드**(거래처·창고·미납 라인 자동 프리필 + 매입단가, 발주 참조 안내 배너, body에 purchaseOrderId). ③ 입고 상세에 발주 링크 행(무발주면 "무발주 입고"). 순수 프론트, 강력새로고침 필요.
+> - **검증**: 도메인 `PurchaseOrderTest` **9건 그린**(RECEIVED 전이·복귀·close/cancel 규칙 3건 신규). 통합 신규 `PurchaseOrderReceiptIntegrationTest` **2건 그린**(부분→전량 RECEIVED 전이 + 입고취소 복귀, 라인별 집계 단언) = 집계 쿼리·매퍼·post/cancel 동기화 실 MySQL 검증. `MmScenarioTest` 그린 = V71 적용+무발주 입고 무회귀. `compileJava/compileTestJava` 그린. **전체 `./gradlew test` BUILD SUCCESSFUL = 회귀 0**(입고 사용 통합테스트 SdMm·PartialDelivery·ConcurrentGoodsIssue·FiAccounting 포함).
+> - **▶ 남은 후속(선택)**: ① PO 결재 e2e 통합테스트(생성→상신→승인→CONFIRMED) ② 초과입고 방지 옵션(현재는 허용) ③ 실 앱 육안 e2e(발주 확정→발주로부터 입고→RECEIVED) ④ 구매요청(PR) 상위 문서 ⑤ 대결/위임.
+> - ⚠️ **미커밋** — 다른 PC에서 이어가려면 hwlee님이 커밋+푸시. ⚠️ 프론트 **강력새로고침**(PO 상세·입고 폼/상세 JS 변경).
+>
+> ### 🆕 전자결재 3단계 — 구매발주(PO) 문서 신설 + 결재 연동 (2026-07-06 세션, 커밋 `8b610ed`)
 > hwlee님이 "다음 진도"로 **구매발주(PO) 신설**을 선택. 그동안 이 ERP는 매입 쪽에 PO 문서가 없어 입고(GoodsReceipt)만 독립 생성됐는데, 직전 세션에 깔아둔 거래처 취급품목(VendorItem)을 게이트로 재사용해 **매입 사이드의 상위 발주 문서**를 신설했다. 입고(MM)·수주(SD)·결재(견적/지급) 패턴을 그대로 본뜸.
 > - **상태머신**: `DRAFT →(전자결재 상신·최종 승인)→ CONFIRMED(발주확정) →(입고 완료)→ CLOSED`, `CANCELLED`(DRAFT/CONFIRMED에서). **결재 없이는 확정 불가**(지출 통제) — 견적/지급처럼 승인 콜백(`PurchaseOrderApprovalListener`, BEFORE_COMMIT)이 `confirmByApproval`로 CONFIRMED 전이. `ApprovalDocType.PURCHASE_ORDER`는 이미 enum에 있었고 전결 규정 시드만 없어서 그것만 추가.
 > - **채번**: prefix `PO`는 **생산지시(ProductionOrder)가 선점** → 구매발주는 **`PORD`**(`PORD-20260706-001`). `TransactionNumberGenerator`에 `PREFIX_PURCHASE_ORDER`+`nextPurchaseOrderNumber` 추가.
@@ -101,7 +112,7 @@
 
 - **🎉 Phase 0~16 전체 구현 완료·검증.** 이후 hwlee님 요청으로 **실무형 기능을 점진적으로 확장 중**(아래 2026-06-10 항목들). 학습 문서(doc/)는 별도 트랙.
 - **▶ 진행 중 = "실무 리얼리즘 확장" 프로젝트**(2026-06-27 착수, 포트폴리오 외부 공개용). 바로 아래 항목 참조. **STEP 1(KRaft)·2(카테고리 마스터화)·3(Factory)·4(마스터 대량확장)·5(3년치 실거래 백필) 완료. STEP 6은 테스트 정리 완료·`doc/` 학습문서만 남음.**
-- **🆕 전자결재 엔진(전사 횡단) 1~3단계 진행 중**(2026-07-05~06). 1~2단계=범용 결재 엔진 + 견적·지급·전표 연동 + 여신 완전통합(전체 112개 테스트 그린 + 실 앱 RDS e2e). **3단계=구매발주(PO) 문서 신설 + 결재 연동**(2026-07-06, 위 최상단 🆕 항목 참조, 미커밋).
+- **🆕 전자결재 엔진(전사 횡단) 1~3단계 + 구매 프로세스 확장 진행 중**(2026-07-05~07). 1~2단계=범용 결재 엔진 + 견적·지급·전표 연동 + 여신 완전통합(전체 112개 테스트 그린 + 실 앱 RDS e2e). 3단계=구매발주(PO) 문서 신설 + 결재 연동(커밋 `8b610ed`). **PO↔입고(GR) 2차 연동=발주 대비 입고 집계·RECEIVED 자동전이**(2026-07-07, 위 최상단 🆕 항목, 미커밋).
 - **🧠 로컬 LLM ERP 에이전트(방식 2 = AI는 추출·파이썬이 판단) — 1단계 프로토타입 구현·검증 완료**(2026-07-07). 코드=`erp-agent/`(저장소 밖 별도 폴더), 설계=`doc/AI에이전트-로컬LLM-업무자동화-설계.md`. Ollama `qwen2.5:7b`로 수주→생산→발주 분기 정상. 최상단 🧠 항목 참조.
 - (보류) Phase 17(자연어 데이터 검색, Text-to-SQL + 가드레일) — STUDY-PLAN Part 3 편입 완료, 구현 미착수. **행동형 에이전트(위 🧠)와는 별개 기술**(읽기 vs 쓰기), 후에 조회 액션에 접목 가능.
 

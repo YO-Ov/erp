@@ -1,0 +1,43 @@
+# ═══════════════════════════════════════════════════════════════════
+# CI/CD — main 에 push 되면 Oracle Cloud 서버로 자동 배포.
+#
+#   흐름:  push(main) → GitHub 러너가 서버에 SSH 접속 → ./deploy.sh 실행
+#          (빌드는 서버에서 → ARM 교차빌드 불필요)
+#
+#   필요한 저장소 Secrets (Settings → Secrets and variables → Actions):
+#     - SSH_HOST : 168.107.50.105
+#     - SSH_USER : ubuntu
+#     - SSH_KEY  : CI 전용 개인키 전체 내용 (ssh-key/ci_deploy_key)
+# ═══════════════════════════════════════════════════════════════════
+name: Deploy to Oracle Cloud
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}   # Actions 탭에서 수동 실행 버튼도 제공
+
+# 배포 중복 방지 — 이전 배포가 끝나기 전엔 새 배포를 겹쳐 돌리지 않음
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 서버에 SSH 접속하여 배포
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          # 시크릿의 개인키를 파일로 (권한 600)
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          # 서버 호스트키 등록 (MITM 방지용 known_hosts)
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # 서버에서 배포 스크립트 실행 (git pull + compose up -d --build)
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes \
+              "$SSH_USER@$SSH_HOST" 'cd ~/erp && ./deploy.sh'

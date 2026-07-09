@@ -1,7 +1,7 @@
 services:
   # ── ERP 전용 DB ──────────────────────────────────────────────
   mysql:
-    image: mysql:8.0
+    image: mysql:8.4
     container_name: hwlee-erp-mysql
     restart: unless-stopped
     environment:
@@ -26,7 +26,7 @@ services:
 
   # ── MES 전용 DB (시스템 간 DB 분리를 물리적으로 강제) ──────────
   mes-mysql:
-    image: mysql:8.0
+    image: mysql:8.4
     container_name: hwlee-mes-mysql
     restart: unless-stopped
     environment:

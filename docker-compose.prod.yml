@@ -14,7 +14,7 @@
 services:
   # ── ERP 전용 DB ──────────────────────────────────────────────
   mysql:
-    image: mysql:8.0
+    image: mysql:8.4
     container_name: hwlee-erp-mysql
     restart: unless-stopped
     environment:
@@ -37,7 +37,7 @@ services:
 
   # ── MES 전용 DB ──────────────────────────────────────────────
   mes-mysql:
-    image: mysql:8.0
+    image: mysql:8.4
     container_name: hwlee-mes-mysql
     restart: unless-stopped
     environment:

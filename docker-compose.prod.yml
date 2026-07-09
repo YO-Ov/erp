@@ -1,0 +1,141 @@
+# ═══════════════════════════════════════════════════════════════════
+# 서버(Oracle Cloud) 배포용 통합 compose
+#   인프라 4개(MySQL×2·Kafka·Zipkin) + 앱 2개(ERP·MES) 를 한 번에 기동.
+#
+#   로컬 docker-compose.yml 과의 차이:
+#   - 앱 2개(erp/mes)를 Dockerfile 로 빌드해 함께 띄운다.
+#   - DB/Kafka/Zipkin 은 '외부에 포트를 열지 않는다'(컨테이너끼리만 통신).
+#   - 앱 포트(8080/8082)는 127.0.0.1 로만 바인딩 → 서버 내부에서 curl 확인용.
+#     외부 공개는 나중에 리버스 프록시(Caddy/Cloudflare)로 80/443 만.
+#
+#   기동:  docker compose -f docker-compose.prod.yml up -d --build
+#   민감값: 같은 폴더의 .env (JWT_SECRET / *_DB_PASSWORD). .env.example 참고.
+# ═══════════════════════════════════════════════════════════════════
+services:
+  # ── ERP 전용 DB ──────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: hwlee-erp-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: erp_db
+      MYSQL_USER: erp
+      MYSQL_PASSWORD: ${ERP_DB_PASSWORD:-erp}
+      TZ: Asia/Seoul
+    volumes:
+      - hwlee-erp-mysql-data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+09:00
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uerp", "-p${ERP_DB_PASSWORD:-erp}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── MES 전용 DB ──────────────────────────────────────────────
+  mes-mysql:
+    image: mysql:8.0
+    container_name: hwlee-mes-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: mes_db
+      MYSQL_USER: mes
+      MYSQL_PASSWORD: ${MES_DB_PASSWORD:-mes}
+      TZ: Asia/Seoul
+    volumes:
+      - hwlee-mes-mysql-data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+09:00
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-umes", "-p${MES_DB_PASSWORD:-mes}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Kafka 단일 브로커 (KRaft) ────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: hwlee-kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      # 앱은 컨테이너 내부 리스너(kafka:29092)로 붙는다. 호스트 리스너는 디버깅용.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      TZ: Asia/Seoul
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  # ── 분산 추적 ────────────────────────────────────────────────
+  zipkin:
+    image: openzipkin/zipkin:3
+    container_name: hwlee-zipkin
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9411:9411"   # 서버 내부에서만 UI 확인 (외부 비공개)
+    environment:
+      TZ: Asia/Seoul
+
+  # ── ERP 앱 ───────────────────────────────────────────────────
+  erp:
+    build:
+      context: ./hwlee-erp
+      dockerfile: Dockerfile
+    image: hwlee-erp:latest
+    container_name: hwlee-erp
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      ERP_DB_PASSWORD: ${ERP_DB_PASSWORD:-erp}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-dot-env-please}
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:8080:8080"   # 서버 내부 curl 확인용. 외부는 리버스 프록시로.
+
+  # ── MES 앱 ───────────────────────────────────────────────────
+  mes:
+    build:
+      context: ./hwlee-mes
+      dockerfile: Dockerfile
+    image: hwlee-mes:latest
+    container_name: hwlee-mes
+    restart: unless-stopped
+    depends_on:
+      mes-mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      MES_DB_PASSWORD: ${MES_DB_PASSWORD:-mes}
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:8082:8082"
+
+volumes:
+  hwlee-erp-mysql-data:
+  hwlee-mes-mysql-data:

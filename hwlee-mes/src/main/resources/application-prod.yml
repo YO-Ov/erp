@@ -1,0 +1,17 @@
+# ── 서버(Oracle Cloud) 배포 전용 프로파일 ──────────────────────────
+# docker-compose.prod.yml 네트워크 '내부 서비스명' 기준 주소.
+spring:
+  datasource:
+    # localhost:3308 → 서비스명 hwlee-mes-mysql:3306
+    url: jdbc:mysql://hwlee-mes-mysql:3306/mes_db?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: mes
+    password: ${MES_DB_PASSWORD:mes}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  kafka:
+    bootstrap-servers: kafka:29092
+
+management:
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans

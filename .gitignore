@@ -31,3 +31,8 @@ build/
 secret.properties
 **/secret.properties
 __pycache__/
+
+### SSH 키 (서버 접속용 개인키 — 절대 커밋 금지) ###
+ssh-key/
+*.pem
+*.key

@@ -3,6 +3,12 @@
 > **이 글의 목적**: [`서버구성.md`](서버구성.md)가 "어디에·왜 올릴지"의 **검토 기록**이라면, 이 문서는
 > 실제로 생성한 인스턴스 위에 **ERP·MES·Docker 인프라를 올리는 실행 절차**와 **CI/CD 도구 선택**을 정리한 기록이다.
 > 인프라/네트워킹/도메인(Cloudflare)의 배경 설명은 [`서버구성.md`](서버구성.md) 참조.
+>
+> **빠른 길잡이** — 목적별로 이 절부터:
+> - 서버에 **SSH 접속** → §0.5
+> - 서버 **최초 세팅**(Docker 등) → §2
+> - **앱까지 실제 배포**(따라 치는 순서) → **§3.4 runbook**
+> - **CI/CD 자동화** 방향 → §4
 
 ---
 
@@ -34,6 +40,61 @@
 
 > ⚠️ **유휴 회수 주의**: Always Free A1은 장기 유휴 시 리소스가 회수될 수 있다. 실습 중엔 되도록 켜두고,
 > "start 실패 / out of capacity"는 설정 문제가 아니라 용량 이슈이니 시간을 두고 재시도. 100% 안전화는 계정을 **Pay As You Go로 업그레이드**(무료 범위 내 0원). — 상세: `서버구성.md` §2
+
+---
+
+## 0.5 SSH 접속 방법
+
+서버에 붙는 첫 관문. 접속에 필요한 값은 **3가지**뿐이다: **① Public IP, ② OS 계정명, ③ 개인키 파일**.
+
+### 접속 명령
+
+```bash
+# 형식:  ssh -i <개인키경로> <계정>@<Public IP>
+ssh -i ~/.ssh/oracle-hyunwoo.key ubuntu@168.107.50.105
+```
+
+- `-i <개인키>`: 인스턴스 **생성 시 다운로드한 private key** 파일 경로.
+- `<계정>`: 이미지 종류로 **고정**됨 — Ubuntu 이미지면 **`ubuntu`**, Oracle Linux면 **`opc`**. (이 문서 §2는 Ubuntu 기준 → `ubuntu`)
+- `<Public IP>`: §0의 `168.107.50.105`. 단, **정지→재시작 시 바뀔 수 있으니**(고정 IP가 아니면) 접속 전 콘솔에서 재확인.
+
+### 개인키 권한 (첫 접속 시 필수)
+
+키 파일 권한이 느슨하면 `UNPROTECTED PRIVATE KEY FILE!` 에러로 접속이 거부된다:
+
+```bash
+chmod 600 ~/.ssh/oracle-hyunwoo.key
+```
+
+### 매번 -i 치기 귀찮으면 (선택) — `~/.ssh/config`
+
+```
+Host hyunwoo
+    HostName 168.107.50.105
+    User ubuntu
+    IdentityFile ~/.ssh/oracle-hyunwoo.key
+```
+
+→ 이후 **`ssh hyunwoo`** 한 줄로 접속.
+
+### ⚠️ 접속이 안 될 때 체크리스트
+
+1. **인스턴스가 Start 상태인가** (정지돼 있으면 콘솔에서 Start)
+2. **VCN Security List에 22번 Ingress가 열려 있나** (기본은 열려 있음 — §2.1 방화벽 2겹 참고)
+3. **키/계정/IP가 맞나** — 계정명 틀리면 `Permission denied (publickey)` 로 떨어짐
+4. **키 권한 600인가** (위 chmod)
+
+---
+
+### 📌 내가 직접 확인해야 할 값 — 어디서 보나
+
+| 값 | 어디서 확인 | 현재 알려진 값 |
+|---|---|---|
+| **Public IP** | OCI 콘솔 → Compute → Instances → `hyunwoo-server` → **Instance details** 의 *Public IP address* | `168.107.50.105` (재시작 시 변동 가능) |
+| **OS 계정명** | 인스턴스 상세의 **Image** 항목 확인 → Ubuntu면 `ubuntu`, Oracle Linux면 `opc` | (Ubuntu 기준이면) `ubuntu` |
+| **개인키 파일** | 인스턴스 **생성할 때 "Download private key"로 받은 `.key`/`.pem`** (보통 `~/Downloads`) | 로컬 파일 확인 필요 |
+
+> **키를 분실한 경우**: 콘솔에서 기존 키 재발급은 불가. 새 SSH 키쌍을 만들어 **콘솔의 인스턴스 콘솔 연결(Cloud Shell/시리얼 콘솔) 또는 메타데이터**를 통해 공개키를 주입해야 한다. (필요 시 별도 안내)
 
 ---
 
@@ -83,14 +144,20 @@ sudo usermod -aG docker $USER   # 로그아웃→재접속 시 sudo 없이 docke
 
 서버에선 앱까지 docker-compose에 넣어 **한 번에 기동**하는 게 재현성·관리 면에서 유리.
 
-### 3.1 만들 것
+### 3.1 만들 것 → ✅ 작성 완료
 
-1. **ERP·MES에 Dockerfile 추가** (멀티스테이지, 베이스는 멀티아치 `eclipse-temurin:21-jre` 류 → ARM에서 그대로 빌드)
-2. **`prod`(=oracle) 프로파일** 추가 — compose 네트워크 내부 주소로 변경:
-   - DB: `localhost:3307` → **`hwlee-erp-mysql:3306`** (서비스명:내부포트)
-   - Kafka: `localhost:9092` → **`kafka:29092`** (내부 리스너)
-3. **`docker-compose.prod.yml`** — 기존 인프라(MySQL×2·Kafka·Zipkin) + **앱 2개(ERP·MES)** 통합
-4. **배포 스크립트 `deploy.sh`** — `git pull && docker compose -f docker-compose.prod.yml up -d --build`
+| 산출물 | 경로 | 역할 |
+|---|---|---|
+| ERP Dockerfile | `hwlee-erp/Dockerfile` | 멀티스테이지(JDK 빌드→JRE 실행). 멀티아치 → ARM에서 그대로 빌드 |
+| MES Dockerfile | `hwlee-mes/Dockerfile` | 위와 동일, 포트 8082 |
+| ERP prod 프로파일 | `hwlee-erp/src/main/resources/application-prod.yml` | DB `hwlee-erp-mysql:3306`, Kafka `kafka:29092`, Zipkin/MES 도 서비스명 |
+| MES prod 프로파일 | `hwlee-mes/src/main/resources/application-prod.yml` | DB `hwlee-mes-mysql:3306`, Kafka `kafka:29092` |
+| 통합 compose | `docker-compose.prod.yml` | 인프라 4개 + 앱 2개. 앱은 `127.0.0.1` 로만 바인딩(외부 비공개) |
+| 손배포 스크립트 | `deploy.sh` | `git pull && compose up -d --build` + 상태 출력 |
+| 민감값 템플릿 | `.env.example` | `JWT_SECRET`, `*_DB_PASSWORD`. 서버에서 `.env` 로 복사해 채움 |
+
+> **왜 Java·MySQL 을 서버에 직접 설치하지 않나**: MySQL·Kafka·Zipkin 은 compose 가 컨테이너로 띄우고,
+> Java 는 **Dockerfile 빌드 스테이지 안에서만** 쓰인다. 서버 OS엔 **Docker 만** 있으면 된다(§2에서 설치 완료).
 
 ### 3.2 Java/ARM 참고
 
@@ -110,6 +177,41 @@ sudo usermod -aG docker $USER   # 로그아웃→재접속 시 sudo 없이 docke
 ```
 
 > **원칙**: 수동 배포(⑤)가 먼저 되어야 자동화(⑦)가 된다. CI/CD는 손배포 위에 얹는 자동화일 뿐.
+
+### 3.4 서버 배포 실행 순서 (runbook — 이대로 따라치면 됨)
+
+§2(기본 세팅+Docker)까지 끝난 서버에서, 위 산출물(§3.1)이 커밋된 상태로 진행:
+
+```bash
+# ── 서버에 SSH 접속 (§0.5) ──
+ssh -i <키> ubuntu@168.107.50.105
+
+# ① 코드 받기 (최초 1회)
+git clone https://github.com/YO-Ov/erp.git
+cd erp
+
+# ② 민감값 파일 생성 — .env 는 git 에 없으므로 서버에서 직접 만든다
+cp .env.example .env
+nano .env          # JWT_SECRET 을 긴 랜덤값으로 교체 (openssl rand -base64 48)
+
+# ③ 배포 — 인프라 4개 + 앱 2개를 한 번에 빌드·기동
+./deploy.sh
+#   (내부적으로:  git pull && docker compose -f docker-compose.prod.yml up -d --build)
+
+# ④ 검증 — 컨테이너 6개가 Up 인지 + 앱 헬스
+docker compose -f docker-compose.prod.yml ps
+curl localhost:8080/actuator/health     # ERP  → {"status":"UP"}
+curl localhost:8082/actuator/health     # MES  → {"status":"UP"}
+```
+
+- **첫 빌드는 느리다**(gradle 의존성 다운로드 + 이미지 빌드, 수 분). 2회차부턴 레이어 캐시로 빨라짐.
+- 앱 포트(8080/8082)는 **`127.0.0.1` 로만** 열려 있어 외부에선 안 보인다. 서버 안에서 `curl` 로만 확인.
+  외부 공개는 이후 도메인+리버스 프록시(⑥)에서 80/443 로.
+- 로그 보기:  `docker compose -f docker-compose.prod.yml logs -f erp`
+- 이후 코드 변경 반영:  서버에서 `./deploy.sh` 한 번 더 (git pull → 재빌드 → 재기동).
+
+> ⚠️ **DB 스키마(Flyway)**: 앱 기동 시 Flyway 가 `erp_db`/`mes_db` 에 마이그레이션을 자동 적용한다.
+> 컨테이너 MySQL 은 빈 DB로 시작하므로 첫 기동에서 전체 스키마가 생성된다(별도 수동 작업 불필요).
 
 ---
 
@@ -139,11 +241,12 @@ sudo usermod -aG docker $USER   # 로그아웃→재접속 시 sudo 없이 docke
 
 ## 5. 다음 할 일
 
-- [ ] 콘솔에서 인스턴스 **Start** → SSH 접속 확인
-- [ ] 기본 세팅 + Docker 설치 (§2)
-- [ ] 방화벽 2겹 개방 (Security List + iptables, 80/443)
-- [ ] **ERP·MES Dockerfile + `prod` 프로파일** 작성 (§3.1)
-- [ ] **docker-compose.prod.yml** 작성
-- [ ] **deploy.sh** 로 손배포 검증
+- [x] 콘솔에서 인스턴스 **Start** → SSH 접속 확인 (§0.5, 접속 성공)
+- [x] 기본 세팅 + Docker 설치 (§2)
+- [x] **ERP·MES Dockerfile + `prod` 프로파일** 작성 (§3.1)
+- [x] **docker-compose.prod.yml** 작성
+- [x] **deploy.sh** + `.env.example` 작성
+- [ ] **서버에서 `./deploy.sh` 손배포 검증** (§3.4) ← **다음 차례**
+- [ ] 방화벽: SSH(22)는 확인됨. 이후 리버스 프록시용 **80/443** 개방 (Security List + iptables)
 - [ ] 도메인 구매 → Cloudflare 연결 + HTTPS (`서버구성.md` §4~5)
 - [ ] GitHub Actions(② SSH 배포)로 자동화

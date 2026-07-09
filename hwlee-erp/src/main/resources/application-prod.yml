@@ -1,0 +1,38 @@
+# ── 서버(Oracle Cloud) 배포 전용 프로파일 ──────────────────────────
+# local: DB/Kafka 를 localhost 로 봄 (개발 PC 전용)
+# aws  : 회사 AWS RDS 를 봄 (서버가 쓸 DB 아님)
+# prod : docker-compose.prod.yml 네트워크 '내부 서비스명' 으로 접속.
+#        → 호스트가 아니라 '컨테이너 네트워크' 기준 주소를 쓴다.
+spring:
+  datasource:
+    # localhost:3307 → 서비스명:내부포트(3306). 컨테이너끼리는 서비스명으로 통신.
+    url: jdbc:mysql://hwlee-erp-mysql:3306/erp_db?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: erp
+    # 기본값 erp — 실제 운영 시 .env 의 ERP_DB_PASSWORD 로 덮어씀
+    password: ${ERP_DB_PASSWORD:erp}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # localhost:9092(호스트 리스너) → kafka:29092(컨테이너 내부 리스너)
+  kafka:
+    bootstrap-servers: kafka:29092
+
+  # 운영: 템플릿/정적 리소스 캐시 켬 (local 은 꺼둠)
+  thymeleaf:
+    cache: true
+  web:
+    resources:
+      cache:
+        period: 3600
+
+# Zipkin 도 컨테이너 서비스명으로
+management:
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+
+# ERP→MES 호출도 컨테이너 서비스명으로 (localhost:8082 → mes:8082)
+mes:
+  base-url: http://mes:8082
+
+# JWT_SECRET 은 application.yml 의 ${JWT_SECRET:...} 로 주입됨.
+# → 운영에선 반드시 .env 의 JWT_SECRET 으로 실제 시크릿을 넣을 것.

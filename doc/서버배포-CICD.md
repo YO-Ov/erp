@@ -246,7 +246,36 @@ curl localhost:8082/actuator/health     # MES  → {"status":"UP"}
 - [x] **ERP·MES Dockerfile + `prod` 프로파일** 작성 (§3.1)
 - [x] **docker-compose.prod.yml** 작성
 - [x] **deploy.sh** + `.env.example` 작성
-- [ ] **서버에서 `./deploy.sh` 손배포 검증** (§3.4) ← **다음 차례**
-- [ ] 방화벽: SSH(22)는 확인됨. 이후 리버스 프록시용 **80/443** 개방 (Security List + iptables)
-- [ ] 도메인 구매 → Cloudflare 연결 + HTTPS (`서버구성.md` §4~5)
-- [ ] GitHub Actions(② SSH 배포)로 자동화
+- [x] **서버에서 `./deploy.sh` 손배포 검증** (§3.4) — 컨테이너 6개 기동, ERP/MES `/actuator/health` = UP (MySQL 8.4 연결 정상)
+- [x] **GitHub Actions(② SSH 배포)로 자동화** — `.github/workflows/deploy.yml`. main push → 러너가 SSH로 서버 접속 → `deploy.sh`. 첫 자동배포 success 확인
+- [x] **도메인 구매** — `hyunwoo.pro` (가비아, 현재 네임서버=가비아 기본)
+- [ ] **도메인 → HTTPS 연결** (`서버구성.md` §4~5) ← **다음 차례** (아래 §6 시작점 참고)
+
+---
+
+## 6. 다음 세션 시작점 — HTTPS 공개 (도메인 hyunwoo.pro)
+
+> 여기까지: **서버에서 앱 6개 기동 + CI/CD 자동배포 완료.** 단, 앱은 `127.0.0.1` 바인딩이라
+> **아직 외부(브라우저)에선 접속 불가.** 다음 목표 = `https://hyunwoo.pro` 로 외부 공개.
+
+### 결정해야 할 것 (세션 시작 시 먼저)
+- **경로 ① Caddy 단독**: 가비아 네임서버 그대로 + 가비아 DNS에 A레코드(→168.107.50.105).
+  서버 Caddy가 Let's Encrypt 자동 HTTPS. 실서버 IP 노출됨. **간단.**
+- **경로 ② Cloudflare(문서 추천, `서버구성.md` §5)**: 가비아 네임서버를 Cloudflare NS로 변경.
+  무료 HTTPS + 실서버 IP 숨김 + DDoS/WAF. **포트폴리오용으로 더 그럴듯.**
+  → SSL 모드는 **Full + Cloudflare Origin 인증서** 권장.
+
+### 남은 작업 (경로 확정 후)
+1. **DNS 연결** — A 레코드 `hyunwoo.pro → 168.107.50.105`
+   - 경로②면: 먼저 Cloudflare에 도메인 추가 → 발급된 NS 2개를 가비아 "타사 네임서버"에 입력
+2. **방화벽 2겹 80/443 개방** — VCN Security List Ingress + 서버 iptables (§2의 2겹 함정)
+3. **리버스 프록시(Caddy) 컨테이너 추가** — `docker-compose.prod.yml` 에 caddy 서비스,
+   `hyunwoo.pro → erp:8080` / (서브도메인 등으로) `mes:8082` 라우팅. Caddyfile 작성.
+4. **앱 포트 바인딩 정리** — 8080/8082 는 `127.0.0.1` 유지(직접 노출 X), 외부는 Caddy 통해 443만.
+5. 브라우저에서 `https://hyunwoo.pro` 접속 확인.
+
+### 참고 (이번 세션에서 만들어둔 것)
+- 서버 접속: `ssh -i ssh-key/ssh-key-2026-07-07.key ubuntu@168.107.50.105` (키 권한 600)
+- CI 배포키: `ssh-key/ci_deploy_key` (서버 authorized_keys 등록됨, GitHub Secret `SSH_KEY`)
+- GitHub Secrets: `SSH_HOST`/`SSH_USER`/`SSH_KEY` 등록 완료
+- 임시로 브라우저 확인만 하려면: SSH 터널 `ssh -i <키> -L 18080:localhost:8080 ubuntu@168.107.50.105` → `http://localhost:18080`

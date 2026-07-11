@@ -136,6 +136,30 @@ services:
     ports:
       - "127.0.0.1:8082:8082"
 
+  # ── 리버스 프록시 (외부 공개 관문) ──────────────────────────────
+  #   유일하게 외부(0.0.0.0)로 80/443 을 여는 컨테이너.
+  #   Cloudflare(주황 구름) → 이 Caddy(443, Origin 인증서) → erp:8080.
+  #   Origin 인증서 파일은 서버의 ./caddy/certs/ 에 직접 둔다(origin.pem/origin.key, git 제외).
+  caddy:
+    image: caddy:2
+    container_name: hwlee-caddy
+    restart: unless-stopped
+    depends_on:
+      - erp
+      - mes
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/certs:/etc/caddy/certs:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      TZ: Asia/Seoul
+
 volumes:
   hwlee-erp-mysql-data:
   hwlee-mes-mysql-data:
+  caddy-data:
+  caddy-config:

@@ -274,6 +274,20 @@ curl localhost:8082/actuator/health     # MES  → {"status":"UP"}
 4. **앱 포트 바인딩 정리** — 8080/8082 는 `127.0.0.1` 유지(직접 노출 X), 외부는 Caddy 통해 443만.
 5. 브라우저에서 `https://hyunwoo.pro` 접속 확인.
 
+### 진행 중 (2026-07-11) — Cloudflare 경로 착수
+- 경로 **②Cloudflare 확정**. Cloudflare 무료 플랜에 `hyunwoo.pro` 사이트 추가(Connect a domain) 완료.
+- **배정된 Cloudflare 네임서버 2개**(가비아 "타사 네임서버"에 입력할 값):
+  - `boyd.ns.cloudflare.com`
+  - `june.ns.cloudflare.com`
+- DNS 레코드: root `@`·`www` A레코드 → `168.107.50.105`, **Proxied(주황 구름)** 로 설정.
+- **가비아 네임서버 교체 완료**(위 2개로) → Cloudflare `Pending → Active` 전파 대기 중.
+- **✅ Caddy 리버스 프록시 구성 작성 완료**(코드):
+  - `caddy/Caddyfile` — Cloudflare Origin 인증서(`/etc/caddy/certs/origin.{pem,key}`)로 443 TLS, `hyunwoo.pro`·`www` → `erp:8080` 프록시. MES 서브도메인은 주석(선택).
+  - `docker-compose.prod.yml` — `caddy` 서비스 추가(유일하게 외부 80/443 오픈) + `caddy-data`/`caddy-config` 볼륨. 앱은 여전히 `127.0.0.1` 바인딩.
+  - `hwlee-erp/.../application-prod.yml` — `server.forward-headers-strategy: framework`(프록시 뒤 https 인식, 로그인 리다이렉트 무한루프 방지).
+  - Origin 인증서 파일(`caddy/certs/origin.pem`·`origin.key`)은 **git 제외**(`*.pem`/`*.key`), 서버에 직접 배치.
+- **남은 것**: ① Cloudflare Origin 인증서 발급 + SSL 모드 **Full (strict)** ② Active 확인 ③ 방화벽 2겹 80/443 ④ 서버에 인증서 배치 ⑤ 커밋·푸시 → 자동배포 → `https://hyunwoo.pro` 확인.
+
 ### 참고 (이번 세션에서 만들어둔 것)
 - 서버 접속: `ssh -i ssh-key/ssh-key-2026-07-07.key ubuntu@168.107.50.105` (키 권한 600)
 - CI 배포키: `ssh-key/ci_deploy_key` (서버 authorized_keys 등록됨, GitHub Secret `SSH_KEY`)

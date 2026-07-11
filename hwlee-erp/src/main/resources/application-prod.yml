@@ -3,6 +3,11 @@
 # aws  : 회사 AWS RDS 를 봄 (서버가 쓸 DB 아님)
 # prod : docker-compose.prod.yml 네트워크 '내부 서비스명' 으로 접속.
 #        → 호스트가 아니라 '컨테이너 네트워크' 기준 주소를 쓴다.
+# 프록시(Cloudflare → Caddy) 뒤에 있으므로 X-Forwarded-* 헤더를 신뢰해
+# 원래 스킴(https)·호스트를 복원한다. 없으면 로그인 리다이렉트가 http 로 나가 무한 리다이렉트.
+server:
+  forward-headers-strategy: framework
+
 spring:
   datasource:
     # localhost:3307 → 서비스명:내부포트(3306). 컨테이너끼리는 서비스명으로 통신.

@@ -1,0 +1,4 @@
+# 이 폴더에 Cloudflare Origin 인증서를 둔다 (서버에서 직접 배치, git 추적 안 함):
+#   - origin.pem  : Cloudflare Origin Server 인증서 본문
+#   - origin.key  : 개인키
+# *.pem / *.key 는 .gitignore 로 제외되므로 이 .gitkeep 만 추적된다.

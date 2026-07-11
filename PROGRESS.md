@@ -19,6 +19,21 @@
 
 ## 현재 위치
 
+> ### 🌐 배포 HTTPS 공개 완료 + 🧠 에이전트 다중대상 전환 구조 (2026-07-11 세션)
+> **오늘 한 것**:
+> - **✅ ERP·MES HTTPS 외부 공개 완료** — **`https://erp.hyunwoo.pro`**(ERP)·**`https://mes.hyunwoo.pro`**(MES), 루트/www→erp 301 리다이렉트. Cloudflare(주황 구름, 실IP 숨김) + Caddy(Origin 인증서 `*.hyunwoo.pro`, 2041 만료) + 방화벽 2겹(OCI Security List + iptables 80/443). 계정 `admin@hyunwoo.com`/`pass1234`. 상세·트러블슈팅 = **`doc/서버배포-CICD.md §6`**.
+>   - 겪은 함정(문서·`deploy.sh`에 반영): ⓐ iptables 삽입 위치(REJECT **앞**) ⓑ **Caddy reload 부분 반영**(앱 `--build` 재생성으로 IP 바뀌면 빈 응답 content-length:0 → `deploy.sh` 를 `caddy reload`→**`docker restart hwlee-caddy`** 로 확정) ⓒ 배포 직후 앱 부팅 중 수십 초 502(정상).
+>   - **⚠️ 미커밋(erp 저장소)**: `deploy.sh`(restart 개선)·`doc/서버배포-CICD.md`. hwlee님이 커밋+푸시해야 다른 PC 반영.
+>   - **남은 선택(Cloudflare 콘솔)**: `Always Use HTTPS` ON(http 80 접속 521 방지), SSL 모드 `Full`→`Full (strict)`.
+> - **✅ 에이전트 다중대상 전환 구조** — `erp-agent/config.py` 를 **`ERP_TARGET=mock|local|prod`** 로 확장(local=`localhost:8080`, prod=`erp.hyunwoo.pro`, 대상별 base_url·계정 분리). `main.py`(접속 대상 표시 + 운영 쓰기 경고)·`.env.example`(로컬/운영 분리) 갱신. **실행: `ERP_TARGET=local python main.py` / `ERP_TARGET=prod python main.py`.** 검증: 세 대상 config 로딩 + 오류값 ValueError 정상. **⚠️ `erp-agent/` 는 erp 저장소 밖 별도 폴더 — erp git에 안 잡힘, 이 맥미니에서 별도 백업 필요.**
+> - **결정(hwlee님)**: 로컬 개발=로컬/AWS DB, 운영=Oracle 자립 DB(외부 미노출 유지), 에이전트=DB 직결 아닌 **API 경유**. Oracle DB 로컬 직접연결은 **안 하기로**(필요시 SSH 터널이 안전한 방법).
+>
+> **▶▶ 다음 세션 시작점 = 에이전트 `HttpERPClient` 실 API 매핑** (현재 로그인·조회 골격만 있고 엔드포인트/스키마 대부분 예시(TODO)·일부 `NotImplementedError`. 전환 구조는 위에서 완성됨):
+> 1. **인증 방식 확정**(첫 관문) — 실 `hwlee-erp` 가 세션 폼 로그인인지 JWT인지 조사(SecurityConfig / 로그인 컨트롤러). 폼 로그인이면 **CSRF 토큰** 처리가 필요할 수 있음(`HttpERPClient._login` 보강).
+> 2. **읽기 조회 실연결** — `list_orders`(SalesOrderController)·`list_my_approvals`(ApprovalController)를 실 경로/응답에 매핑 → **`ERP_TARGET=prod`(운영 서버 상시 가동)로 읽기가 실제 되는지 확인**(읽기라 안전).
+> 3. **쓰기 API 매핑** — `create_sales_order`·발주·상신 등. ⚠️ **로컬에서만 테스트**(운영 데이터 보호).
+> - 착수 파일: `erp-agent/erp_client.py`(HttpERPClient 108~188행). 조사 대상: `hwlee-erp` 컨트롤러·시큐리티 설정.
+>
 > ### 🧠 로컬 LLM ERP 에이전트 — 1단계 프로토타입 구현·검증 완료 (2026-07-07 세션, 미커밋)
 > hwlee님이 "AI로 ERP 업무 자동화"를 논의 → **행동형 에이전트**(견적/수주/재고→생산→발주까지)로 확장 아이디어. 로컬 7B(Ollama)는 다단계 판단이 불안정하고, 유료 API(Claude 등)는 비용 발생. **결론 = 역할을 쪼개는 "방식 2" 채택**: **AI는 자연어→구조화 JSON 추출만, 비즈니스 흐름 판단은 파이썬 코드가** 결정론적으로. 완전 무료(로컬)이고 실무의 안전한 AI 패턴이며 이 프로젝트의 "도메인 흐름 직접 설계" 목적과 일치.
 > - **위치**: 자바 ERP 저장소와 **분리된 별도 폴더 `erp-agent/`**(`/Users/hwlee/IdeaProjects/my-app/erp-agent`, 이 맥미니 전용). ⚠️ **이건 erp 저장소 밖이라 erp git에 안 잡힘** — 별도 관리/백업 필요.

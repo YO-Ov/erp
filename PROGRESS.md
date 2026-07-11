@@ -86,11 +86,12 @@
 >
 > **✅ 2026-07-06 세션 추가 — 검색 콤보박스 전역 확장(순수 프론트, 미커밋)**: hwlee님 요청 "데이터 많은 select 전부 검색형으로". 기존 자동향상은 목록 필터바(`form.filter-bar`)만 덮었는데, `erp.js` 스캔 범위를 **화면 내 모든 `select` + 동적 추가 select(라인 아이템 행·모달)**로 확장(DOMContentLoaded 전체 스캔 + `document.body` childList MutationObserver). 옵션 12개 초과만 콤보화(짧은 enum·페이지크기는 네이티브, `data-no-search` opt-out). 이제 **작성 폼(견적·수주 등)의 고객·품목·거래처·직원·계정 select까지 한 번에** 검색형. `enhanceSelect`에 **required 해제** 추가(display:none 된 required select 이 네이티브 검증에서 "not focusable"로 제출을 막는 문제 → 앱/서버 검증에 위임). **템플릿 무수정 — erp.js 1파일만**. ⚠️ 강력새로고침 필요. 라인테이블 셀 안 콤보 메뉴 클리핑은 실렌더 육안 확인 권장.
 >
-> **🖥 병행 트랙 — Oracle Cloud Always Free 배포 (진행 중, 앱과 무관)**: hwlee님 개인 Oracle 계정(dev.hwlee@gmail.com)에서 ERP/MES를 무료로 서비스하려는 중. 상태:
-> - **DB 방침 = Oracle VM 안 Docker MySQL로 자립**(회사 RDS 분리). Flyway V1~V67이 스키마+3년치 시드를 다 만들므로 데이터 이전 불필요 = 빈 MySQL만 있으면 됨.
-> - **막힌 지점**: Always Free ARM(A1) 한도가 무료계층에서 0 → A1 생성 불가. → **종량제(Pay As You Go) 업그레이드 진행 중**(카드 등록 완료, "업그레이드 진행 중" 상태, 완료 메일 대기). 업그레이드해도 Always Free 범위(A1 2 OCPU/12GB, 부트 200GB)만 쓰면 요금 0. **완료되면 예산 알림 1$ 설정 → A1 인스턴스(2 OCPU/12GB, Ubuntu 22.04) 생성**.
-> - **다음 배포 작업**: ① A1 VM 생성 ② OCI 보안리스트 + VM iptables로 8080·8082 개방(iptables 잊으면 접속 안 됨-최대함정) ③ Docker 설치 ④ 배포 파일(ERP·MES Dockerfile + `docker-compose.prod.yml`: MySQL2+Kafka+Zipkin+ERP+MES) 작성해 `docker compose up`. **배포 파일은 아직 안 만듦.**
-> - SSH 키는 생성 완료(맥 `~/.ssh/id_ed25519`). 기존 AMD 서버 prod·dev(E2.1.Micro)는 A1과 무관, 건드리지 말 것.
+> **🖥 병행 트랙 — Oracle Cloud 배포 = ✅ HTTPS 외부 공개 완료 (2026-07-11)**: hwlee님 개인 Oracle 계정에서 ERP/MES 무료 서비스. **`https://hyunwoo.pro` 실제 접속 200 확인.** 상세 실행기록·트러블슈팅은 **`doc/서버배포-CICD.md`**(§6 최신) 참조.
+> - **인프라**: Oracle A1(`hyunwoo-server`, 2 OCPU/12GB, IP `168.107.50.105`, Ubuntu 22.04). Docker compose로 컨테이너 **7개**(MySQL×2·Kafka·Zipkin·ERP·MES·**Caddy**). DB는 VM 안 Docker MySQL 자립(Flyway가 스키마+3년치 시드 생성). 앱은 `127.0.0.1` 바인딩, 외부는 Caddy만 80/443.
+> - **CI/CD**: `main` push → GitHub Actions가 SSH로 서버 `deploy.sh`(git pull + `docker compose -f docker-compose.prod.yml up -d --build`). 자동배포 검증됨.
+> - **HTTPS**: 도메인 `hyunwoo.pro`(가비아 등록, NS→Cloudflare `boyd`/`june.ns.cloudflare.com`). Cloudflare(주황 구름, 실IP 숨김) → Caddy(Cloudflare Origin 인증서, 2041 만료) → erp:8080. 방화벽 2겹(OCI Security List + iptables 80/443).
+> - **⚠️ 남은 마무리(선택, Cloudflare 콘솔)**: ① `Always Use HTTPS` ON(안 켜면 http(80) 접속이 521) ② SSL 모드 `Full`→`Full (strict)`. ③ 문서 변경(§6·PROGRESS) 커밋·푸시.
+> - 기존 AMD 서버 prod·dev(E2.1.Micro)는 이 A1과 무관, 건드리지 말 것.
 >
 > ---
 >

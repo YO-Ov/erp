@@ -17,11 +17,17 @@
 	auto_https disable_redirects
 }
 
-# ── ERP — https://hyunwoo.pro , https://www.hyunwoo.pro ──────────────
-hyunwoo.pro, www.hyunwoo.pro {
+# ── ERP — https://erp.hyunwoo.pro (정식 주소) ────────────────────────
+erp.hyunwoo.pro {
 	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
 	encode gzip zstd
 	reverse_proxy erp:8080
+}
+
+# ── 루트·www → erp 서브도메인으로 301 리다이렉트 (경로 유지) ──────────
+hyunwoo.pro, www.hyunwoo.pro {
+	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
+	redir https://erp.hyunwoo.pro{uri} permanent
 }
 
 # ── MES — (선택) https://mes.hyunwoo.pro ─────────────────────────────

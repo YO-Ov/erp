@@ -249,11 +249,37 @@ curl localhost:8082/actuator/health     # MES  → {"status":"UP"}
 - [x] **서버에서 `./deploy.sh` 손배포 검증** (§3.4) — 컨테이너 6개 기동, ERP/MES `/actuator/health` = UP (MySQL 8.4 연결 정상)
 - [x] **GitHub Actions(② SSH 배포)로 자동화** — `.github/workflows/deploy.yml`. main push → 러너가 SSH로 서버 접속 → `deploy.sh`. 첫 자동배포 success 확인
 - [x] **도메인 구매** — `hyunwoo.pro` (가비아, 현재 네임서버=가비아 기본)
-- [ ] **도메인 → HTTPS 연결** (`서버구성.md` §4~5) ← **다음 차례** (아래 §6 시작점 참고)
+- [x] **도메인 → HTTPS 연결** (Cloudflare 경로) — **완료 2026-07-11**. `https://hyunwoo.pro`·`https://www.hyunwoo.pro` = 200. (Caddy + Cloudflare Origin 인증서, §6 참조)
 
 ---
 
-## 6. 다음 세션 시작점 — HTTPS 공개 (도메인 hyunwoo.pro)
+## 6. ✅ HTTPS 공개 — 완료 (2026-07-11)
+
+> **`https://hyunwoo.pro` 외부 공개 완료.** 경로 ②Cloudflare 채택. 실제 접속 200 확인.
+
+### 최종 구성
+```
+브라우저 → Cloudflare(무료 HTTPS·WAF·실IP 숨김, 주황 구름)
+         → [Cloudflare Origin 인증서, 15년]
+         → 서버 Caddy(443) → erp:8080
+```
+- **DNS**: Cloudflare(NS=`boyd`/`june.ns.cloudflare.com`)에 `@`·`www` A레코드 → `168.107.50.105`, Proxied.
+- **인증서**: Cloudflare Origin CA(`*.hyunwoo.pro`, 2041 만료). 서버 `~/erp/caddy/certs/origin.{pem,key}`(git 제외, `chmod 600` key).
+- **Caddy**: `caddy/Caddyfile` — `tls` 로 Origin 인증서 지정, `reverse_proxy erp:8080`. compose `caddy` 서비스가 외부 80/443 유일 노출.
+- **방화벽 2겹**: OCI Security List Ingress 80/443 + 서버 iptables `-I INPUT 5`(REJECT 앞)에 80/443 ACCEPT + `netfilter-persistent save`.
+- **Spring**: `application-prod.yml` `server.forward-headers-strategy: framework`(프록시 뒤 https 인식).
+
+### ⚠️ 남은 마무리 (Cloudflare 콘솔, 선택)
+- **Always Use HTTPS 켜기** — `SSL/TLS → Edge Certificates → Always Use HTTPS` ON. (안 켜면 `http://`(80) 접속이 **521** — Caddy가 80 리다이렉트를 안 열어서. 켜면 Cloudflare가 http→https 승격해 해소.)
+- **SSL 모드 Full → Full (strict)** — Origin 인증서를 쓰므로 strict 가 정확. `SSL/TLS → Overview`.
+
+### 트러블슈팅 메모
+- iptables 삽입 시 **REJECT 규칙 앞**에 와야 함(`-I INPUT 5`). 뒤에 넣으면(`-I INPUT 6`) REJECT 가 먼저 걸려 무효 — 실제로 한 번 실수했다가 순서 교정.
+- `curl https://localhost -H Host:` 로는 검증 불가(TLS SNI 불일치로 000). `--resolve hyunwoo.pro:443:127.0.0.1` 로 SNI 맞춰야 함.
+
+---
+
+## (구) 다음 세션 시작점 — HTTPS 공개 (도메인 hyunwoo.pro)
 
 > 여기까지: **서버에서 앱 6개 기동 + CI/CD 자동배포 완료.** 단, 앱은 `127.0.0.1` 바인딩이라
 > **아직 외부(브라우저)에선 접속 불가.** 다음 목표 = `https://hyunwoo.pro` 로 외부 공개.

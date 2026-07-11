@@ -262,13 +262,14 @@ curl localhost:8082/actuator/health     # MES  → {"status":"UP"}
 브라우저 → Cloudflare(무료 HTTPS·WAF·실IP 숨김, 주황 구름)
          → [Cloudflare Origin 인증서, *.hyunwoo.pro, 15년]
          → 서버 Caddy(443)
-             ├ erp.hyunwoo.pro           → erp:8080   (정식 주소)
-             ├ hyunwoo.pro / www         → 301 redir → erp.hyunwoo.pro
-             └ mes.hyunwoo.pro (주석)     → mes:8082   (추후)
+             ├ erp.hyunwoo.pro           → erp:8080   (ERP 정식 주소)
+             ├ mes.hyunwoo.pro           → mes:8082   (MES)
+             └ hyunwoo.pro / www         → 301 redir → erp.hyunwoo.pro
 ```
-- **정식 주소 = `https://erp.hyunwoo.pro`** (2026-07-11 서브도메인화). 루트·www 는 여기로 301 리다이렉트.
-- **DNS**: Cloudflare(NS=`boyd`/`june.ns.cloudflare.com`)에 `@`·`www`·**`erp`** A레코드 → `168.107.50.105`, Proxied. (mes 는 추후 추가)
-- ⚠️ **Caddyfile 변경 후 반영**: 볼륨 마운트라 `compose up` 이 caddy 를 재생성 안 함 → `deploy.sh` 가 `caddy reload`(실패 시 restart) 수행하도록 개선함. 수동이면 `docker exec hwlee-caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`.
+- **정식 주소 = `https://erp.hyunwoo.pro` / `https://mes.hyunwoo.pro`** (2026-07-11 서브도메인화). 루트·www 는 erp 로 301 리다이렉트.
+- **DNS**: Cloudflare(NS=`boyd`/`june.ns.cloudflare.com`)에 `@`·`www`·**`erp`**·**`mes`** A레코드 → `168.107.50.105`, Proxied.
+- **주의**: `up -d --build` 는 두 앱 모두 재빌드 → 한쪽만 바꿔도 erp/mes 컨테이너가 함께 재생성되어 **재기동 중 수십 초 502** 가능(부팅 후 자동 정상).
+- ⚠️ **Caddyfile 변경·앱 재생성 후 반영**: 볼륨 마운트라 `compose up` 이 caddy 를 재생성 안 함. 게다가 앱이 `--build` 로 재생성되면 IP 가 바뀌는데 **`caddy reload` 는 새 upstream 을 부분만 반영해 빈 응답(content-length:0)** 이 나는 사례를 겪음(erp·mes 둘 다). → `deploy.sh` 가 **`docker restart hwlee-caddy`** 하도록 확정(순간 다운타임 허용). 수동이면 `docker restart hwlee-caddy`.
 - **인증서**: Cloudflare Origin CA(`*.hyunwoo.pro`, 2041 만료). 서버 `~/erp/caddy/certs/origin.{pem,key}`(git 제외, `chmod 600` key).
 - **Caddy**: `caddy/Caddyfile` — `tls` 로 Origin 인증서 지정, `reverse_proxy erp:8080`. compose `caddy` 서비스가 외부 80/443 유일 노출.
 - **방화벽 2겹**: OCI Security List Ingress 80/443 + 서버 iptables `-I INPUT 5`(REJECT 앞)에 80/443 ACCEPT + `netfilter-persistent save`.

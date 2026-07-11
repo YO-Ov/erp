@@ -21,13 +21,14 @@ git pull --ff-only
 echo "▶ [2/4] 빌드 + 기동 (인프라 4개 + 앱 2개 + Caddy)"
 docker compose -f "$COMPOSE_FILE" up -d --build
 
-# Caddyfile 은 볼륨 마운트라 compose 가 caddy 컨테이너를 재생성하지 않는다.
-# → Caddyfile 변경을 확실히 반영하려면 명시적으로 리로드(무중단), 실패 시 재시작 폴백.
-echo "▶ [3/4] Caddy 설정 리로드"
+# compose up 은 caddy 컨테이너를 재생성하지 않으므로(Caddyfile 은 볼륨 마운트),
+# Caddyfile 변경·앱 재생성을 반영하려면 caddy 를 명시적으로 다뤄야 한다.
+# ⚠️ 'caddy reload' 는 앱(erp/mes)이 --build 로 재생성되어 IP 가 바뀐 경우 새 upstream 을
+#    부분만 반영해 빈 응답(content-length:0)이 나는 사례가 있었다(2026-07-11 mes/erp 둘 다 겪음).
+#    → 확실한 반영을 위해 restart(순간 다운타임 1~2초, 학습용 서비스라 허용).
+echo "▶ [3/4] Caddy 재시작 (새 upstream IP + Caddyfile 변경 반영)"
 if docker ps --format '{{.Names}}' | grep -q '^hwlee-caddy$'; then
-  docker exec hwlee-caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile \
-    && echo "   caddy reload OK" \
-    || { echo "   reload 실패 → 재시작"; docker restart hwlee-caddy; }
+  docker restart hwlee-caddy >/dev/null && echo "   caddy restart OK"
 fi
 
 echo "▶ [4/4] 컨테이너 상태"

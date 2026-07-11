@@ -1,5 +1,10 @@
 # ── 서버(Oracle Cloud) 배포 전용 프로파일 ──────────────────────────
 # docker-compose.prod.yml 네트워크 '내부 서비스명' 기준 주소.
+
+# 프록시(Cloudflare → Caddy) 뒤에 있으므로 X-Forwarded-* 를 신뢰해 https/host 복원.
+server:
+  forward-headers-strategy: framework
+
 spring:
   datasource:
     # localhost:3308 → 서비스명 hwlee-mes-mysql:3306

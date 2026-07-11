@@ -18,10 +18,19 @@ fi
 echo "▶ [1/3] 최신 코드 가져오기 (git pull)"
 git pull --ff-only
 
-echo "▶ [2/3] 빌드 + 기동 (인프라 4개 + 앱 2개)"
+echo "▶ [2/4] 빌드 + 기동 (인프라 4개 + 앱 2개 + Caddy)"
 docker compose -f "$COMPOSE_FILE" up -d --build
 
-echo "▶ [3/3] 컨테이너 상태"
+# Caddyfile 은 볼륨 마운트라 compose 가 caddy 컨테이너를 재생성하지 않는다.
+# → Caddyfile 변경을 확실히 반영하려면 명시적으로 리로드(무중단), 실패 시 재시작 폴백.
+echo "▶ [3/4] Caddy 설정 리로드"
+if docker ps --format '{{.Names}}' | grep -q '^hwlee-caddy$'; then
+  docker exec hwlee-caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile \
+    && echo "   caddy reload OK" \
+    || { echo "   reload 실패 → 재시작"; docker restart hwlee-caddy; }
+fi
+
+echo "▶ [4/4] 컨테이너 상태"
 docker compose -f "$COMPOSE_FILE" ps
 
 echo ""

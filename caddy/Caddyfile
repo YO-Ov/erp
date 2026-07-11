@@ -30,10 +30,9 @@ hyunwoo.pro, www.hyunwoo.pro {
 	redir https://erp.hyunwoo.pro{uri} permanent
 }
 
-# ── MES — (선택) https://mes.hyunwoo.pro ─────────────────────────────
-# Cloudflare DNS 에 mes A레코드(→168.107.50.105, Proxied)를 추가한 뒤 아래 주석을 해제.
-# mes.hyunwoo.pro {
-# 	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
-# 	encode gzip zstd
-# 	reverse_proxy mes:8082
-# }
+# ── MES — https://mes.hyunwoo.pro ────────────────────────────────────
+mes.hyunwoo.pro {
+	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
+	encode gzip zstd
+	reverse_proxy mes:8082
+}

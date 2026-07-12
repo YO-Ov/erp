@@ -1,6 +1,8 @@
 package com.hwlee.erp.sd.order;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -11,6 +13,23 @@ public interface SalesOrderRepository
         extends JpaRepository<SalesOrder, Long>, JpaSpecificationExecutor<SalesOrder> {
 
     Optional<SalesOrder> findByNumber(String number);
+
+    // ── 영업 대시보드 집계 ──
+
+    /** 상태별 건수·금액 (파이프라인). */
+    @Query("select o.status as status, count(o) as count, coalesce(sum(o.totalAmount), 0) as amount "
+            + "from SalesOrder o group by o.status")
+    List<SalesOrderStatusCount> aggregateByStatus();
+
+    /** 기간 내 수주 건수 (이번 달 수주). */
+    long countByOrderDateBetween(LocalDate from, LocalDate to);
+
+    /** 기간 내 수주 금액 합계. */
+    @Query("select coalesce(sum(o.totalAmount), 0) from SalesOrder o where o.orderDate between :from and :to")
+    BigDecimal sumAmountByOrderDateBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /** 최근 수주 5건. */
+    List<SalesOrder> findTop5ByOrderByOrderDateDescIdDesc();
 
     /**
      * 한 고객의 "아직 청구(인보이스 발행) 전인" 활성 수주 합계 = 여신사용액의 ① 미청구 백로그 항.

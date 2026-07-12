@@ -12,82 +12,270 @@
         </div>
     </div>
 
-    <!-- 통계 카드 — 리포트 API 연동 (FINANCE/ADMIN 만 수치 표시, 그 외 권한은 '—' 유지) -->
+    <!-- 공통 요약 카드 (모든 역할) — 내 결재/알림 현황 -->
     <div class="row g-3 mb-4">
         <div class="col-sm-6 col-xl-3">
-            <div class="card"><div class="card-body stat-card">
-                <div class="stat-icon" style="background:#22c55e"><i class="bi bi-receipt"></i></div>
-                <div><div class="stat-label">이번 달 매출</div><div class="stat-value" id="stat-sales">—</div></div>
-            </div></div>
+            <a class="card text-decoration-none text-reset" href="/approvals"><div class="card-body stat-card">
+                <div class="stat-icon" style="background:#6366f1"><i class="bi bi-inbox"></i></div>
+                <div><div class="stat-label">결재 대기 (내가 결재)</div><div class="stat-value" id="stat-inbox">—</div></div>
+            </div></a>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <a class="card text-decoration-none text-reset" href="/approvals"><div class="card-body stat-card">
+                <div class="stat-icon" style="background:#0ea5e9"><i class="bi bi-hourglass-split"></i></div>
+                <div><div class="stat-label">진행중 상신 (내가 올림)</div><div class="stat-value" id="stat-pending">—</div></div>
+            </div></a>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <a class="card text-decoration-none text-reset" href="/approvals"><div class="card-body stat-card">
+                <div class="stat-icon" style="background:#ef4444"><i class="bi bi-x-octagon"></i></div>
+                <div><div class="stat-label">반려됨 (재작성 필요)</div><div class="stat-value" id="stat-rejected">—</div></div>
+            </div></a>
         </div>
         <div class="col-sm-6 col-xl-3">
             <div class="card"><div class="card-body stat-card">
-                <div class="stat-icon" style="background:#2563eb"><i class="bi bi-graph-up"></i></div>
-                <div><div class="stat-label">당기순이익 (올해)</div><div class="stat-value" id="stat-net">—</div></div>
-            </div></div>
-        </div>
-        <div class="col-sm-6 col-xl-3">
-            <div class="card"><div class="card-body stat-card">
-                <div class="stat-icon" style="background:#f59e0b"><i class="bi bi-box-seam"></i></div>
-                <div><div class="stat-label">재고 평가액</div><div class="stat-value" id="stat-inv-val">—</div></div>
-            </div></div>
-        </div>
-        <div class="col-sm-6 col-xl-3">
-            <div class="card"><div class="card-body stat-card">
-                <div class="stat-icon" style="background:#0ea5e9"><i class="bi bi-clipboard-data"></i></div>
-                <div><div class="stat-label">재고 품목 수</div><div class="stat-value" id="stat-inv-cnt">—</div></div>
+                <div class="stat-icon" style="background:#f59e0b"><i class="bi bi-bell"></i></div>
+                <div><div class="stat-label">미확인 알림</div><div class="stat-value" id="stat-notif">—</div></div>
             </div></div>
         </div>
     </div>
 
+    <!-- 영업(SD) 전용 위젯 -->
+    <div sec:authorize="hasAnyRole('SALES','ADMIN')">
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-xl-3">
+                <div class="card"><div class="card-body stat-card">
+                    <div class="stat-icon" style="background:#22c55e"><i class="bi bi-cart-check"></i></div>
+                    <div><div class="stat-label">이번 달 수주</div><div class="stat-value" id="sd-month-amt">—</div>
+                        <div class="small text-muted"><span id="sd-month-cnt">—</span>건</div></div>
+                </div></div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="card"><div class="card-body stat-card">
+                    <div class="stat-icon" style="background:#0ea5e9"><i class="bi bi-truck"></i></div>
+                    <div><div class="stat-label">출하 대기</div><div class="stat-value" id="sd-ship-amt">—</div>
+                        <div class="small text-muted"><span id="sd-ship-cnt">—</span>건</div></div>
+                </div></div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="card"><div class="card-body stat-card">
+                    <div class="stat-icon" style="background:#f59e0b"><i class="bi bi-receipt-cutoff"></i></div>
+                    <div><div class="stat-label">미청구</div><div class="stat-value" id="sd-uninv-amt">—</div>
+                        <div class="small text-muted"><span id="sd-uninv-cnt">—</span>건</div></div>
+                </div></div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <a class="card text-decoration-none text-reset" href="/sd/quotations"><div class="card-body stat-card">
+                    <div class="stat-icon" style="background:#8b5cf6"><i class="bi bi-send-check"></i></div>
+                    <div><div class="stat-label">견적 발송 대기</div><div class="stat-value" id="sd-quote-cnt">—</div>
+                        <div class="small text-muted">승인됨 · 발송 전</div></div>
+                </div></a>
+            </div>
+        </div>
+        <div class="row g-3 mb-4">
+            <div class="col-lg-8">
+                <div class="card h-100"><div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold mb-0"><i class="bi bi-cart-check me-1"></i> 최근 수주</h6>
+                        <a href="/sd/sales-orders" class="small">수주 관리 →</a>
+                    </div>
+                    <div id="sd-recent"><div class="text-muted small">불러오는 중…</div></div>
+                </div></div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card h-100"><div class="card-body">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-diagram-3 me-1"></i> 수주 파이프라인</h6>
+                    <div id="sd-pipeline"><div class="text-muted small">불러오는 중…</div></div>
+                </div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 재무 KPI (재무·임원·관리자만) -->
+    <div sec:authorize="hasAnyRole('FINANCE','DIRECTOR','ADMIN')">
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-xl-3">
+                <div class="card"><div class="card-body stat-card">
+                    <div class="stat-icon" style="background:#22c55e"><i class="bi bi-receipt"></i></div>
+                    <div><div class="stat-label">이번 달 매출</div><div class="stat-value" id="stat-sales">—</div></div>
+                </div></div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="card"><div class="card-body stat-card">
+                    <div class="stat-icon" style="background:#2563eb"><i class="bi bi-graph-up"></i></div>
+                    <div><div class="stat-label">당기순이익 (올해)</div><div class="stat-value" id="stat-net">—</div></div>
+                </div></div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="card"><div class="card-body stat-card">
+                    <div class="stat-icon" style="background:#f59e0b"><i class="bi bi-box-seam"></i></div>
+                    <div><div class="stat-label">재고 평가액</div><div class="stat-value" id="stat-inv-val">—</div></div>
+                </div></div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="card"><div class="card-body stat-card">
+                    <div class="stat-icon" style="background:#0ea5e9"><i class="bi bi-clipboard-data"></i></div>
+                    <div><div class="stat-label">재고 품목 수</div><div class="stat-value" id="stat-inv-cnt">—</div></div>
+                </div></div>
+            </div>
+        </div>
+    </div>
+
     <div class="row g-3">
+        <!-- 좌: 내가 처리할 것 -->
         <div class="col-lg-8">
-            <div class="card h-100"><div class="card-body">
-                <h6 class="fw-bold mb-3">개요</h6>
-                <div class="empty-state">
-                    <i class="bi bi-bar-chart-line"></i>
-                    대시보드 위젯은 준비 중입니다.<br>
-                    <span class="small">좌측 메뉴에서 업무 화면으로 이동하세요.</span>
+            <div class="card mb-3"><div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold mb-0"><i class="bi bi-inbox me-1"></i> 내 결재 대기</h6>
+                    <a href="/approvals" class="small">결재함 →</a>
                 </div>
+                <div id="inbox-list"><div class="text-muted small">불러오는 중…</div></div>
+            </div></div>
+            <div class="card"><div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold mb-0"><i class="bi bi-send me-1"></i> 내 상신 현황</h6>
+                    <a href="/approvals" class="small">전체 →</a>
+                </div>
+                <div id="outbox-list"><div class="text-muted small">불러오는 중…</div></div>
             </div></div>
         </div>
+
+        <!-- 우: 알림 + 바로가기 -->
         <div class="col-lg-4">
-            <div class="card h-100"><div class="card-body">
-                <h6 class="fw-bold mb-3">바로가기</h6>
-                <div class="list-group list-group-flush" sec:authorize="hasAnyRole('SALES','ADMIN')">
-                    <a class="list-group-item list-group-item-action d-flex align-items-center gap-2 px-0" href="/sd/quotations">
-                        <i class="bi bi-file-earmark-text text-primary"></i> 견적 관리</a>
-                    <a class="list-group-item list-group-item-action d-flex align-items-center gap-2 px-0" href="/sd/sales-orders">
-                        <i class="bi bi-cart-check text-primary"></i> 수주 관리</a>
-                    <a class="list-group-item list-group-item-action d-flex align-items-center gap-2 px-0" href="/sd/deliveries">
-                        <i class="bi bi-truck text-primary"></i> 출하 관리</a>
-                    <a class="list-group-item list-group-item-action d-flex align-items-center gap-2 px-0" href="/sd/invoices">
-                        <i class="bi bi-receipt text-primary"></i> 인보이스 관리</a>
+            <div class="card mb-3"><div class="card-body">
+                <h6 class="fw-bold mb-3"><i class="bi bi-bell me-1"></i> 알림</h6>
+                <div id="notif-list"><div class="text-muted small">불러오는 중…</div></div>
+            </div></div>
+            <div class="card"><div class="card-body">
+                <h6 class="fw-bold mb-3"><i class="bi bi-grid me-1"></i> 바로가기</h6>
+                <div class="list-group list-group-flush dash-shortcuts">
+                    <div sec:authorize="hasAnyRole('SALES','ADMIN')">
+                        <a class="list-group-item list-group-item-action px-0" href="/sd/quotations"><i class="bi bi-file-earmark-text text-primary me-2"></i>견적</a>
+                        <a class="list-group-item list-group-item-action px-0" href="/sd/sales-orders"><i class="bi bi-cart-check text-primary me-2"></i>수주</a>
+                        <a class="list-group-item list-group-item-action px-0" href="/sd/deliveries"><i class="bi bi-truck text-primary me-2"></i>출하</a>
+                        <a class="list-group-item list-group-item-action px-0" href="/sd/invoices"><i class="bi bi-receipt text-primary me-2"></i>인보이스</a>
+                    </div>
+                    <div sec:authorize="hasAnyRole('PURCHASING','ADMIN')">
+                        <a class="list-group-item list-group-item-action px-0" href="/mm/purchase-orders"><i class="bi bi-cart-plus text-success me-2"></i>구매발주</a>
+                        <a class="list-group-item list-group-item-action px-0" href="/mm/goods-receipts"><i class="bi bi-box-arrow-in-down text-success me-2"></i>입고</a>
+                        <a class="list-group-item list-group-item-action px-0" href="/mm/stocks"><i class="bi bi-boxes text-success me-2"></i>재고</a>
+                    </div>
+                    <div sec:authorize="hasAnyRole('PRODUCTION','ADMIN')">
+                        <a class="list-group-item list-group-item-action px-0" href="/pp/planned-orders"><i class="bi bi-lightbulb text-warning me-2"></i>계획오더(MRP)</a>
+                        <a class="list-group-item list-group-item-action px-0" href="/pp/production-orders"><i class="bi bi-gear-wide-connected text-warning me-2"></i>생산지시</a>
+                    </div>
+                    <div sec:authorize="hasAnyRole('FINANCE','ADMIN')">
+                        <a class="list-group-item list-group-item-action px-0" href="/fi/journal-entries"><i class="bi bi-journal-text text-info me-2"></i>전표</a>
+                        <a class="list-group-item list-group-item-action px-0" href="/fi/payments"><i class="bi bi-cash-stack text-info me-2"></i>입출금</a>
+                        <a class="list-group-item list-group-item-action px-0" href="/fi/credit-limit-requests"><i class="bi bi-shield-check text-info me-2"></i>여신 승인</a>
+                    </div>
+                    <div sec:authorize="hasAnyRole('FINANCE','DIRECTOR','ADMIN')">
+                        <a class="list-group-item list-group-item-action px-0" href="/reports/income-statement"><i class="bi bi-file-earmark-bar-graph text-secondary me-2"></i>손익계산서</a>
+                    </div>
+                    <div sec:authorize="hasAnyRole('HR','ADMIN')">
+                        <a class="list-group-item list-group-item-action px-0" href="/hr/employees"><i class="bi bi-person-badge text-danger me-2"></i>직원</a>
+                        <a class="list-group-item list-group-item-action px-0" href="/hr/payroll-runs"><i class="bi bi-wallet2 text-danger me-2"></i>급여대장</a>
+                    </div>
+                    <div sec:authorize="hasRole('ADMIN')">
+                        <a class="list-group-item list-group-item-action px-0" href="/admin/users"><i class="bi bi-people me-2"></i>사용자</a>
+                    </div>
                 </div>
-                <p class="text-muted small mb-0 mt-2" sec:authorize="!hasAnyRole('SALES','ADMIN')">
-                    접근 가능한 업무 메뉴가 없습니다.
-                </p>
             </div></div>
         </div>
     </div>
 
     <script>
-        (function loadStats() {
-            const ymd = d => d.toISOString().slice(0, 10);
+        (function dashboard() {
             const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+            const APV = { PENDING: '결재중', APPROVED: '승인', REJECTED: '반려', DRAFT: '작성중', WITHDRAWN: '회수' };
+            const APV_CLS = { PENDING: 'bg-info', APPROVED: 'bg-success', REJECTED: 'bg-danger', DRAFT: 'bg-secondary', WITHDRAWN: 'bg-secondary' };
+            const empty = msg => `<div class="text-muted small py-2">${ERP.esc(msg)}</div>`;
+
+            // ── 내 결재 대기 (inbox) ──
+            ERP.api('/api/approvals/inbox' + ERP.query({ size: 5, sort: 'requestedAt,desc' })).then(page => {
+                set('stat-inbox', ERP.num(page.totalElements));
+                const rows = page.content || [];
+                document.getElementById('inbox-list').innerHTML = rows.length ? rows.map(a => `
+                    <a href="/approvals" class="d-flex justify-content-between align-items-center py-2 border-bottom text-decoration-none text-reset">
+                        <div>
+                            <div class="fw-semibold">${ERP.esc(a.docTypeLabel || '')} <span class="text-muted small">${ERP.esc(a.number || '')}</span></div>
+                            <div class="small text-muted">상신자 ${ERP.esc(a.requester || '-')}${a.amount != null ? ' · ' + ERP.won(a.amount) : ''}</div>
+                        </div>
+                        <span class="badge bg-info">결재하기</span>
+                    </a>`).join('') : empty('결재할 문서가 없습니다. 👍');
+            }).catch(() => { set('stat-inbox', '0'); document.getElementById('inbox-list').innerHTML = empty('결재할 문서가 없습니다.'); });
+
+            // ── 내 상신 현황 (outbox) ──
+            ERP.api('/api/approvals/outbox' + ERP.query({ size: 100, sort: 'requestedAt,desc' })).then(page => {
+                const rows = page.content || [];
+                set('stat-pending', ERP.num(rows.filter(a => a.status === 'PENDING').length));
+                set('stat-rejected', ERP.num(rows.filter(a => a.status === 'REJECTED').length));
+                document.getElementById('outbox-list').innerHTML = rows.length ? rows.slice(0, 5).map(a => `
+                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                        <div>
+                            <div class="fw-semibold">${ERP.esc(a.docTypeLabel || '')} <span class="text-muted small">${ERP.esc(a.number || '')}</span></div>
+                            ${a.status === 'REJECTED' && a.returnReason ? `<div class="small text-danger">사유: ${ERP.esc(a.returnReason)}</div>` : ''}
+                        </div>
+                        <span class="badge ${APV_CLS[a.status] || 'bg-secondary'}">${ERP.esc(APV[a.status] || a.status)}</span>
+                    </div>`).join('') : empty('상신한 문서가 없습니다.');
+            }).catch(() => { set('stat-pending', '0'); set('stat-rejected', '0'); document.getElementById('outbox-list').innerHTML = empty('상신한 문서가 없습니다.'); });
+
+            // ── 알림 ──
+            ERP.api('/api/notifications/unread-count').then(d => set('stat-notif', ERP.num(d.count))).catch(() => set('stat-notif', '0'));
+            ERP.api('/api/notifications' + ERP.query({ unreadOnly: true, size: 5 })).then(page => {
+                const rows = page.content || [];
+                document.getElementById('notif-list').innerHTML = rows.length ? rows.map(n => `
+                    <a href="${ERP.esc(n.linkUrl || '#')}" class="d-block py-2 border-bottom text-decoration-none text-reset">
+                        <div class="fw-semibold small">${ERP.esc(n.title || '')}</div>
+                        <div class="small text-muted text-truncate">${ERP.esc(n.message || '')}</div>
+                    </a>`).join('') : empty('새 알림이 없습니다.');
+            }).catch(() => { document.getElementById('notif-list').innerHTML = empty('새 알림이 없습니다.'); });
+
+            // ── 영업(SD) 위젯 — SALES 블록이 있을 때만 ──
+            const SO = { DRAFT: '작성중', CONFIRMED: '확정', SHIPPING: '출하중', SHIPPED: '출하완료', INVOICING: '청구중', INVOICED: '청구완료', CLOSED: '종료', CANCELLED: '취소' };
+            const SO_CLS = { DRAFT: 'bg-secondary', CONFIRMED: 'bg-primary', SHIPPING: 'bg-info', SHIPPED: 'bg-info', INVOICING: 'bg-warning', INVOICED: 'bg-success', CLOSED: 'bg-dark', CANCELLED: 'bg-secondary' };
+            if (document.getElementById('sd-month-amt')) {
+                ERP.api('/api/sd/dashboard').then(d => {
+                    set('sd-month-amt', ERP.won(d.thisMonthOrderAmount) || '₩0');
+                    set('sd-month-cnt', ERP.num(d.thisMonthOrderCount) || '0');
+                    set('sd-ship-amt', ERP.won(d.awaitingShipmentAmount) || '₩0');
+                    set('sd-ship-cnt', ERP.num(d.awaitingShipmentCount) || '0');
+                    set('sd-uninv-amt', ERP.won(d.uninvoicedAmount) || '₩0');
+                    set('sd-uninv-cnt', ERP.num(d.uninvoicedCount) || '0');
+                    set('sd-quote-cnt', ERP.num(d.quotationToSendCount) || '0');
+
+                    const rows = d.recentOrders || [];
+                    document.getElementById('sd-recent').innerHTML = rows.length ? rows.map(o => `
+                        <a href="/sd/sales-orders" class="d-flex justify-content-between align-items-center py-2 border-bottom text-decoration-none text-reset">
+                            <div>
+                                <div class="fw-semibold">${ERP.esc(o.number)} <span class="text-muted small">${ERP.esc(o.customerName || '')}</span></div>
+                                <div class="small text-muted">${ERP.esc(o.orderDate || '')} · ${ERP.won(o.totalAmount)}</div>
+                            </div>
+                            <span class="badge ${SO_CLS[o.status] || 'bg-secondary'}">${ERP.esc(SO[o.status] || o.status)}</span>
+                        </a>`).join('') : empty('수주 내역이 없습니다.');
+
+                    const pipe = d.pipeline || {};
+                    const max = Math.max(1, ...Object.values(pipe));
+                    document.getElementById('sd-pipeline').innerHTML = Object.keys(SO)
+                        .filter(k => pipe[k] !== undefined)
+                        .map(k => `
+                            <div class="mb-2">
+                                <div class="d-flex justify-content-between small"><span>${ERP.esc(SO[k])}</span><span class="fw-semibold">${ERP.num(pipe[k] || 0)}</span></div>
+                                <div class="progress" style="height:6px"><div class="progress-bar ${(SO_CLS[k] || 'bg-secondary').replace('bg-', 'bg-')}" style="width:${Math.round((pipe[k] || 0) / max * 100)}%"></div></div>
+                            </div>`).join('');
+                }).catch(() => {});
+            }
+
+            // ── 재무 KPI (권한 없으면 403 → 조용히 무시, 카드 자체가 비표시) ──
+            const ymd = d => d.toISOString().slice(0, 10);
             const now = new Date();
             const monthFirst = new Date(now.getFullYear(), now.getMonth(), 1);
             const yearFirst = new Date(now.getFullYear(), 0, 1);
-
-            // 권한(FINANCE/ADMIN) 없으면 403 → 조용히 무시하고 '—' 유지.
-            ERP.api('/api/reports/sales' + ERP.query({from: ymd(monthFirst), to: ymd(now), unit: 'MONTH'}))
+            ERP.api('/api/reports/sales' + ERP.query({ from: ymd(monthFirst), to: ymd(now), unit: 'MONTH' }))
                 .then(d => set('stat-sales', ERP.won(d.total.totalAmount))).catch(() => {});
-
             ERP.api('/api/reports/inventory')
-                .then(d => { set('stat-inv-val', ERP.won(d.totalValuation)); set('stat-inv-cnt', ERP.num(d.rows.length)); })
-                .catch(() => {});
-
-            ERP.api('/api/reports/income-statement' + ERP.query({from: ymd(yearFirst), to: ymd(now)}))
+                .then(d => { set('stat-inv-val', ERP.won(d.totalValuation)); set('stat-inv-cnt', ERP.num(d.rows.length)); }).catch(() => {});
+            ERP.api('/api/reports/income-statement' + ERP.query({ from: ymd(yearFirst), to: ymd(now) }))
                 .then(d => set('stat-net', ERP.won(d.netIncome))).catch(() => {});
         })();
     </script>

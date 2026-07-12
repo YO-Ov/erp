@@ -61,6 +61,13 @@ management:
 mes:
   base-url: ${MES_BASE_URL:http://localhost:8082}
 
+# AI 어시스턴트 — 로컬 LLM 에이전트(erp-agent, Python/FastAPI) 위치.
+# LLM 첫 호출은 모델 로딩으로 느릴 수 있어 read 타임아웃을 넉넉히 둔다.
+assistant:
+  agent:
+    base-url: ${ERP_AGENT_BASE_URL:http://localhost:8000}
+    timeout-seconds: ${ERP_AGENT_TIMEOUT:120}
+
 # Phase 12 — 회복성: MES 호출 재시도 + 서킷브레이커
 resilience4j:
   retry:

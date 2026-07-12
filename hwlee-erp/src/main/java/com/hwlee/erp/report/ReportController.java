@@ -18,7 +18,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/reports")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('FINANCE','ADMIN')")
+// 전사 리포트(매출·재고·손익)는 재무·관리자에 더해 임원(DIRECTOR)도 열람할 수 있다.
+@PreAuthorize("hasAnyRole('FINANCE','DIRECTOR','ADMIN')")
 public class ReportController {
 
     private final ReportService service;

@@ -65,6 +65,9 @@
             <a class="nav-link" th:classappend="${active == 'approval'} ? 'active'" href="/approvals">
                 <i class="bi bi-pen"></i> 전자결재
             </a>
+            <a class="nav-link" th:classappend="${active == 'assistant'} ? 'active'" href="/assistant">
+                <i class="bi bi-robot"></i> AI 어시스턴트
+            </a>
 
             <div sec:authorize="hasAnyRole('SALES','ADMIN')">
                 <div class="nav-section">영업 (SD)</div>

@@ -19,6 +19,19 @@
 
 ## 현재 위치
 
+> ### 🌐 B 방식 완성 — 운영 웹챗봇 → 이 맥 에이전트 (Cloudflare Tunnel + 비밀키 인증) + 조회 버그 2건 수정 (2026-07-14 세션)
+> A 방식(이 맥→운영 조회)에 이어, **운영 사이트 `erp.hyunwoo.pro` 챗봇이 이 맥에서 도는 에이전트를 호출**하도록 완성. 이 맥이 NAT 뒤라 인터넷에서 도달 불가하던 걸 **Cloudflare Tunnel**로 해결.
+> - **네트워크 = Cloudflare Named Tunnel**: `cloudflared` 설치(brew) → 로그인(`hyunwoo.pro` zone, Cloudflare 관리 중) → 터널 `erp-agent`(ID `e3355dc5-fab3-429b-aec2-157b506adfe6`) 생성 → DNS `agent.hyunwoo.pro` 연결 → `~/.cloudflared/config.yml`(agent.hyunwoo.pro → `localhost:8000`). 경로: 운영 컨테이너 → Cloudflare → 터널 → 이 맥 :8000.
+> - **인증 = 공유 비밀 헤더 `X-Agent-Secret`**: 에이전트가 인터넷에 노출되므로 무단호출 차단. `server.py`가 `AGENT_SECRET` 설정 시 `/chat`에 헤더 없거나 틀리면 **401**. 운영 `AssistantController`가 `X-Agent-Secret`(=`assistant.agent.secret`=서버 env `ASSISTANT_AGENT_SECRET`) 첨부. `application.yml`·`docker-compose.prod.yml`·`.env.example` 반영. **비밀키: `erp-agent/.env`의 `AGENT_SECRET` == 서버 `.env`의 `ASSISTANT_AGENT_SECRET`(동일 값)**. ERP 쪽 코드는 커밋 `9bc56b9 에이전트 설정`으로 푸시됨.
+> - **✅ e2e 검증**: 공개 `https://agent.hyunwoo.pro/chat` — 헤더 없음/틀림 → 401, 맞음+사용자 JWT → 200 실데이터. 브라우저 챗봇도 실데이터 응답 확인(운영 배포됨). 에이전트는 **`ERP_TARGET=prod`** 로 구동(브라우저 로그인 사용자의 JWT로 그 사용자 RBAC대로 조회).
+> - **🐞 조회 버그 2건 수정(`erp_api.py`, 이 맥 전용 재시작만으로 반영·운영 재배포 불필요)**: ⓐ "고객 20건"이 실은 페이지 크기(size=20)였음 → `totalElements` 반영해 **"고객 총 100건 (최근 20건 표시)"** 로. 고객·수주·결재 공통. (검증: 고객 100건·수주 782건, 100건은 totalElements+실행수+유니크코드 3중 확인) ⓑ **개수 질문("총 고객 수"/"몇 건")은 목록 없이 총계 한 줄만**(`_is_count_question`), "목록 보여줘"는 목록까지.
+> - **⚠️ 지금 상태 = 임시 구동(상시화 안 됨!)**: 이 맥의 **에이전트·터널이 세션 백그라운드로만** 떠 있음 → 세션/맥 종료 시 꺼지고 `agent.hyunwoo.pro`는 502(챗봇 죽음). **재기동 방법**: ① 에이전트 `cd erp-agent && ERP_TARGET=prod .venv/bin/uvicorn server:app --port 8000` ② 터널 `cloudflared tunnel run erp-agent`. (Ollama는 brew services 상주)
+> - **▶▶ 다음 진도(이번에 못 끝낸 것)**:
+>   1. **상시화(durability)** — 터널 `sudo cloudflared service install`(재부팅에도 유지), 에이전트도 launchd/`brew services` 로 상시 실행(`ERP_TARGET=prod`). 안 하면 맥 끄면 운영 챗봇이 죽음.
+>   2. **데모 안전화(A·B, hwlee님 "다른 사람이 물으면 값 안 나올까 걱정")** — (A) `chat.html` 예시 칩을 **운영 작동 질문**으로 교체: 지금 5개 중 3개(수주해줘·재고·상신)가 운영에선 "비활성/미연결" 막다른 답 → 고객/수주/손익/결재 조회 칩으로 바꾸고 커밋·배포. (B) 범위 밖 질문 안내문을 "이해 못함" 대신 **"고객·수주·손익·결재 조회 가능"** 가이드로.
+>   3. **erp-agent 백업** — `erp-agent/`는 erp git **밖**(이 맥 전용)이라 이번 수정들(`erp_api.py`·`server.py`·`main.py`·`orchestrator.py`·`config.py`·`erp_client.py`·`.env`) **버전관리 안 됨** → 별도 백업 필요.
+>   4. (선택) 재고 조회 실 API 매핑 / 쓰기 실연결은 `local` 한정(운영 보호).
+
 > ### 🔌 A 방식 완성 — 이 맥의 에이전트 ↔ 운영 ERP 읽기 실연결 (2026-07-13 세션, 미커밋 · erp-agent 저장소 밖)
 > hwlee님 결정 재확인 = **AI 계층(Ollama+에이전트)은 이 맥에만, ERP는 Oracle Cloud(운영), 둘은 HTTP·API 경유**(PROGRESS 상단 배치도). 그동안 "구조·읽기 매핑은 됐지만 CLI에서 운영 인증(JWT) 연결이 빠져" 실제로는 안 돌던 A 방식을 **완성·운영 대상 e2e 검증**.
 > - **핵심 = 에이전트가 '그 계정으로' 스스로 로그인**: `erp_api.py`에 **`login(base_url, user, pw)`** 신설(`POST /api/auth/login` → `accessToken`·`roles`). 웹은 브라우저 JWT를 프록시가 실어주지만, CLI/서버가 실 ERP에 직접 붙을 땐 에이전트가 이 함수로 로그인해 토큰 확보 → 이후 모든 조회를 그 토큰으로(ERP RBAC 그대로 적용).

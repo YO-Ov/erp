@@ -19,6 +19,15 @@
 
 ## 현재 위치
 
+> ### 🔌 A 방식 완성 — 이 맥의 에이전트 ↔ 운영 ERP 읽기 실연결 (2026-07-13 세션, 미커밋 · erp-agent 저장소 밖)
+> hwlee님 결정 재확인 = **AI 계층(Ollama+에이전트)은 이 맥에만, ERP는 Oracle Cloud(운영), 둘은 HTTP·API 경유**(PROGRESS 상단 배치도). 그동안 "구조·읽기 매핑은 됐지만 CLI에서 운영 인증(JWT) 연결이 빠져" 실제로는 안 돌던 A 방식을 **완성·운영 대상 e2e 검증**.
+> - **핵심 = 에이전트가 '그 계정으로' 스스로 로그인**: `erp_api.py`에 **`login(base_url, user, pw)`** 신설(`POST /api/auth/login` → `accessToken`·`roles`). 웹은 브라우저 JWT를 프록시가 실어주지만, CLI/서버가 실 ERP에 직접 붙을 땐 에이전트가 이 함수로 로그인해 토큰 확보 → 이후 모든 조회를 그 토큰으로(ERP RBAC 그대로 적용).
+> - **`main.py`(CLI)**: http 모드면 기동 시 `config.ERP_USER/PASSWORD`로 자동 로그인 → 로그인 성공/역할 출력 → 매 `orch.handle(...)`에 `erp_token`·`user_email`·`erp_roles` 전달. 실패 시 명확한 안내 후 종료.
+> - **`orchestrator.py`**: `config.ERP_MODE=="http"`면 신규 `_handle_http()`로 분기 — 조회(결재/수주/고객)는 사용자 토큰 `ErpReads`(RBAC), **쓰기(ORDER·SUBMIT_APPROVAL)는 운영 데이터 보호로 비활성**(안내 메시지), 재고는 실 API 미연결 안내. QUERY(손익·자유)는 기존 `_free_query` 토큰 경로 그대로. **mock 모드는 무회귀**(쓰기 Plan 확인게이트 유지).
+> - **`config.py`**: `ERP_API_BASE_URL`이 대상 ERP와 동일하게 해석되도록 수정(하드코딩 localhost:8080 버그 → prod면 `erp.hyunwoo.pro`). **`erp_client.py`**: http 모드에선 조회를 JWT 경로가 하므로 `HttpERPClient`의 (운영에 안 맞는) 폼 로그인 생략. **`.env` 신설**(이 맥 전용, gitignore): 대상별 계정 채워 `ERP_TARGET=prod`만으로 동작.
+> - **✅ 운영 서버 실 검증**: `ERP_TARGET=prod .venv/bin/python main.py` — admin 자동 로그인 → 고객·수주·손익 **운영 실데이터** 조회(CLI+LLM 전체 흐름) / 쓰기 시도 → 안전 차단. **RBAC 강제 확인**: `PROD_USER=kim@`(SALES)이면 손익 🔒권한없음·수주 OK. 컴파일·mock 무회귀 통과. `erp/실행방법.md` AI 섹션에 운영 조회 사용법 반영.
+> - **▶ 다음(선택)**: ⓐ **쓰기 실연결은 `local` 대상 한정**으로 별도 매핑(운영 보호 유지) — `erp_client.py` HttpERPClient TODO/NotImplemented 부분. ⓑ 재고 조회 실 API 매핑. ⓒ 운영 웹사이트 화면 챗봇을 이 맥 에이전트에 물리려면 별도 세팅 필요(운영 컨테이너→이 맥 도달: 공개 URL/터널 + `ERP_AGENT_BASE_URL`).
+
 > ### 📊 역할별 대시보드 개편 — 공통 위젯 + 영업 대시보드 (2026-07-13 세션, 미커밋)
 > 기존 대시보드는 재무 전용 KPI 카드 4개(비-재무는 전부 "—") + "준비중" 플레이스홀더라 **대부분 역할에게 빈 화면**이었음. hwlee님 요청으로 역할별로 개편.
 > - **1단계 공통 위젯(모든 역할)** — `dashboard.html` 개편: 요약카드 4개(결재 대기/진행중 상신/반려됨/미확인 알림) + **내 결재 대기 목록**(inbox) + **내 상신 현황**(outbox, 반려사유 표시) + **알림 목록** + **바로가기(전 역할)**. 재무 KPI 카드는 `sec:authorize(FINANCE/DIRECTOR/ADMIN)`로 감싸 비-재무엔 안 뜸. 기존 API만(`/api/approvals/inbox·outbox`, `/api/notifications`).

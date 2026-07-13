@@ -42,11 +42,18 @@ public class AssistantController {
 
     public AssistantController(
             @Value("${assistant.agent.base-url:http://localhost:8000}") String baseUrl,
-            @Value("${assistant.agent.timeout-seconds:120}") long timeoutSeconds) {
+            @Value("${assistant.agent.timeout-seconds:120}") long timeoutSeconds,
+            @Value("${assistant.agent.secret:}") String agentSecret) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(5));
         factory.setReadTimeout(Duration.ofSeconds(timeoutSeconds));
-        this.agent = RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
+        RestClient.Builder builder = RestClient.builder().baseUrl(baseUrl).requestFactory(factory);
+        // 에이전트가 인터넷(Cloudflare Tunnel)에 노출될 때 무단 호출을 막는 공유 비밀 헤더.
+        // 값이 있으면 모든 에이전트 호출에 실어 보낸다. (로컬 개발은 비어 있어 헤더 없이 호출)
+        if (agentSecret != null && !agentSecret.isBlank()) {
+            builder = builder.defaultHeader("X-Agent-Secret", agentSecret);
+        }
+        this.agent = builder.build();
     }
 
     /**

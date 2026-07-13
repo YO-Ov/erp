@@ -113,6 +113,11 @@ services:
       ERP_DB_PASSWORD: ${ERP_DB_PASSWORD:-erp}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-dot-env-please}
       TZ: Asia/Seoul
+      # AI 어시스턴트 — 이 맥에서 도는 에이전트를 Cloudflare Tunnel(agent.hyunwoo.pro)로 호출.
+      #   비밀키는 서버 .env 의 ASSISTANT_AGENT_SECRET(에이전트 쪽 AGENT_SECRET 과 동일 값).
+      #   비우면 챗봇은 "에이전트 연결 불가" 로만 뜬다(운영 기본 안전값).
+      ERP_AGENT_BASE_URL: ${ERP_AGENT_BASE_URL:-https://agent.hyunwoo.pro}
+      ASSISTANT_AGENT_SECRET: ${ASSISTANT_AGENT_SECRET:-}
     ports:
       - "127.0.0.1:8080:8080"   # 서버 내부 curl 확인용. 외부는 리버스 프록시로.
 

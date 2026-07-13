@@ -67,6 +67,9 @@ assistant:
   agent:
     base-url: ${ERP_AGENT_BASE_URL:http://localhost:8000}
     timeout-seconds: ${ERP_AGENT_TIMEOUT:120}
+    # 에이전트가 인터넷(Cloudflare Tunnel)에 노출될 때 무단 호출 차단용 공유 비밀.
+    # 운영에서만 설정(서버 .env 의 ASSISTANT_AGENT_SECRET). 로컬은 비어 있어 무인증.
+    secret: ${ASSISTANT_AGENT_SECRET:}
 
 # Phase 12 — 회복성: MES 호출 재시도 + 서킷브레이커
 resilience4j:

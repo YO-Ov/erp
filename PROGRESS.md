@@ -19,6 +19,13 @@
 
 ## 현재 위치
 
+> ### 🧭 별도 트랙 — 프론트엔드 전환 & 포트폴리오 사이트 (ERP 커리큘럼과 무관, 2026-07-15 신설)
+> ERP 커리큘럼(Phase 0~16)과 **독립된 별도 트랙**. 상세 계획·결정·다음 진도는 → **`doc/프론트엔드전환-포트폴리오사이트-계획.md`**.
+> - **목표**: ⓐ `hyunwoo.pro`에 프로필+포트폴리오 사이트(ERP·MES·AI 3개 소개) ⓑ **Vue·React 직접 학습** = ERP를 SPA로 점진 전환.
+> - **핵심 결정**: 포트폴리오는 ERP/MES/AI 어디에도 종속 안 시키고 **독립 정적 사이트**(서브도메인 분리) + 방문자 분석은 외부 analytics(프레임워크·DB 불필요, YAGNI). 전환은 **통째로 X → 모듈 단위 점진**(REST 39개 기반 활용, 첫 대상 SD 견적 유력).
+> - **미확정**: ERP 프레임워크 React vs Vue (또는 ERP=React/MES=Vue 분배 A안).
+> - **다음 진도**: ① 프레임워크/전략 확정 ② **포트폴리오 콘텐츠 초안**(프레임워크 무관, 지금 가능) ③ 정적 뼈대+analytics 배포 ④ ERP SPA 착수(확정 후).
+
 > ### 🌐 B 방식 완성 — 운영 웹챗봇 → 이 맥 에이전트 (Cloudflare Tunnel + 비밀키 인증) + 조회 버그 2건 수정 (2026-07-14 세션)
 > A 방식(이 맥→운영 조회)에 이어, **운영 사이트 `erp.hyunwoo.pro` 챗봇이 이 맥에서 도는 에이전트를 호출**하도록 완성. 이 맥이 NAT 뒤라 인터넷에서 도달 불가하던 걸 **Cloudflare Tunnel**로 해결.
 > - **네트워크 = Cloudflare Named Tunnel**: `cloudflared` 설치(brew) → 로그인(`hyunwoo.pro` zone, Cloudflare 관리 중) → 터널 `erp-agent`(ID `e3355dc5-fab3-429b-aec2-157b506adfe6`) 생성 → DNS `agent.hyunwoo.pro` 연결 → `~/.cloudflared/config.yml`(agent.hyunwoo.pro → `localhost:8000`). 경로: 운영 컨테이너 → Cloudflare → 터널 → 이 맥 :8000.

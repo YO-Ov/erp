@@ -12,4 +12,13 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
 
     @Query("select distinct w from WorkOrder w left join fetch w.lines order by w.id desc")
     List<WorkOrder> findAllWithLines();
+
+    /**
+     * 생산 시뮬레이터 대상 — 진행 중(IN_PROGRESS)이면서 배정 설비가 가동(RUNNING) 중인 작업지시.
+     * "설비 가동을 켜면 그 설비의 작업지시가 생산된다"는 규칙의 질의.
+     */
+    @Query("select w from WorkOrder w join w.assignedEquipment e "
+            + "where w.status = com.hwlee.mes.workorder.WorkOrderStatus.IN_PROGRESS "
+            + "and e.status = com.hwlee.mes.master.equipment.EquipmentStatus.RUNNING")
+    List<WorkOrder> findRunningInProgress();
 }

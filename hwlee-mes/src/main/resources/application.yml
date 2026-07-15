@@ -38,6 +38,14 @@ server:
   # 8081 은 React Native Metro 기본 포트라 충돌 → 8082 사용.
   port: 8082
 
+# 생산 시뮬레이터 — 설비 가동(RUNNING) + 작업지시 진행중(IN_PROGRESS)이면 자동 생산(학습용 데모).
+mes:
+  simulator:
+    enabled: true
+    tick-ms: 2000            # 2초마다 한 틱
+    rate: 0.12               # 틱당 지시수량의 12% 생산 (약 8~9틱 = 15~20초에 완료)
+    defect-probability: 0.15 # 틱당 15% 확률로 불량 1개
+
 # 분산 추적 — 모든 요청 샘플링(학습), Zipkin 으로 전송
 management:
   tracing:

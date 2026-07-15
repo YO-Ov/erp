@@ -1,0 +1,55 @@
+// 백엔드 enum(WorkOrderStatus / EquipmentStatus) → 한글 라벨·색상 매핑.
+// 코드값은 서버가 내려주는 그대로 두고, 표시에만 이 매핑을 쓴다.
+
+export const WORK_ORDER_STATUS = {
+  RECEIVED: { label: '접수', tone: 'neutral' },
+  IN_PROGRESS: { label: '진행중', tone: 'active' },
+  PAUSED: { label: '일시정지', tone: 'warn' },
+  COMPLETED: { label: '완료', tone: 'done' },
+  CANCELLED: { label: '취소', tone: 'muted' },
+}
+
+export const EQUIPMENT_STATUS = {
+  RUNNING: { label: '가동', tone: 'active' },
+  IDLE: { label: '대기', tone: 'neutral' },
+  DOWN: { label: '고장/정지', tone: 'danger' },
+  MAINTENANCE: { label: '정비', tone: 'warn' },
+}
+
+export function workOrderStatus(code) {
+  return WORK_ORDER_STATUS[code] || { label: code || '-', tone: 'neutral' }
+}
+
+export function equipmentStatus(code) {
+  return EQUIPMENT_STATUS[code] || { label: code || '-', tone: 'neutral' }
+}
+
+// 설비 상태 변경 버튼으로 노출할 전체 상태 목록(순서 고정).
+export const EQUIPMENT_STATUS_CODES = ['RUNNING', 'IDLE', 'DOWN', 'MAINTENANCE']
+
+export const QUALITY_RESULT = {
+  PASS: { label: '합격', tone: 'active' },
+  FAIL: { label: '불합격', tone: 'danger' },
+}
+export function qualityResult(code) {
+  return QUALITY_RESULT[code] || { label: code || '-', tone: 'neutral' }
+}
+
+// 현재 상태에서 어떤 실행 액션이 가능한지 — 백엔드 상태전이 규칙과 일치시킨다.
+// RECEIVED ──start──▶ IN_PROGRESS ──complete──▶ COMPLETED
+//                       │    ▲
+//                    pause  resume
+//                       ▼    │
+//                      PAUSED
+export function allowedActions(code) {
+  switch (code) {
+    case 'RECEIVED':
+      return ['start']
+    case 'IN_PROGRESS':
+      return ['pause', 'report', 'complete']
+    case 'PAUSED':
+      return ['resume']
+    default:
+      return []
+  }
+}

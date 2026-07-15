@@ -1,0 +1,16 @@
+# 의존성
+node_modules/
+
+# 빌드 산출물
+dist/
+dist-ssr/
+
+# 로컬 환경설정
+*.local
+.env.local
+.env.*.local
+
+# 에디터/OS
+.DS_Store
+*.log
+.vite/

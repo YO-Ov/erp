@@ -1,0 +1,23 @@
+{
+  "name": "hwlee-erp-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ERP 프론트엔드 SPA (React 19 + Vite) — Thymeleaf에서 점진 전환",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.62.7",
+    "axios": "^1.7.9",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.7"
+  }
+}

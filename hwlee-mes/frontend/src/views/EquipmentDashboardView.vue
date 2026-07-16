@@ -77,12 +77,14 @@ async function refreshUtils() {
 }
 
 // ── 실시간 폴링 ──
-// 가동률 = 가동시간 ÷ 전체시간. RUNNING 상태로 시간이 흐르는 동안 값이 오르므로,
-// 가동을 켠 뒤에는 주기적으로 다시 읽어야 게이지가 차오르는 게 눈에 보인다.
-// 가동중(RUNNING)인 설비가 하나라도 있으면 2.5초마다 가동률을 갱신하고, 없으면 멈춘다.
+// 가동률(오늘) = 가동시간(RUNNING) ÷ 부하시간(RUNNING+DOWN). 부하시간이 흐르면 값이 변하므로
+// (가동 RUNNING 은 올리고, 고장 DOWN 은 내림), 그런 설비가 하나라도 있으면 2.5초마다 다시 읽어
+// 게이지가 움직이는 게 눈에 보이게 한다. 대기·정비만 있는 설비는 값이 안 변하므로 폴링을 멈춘다.
 const POLL_MS = 2500
 let timer = null
-const anyRunning = computed(() => equipments.value.some((e) => e.status === 'RUNNING'))
+const anyLoading = computed(() =>
+  equipments.value.some((e) => e.status === 'RUNNING' || e.status === 'DOWN'),
+)
 
 function startPolling() {
   if (timer) return
@@ -94,7 +96,7 @@ function stopPolling() {
     timer = null
   }
 }
-watch(anyRunning, (running) => (running ? startPolling() : stopPolling()), { immediate: true })
+watch(anyLoading, (loading) => (loading ? startPolling() : stopPolling()), { immediate: true })
 
 onMounted(load)
 onUnmounted(stopPolling) // 화면 떠날 때 타이머 정리(누수 방지)
@@ -105,7 +107,7 @@ onUnmounted(stopPolling) // 화면 떠날 때 타이머 정리(누수 방지)
     <div class="page-head">
       <h1>설비 가동현황</h1>
       <div class="head-actions">
-        <span v-if="anyRunning" class="live"><span class="dot"></span>실시간 가동률 갱신중</span>
+        <span v-if="anyLoading" class="live"><span class="dot"></span>실시간 가동률 갱신중</span>
         <button @click="load" :disabled="loading">{{ loading ? '불러오는 중…' : '새로고침' }}</button>
       </div>
     </div>
@@ -129,13 +131,14 @@ onUnmounted(stopPolling) // 화면 떠날 때 타이머 정리(누수 방지)
           <StatusBadge :label="equipmentStatus(eq.status).label" :tone="equipmentStatus(eq.status).tone" />
         </div>
 
-        <div class="eq-util" v-if="util(eq.code) != null">
+        <div class="eq-util">
           <div class="util-head">
-            <span class="muted">가동률</span>
-            <span class="util-num">{{ util(eq.code).toFixed(1) }}%</span>
+            <span class="muted">가동률(오늘)</span>
+            <span v-if="util(eq.code) != null" class="util-num">{{ util(eq.code).toFixed(1) }}%</span>
+            <span v-else class="util-num muted" title="오늘 가동·고장 시간이 아직 없어 집계 전입니다">집계 전</span>
           </div>
           <div class="progress">
-            <div class="progress-bar" :style="{ width: Math.min(100, util(eq.code)) + '%' }"></div>
+            <div class="progress-bar" :style="{ width: Math.min(100, util(eq.code) ?? 0) + '%' }"></div>
           </div>
         </div>
 

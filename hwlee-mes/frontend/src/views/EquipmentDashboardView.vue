@@ -221,7 +221,8 @@ h1 {
 }
 .eq-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  /* min() — 280px 보다 좁은 기기에서 카드가 화면 밖으로 넘치지 않게 */
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: 14px;
 }
 .eq-card {
@@ -295,6 +296,17 @@ h1 {
 @media (max-width: 640px) {
   .summary {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .page-head {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  /* 상태 버튼 4개는 폰 폭에서 글자가 눌린다 → 2×2 로 */
+  .eq-actions {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .mini {
+    padding: 8px 4px;
   }
 }
 </style>

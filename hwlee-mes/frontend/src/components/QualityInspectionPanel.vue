@@ -80,32 +80,34 @@ onMounted(load)
 
     <p v-if="error" class="error">⚠ {{ error }}</p>
 
-    <table v-if="inspections.length">
-      <thead>
-        <tr>
-          <th>검사시각</th>
-          <th>검사</th>
-          <th>합격</th>
-          <th>불량</th>
-          <th>불량사유</th>
-          <th>결과</th>
-          <th>비고</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="ins in inspections" :key="ins.id">
-          <td class="muted">{{ fmtDateTime(ins.inspectedAt) }}</td>
-          <td>{{ fmt(ins.inspectedQty) }}</td>
-          <td>{{ fmt(ins.passedQty) }}</td>
-          <td :class="{ error: Number(ins.defectQty) > 0 }">{{ fmt(ins.defectQty) }}</td>
-          <td class="muted">{{ ins.defectReasonName || '-' }}</td>
-          <td>
-            <StatusBadge :label="qualityResult(ins.result).label" :tone="qualityResult(ins.result).tone" />
-          </td>
-          <td class="muted">{{ ins.note || '-' }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <div v-if="inspections.length" class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>검사시각</th>
+            <th>검사</th>
+            <th>합격</th>
+            <th>불량</th>
+            <th>불량사유</th>
+            <th>결과</th>
+            <th>비고</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="ins in inspections" :key="ins.id">
+            <td class="muted nowrap">{{ fmtDateTime(ins.inspectedAt) }}</td>
+            <td>{{ fmt(ins.inspectedQty) }}</td>
+            <td>{{ fmt(ins.passedQty) }}</td>
+            <td :class="{ error: Number(ins.defectQty) > 0 }">{{ fmt(ins.defectQty) }}</td>
+            <td class="muted">{{ ins.defectReasonName || '-' }}</td>
+            <td>
+              <StatusBadge :label="qualityResult(ins.result).label" :tone="qualityResult(ins.result).tone" />
+            </td>
+            <td class="muted">{{ ins.note || '-' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
     <p v-else-if="!loading" class="muted">등록된 검사 이력이 없습니다.</p>
 
     <!-- 신규 검사 등록 -->
@@ -153,5 +155,32 @@ input[type='number'] {
 .note {
   flex: 1;
   min-width: 140px;
+}
+/* 검사 이력은 7컬럼이라 폰에서 접히면 되레 안 읽힌다 → 표만 가로 스크롤 */
+.table-scroll {
+  overflow-x: auto;
+}
+.table-scroll table {
+  min-width: 640px;
+}
+.nowrap {
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  /* 입력 폭 고정을 풀어 검사·합격·불량이 한 줄에 셋씩 들어가게 */
+  .insp-form {
+    gap: 8px;
+  }
+  .insp-form input[type='number'] {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+  .insp-form select,
+  .insp-form .note,
+  .insp-form button {
+    flex-basis: 100%;
+  }
 }
 </style>

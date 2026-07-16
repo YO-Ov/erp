@@ -219,19 +219,21 @@ onUnmounted(stopPolling) // 화면 떠날 때 타이머 정리(누수 방지)
     <!-- 소요 자재(BOM 라인) -->
     <div class="panel" v-if="wo.lines && wo.lines.length">
       <h2>소요 자재</h2>
-      <table>
-        <thead>
-          <tr><th>#</th><th>부품</th><th>소요량</th><th>단위</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="l in wo.lines" :key="l.lineNo">
-            <td class="muted">{{ l.lineNo }}</td>
-            <td>{{ l.componentName }} <span class="muted mono">({{ l.componentCode }})</span></td>
-            <td>{{ fmt(l.requiredQty) }}</td>
-            <td class="muted">{{ l.unit }}</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>#</th><th>부품</th><th>소요량</th><th>단위</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="l in wo.lines" :key="l.lineNo">
+              <td class="muted">{{ l.lineNo }}</td>
+              <td>{{ l.componentName }} <span class="muted mono">({{ l.componentCode }})</span></td>
+              <td>{{ fmt(l.requiredQty) }}</td>
+              <td class="muted">{{ l.unit }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- 현장 실행 액션 -->
@@ -396,9 +398,56 @@ input {
 input[type='number'] {
   width: 130px;
 }
+/* 소요 자재 표는 4컬럼뿐이라 카드 전환 대신 가로 스크롤로 충분하다.
+   표만 밀리고 페이지 전체는 안 밀린다. */
+.table-scroll {
+  overflow-x: auto;
+}
+.table-scroll table {
+  min-width: 420px;
+}
+
 @media (max-width: 720px) {
   .grid {
     grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .page-head {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  h1 {
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 19px;
+  }
+  /* 라벨 130px 고정은 폰에서 값 쪽이 너무 좁아진다 → 라벨 위, 값 아래 */
+  .info {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .info dt {
+    font-size: 12px;
+  }
+  .info dd:not(:last-child) {
+    margin-bottom: 10px;
+  }
+  .metrics {
+    gap: 16px;
+  }
+  /* 실적 등록 줄 — 입력 두 칸이 나란히, 사유·버튼은 전체 폭 */
+  .exec .action-row.report input[type='number'] {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+  .exec .action-row.report select,
+  .exec .action-row.report button {
+    flex-basis: 100%;
+  }
+  .exec .action-row select {
+    max-width: 100%;
   }
 }
 </style>

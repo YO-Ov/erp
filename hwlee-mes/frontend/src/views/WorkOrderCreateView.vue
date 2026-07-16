@@ -124,7 +124,7 @@ async function submit() {
           <h2>소요 자재 (BOM)</h2>
           <button type="button" @click="addLine">+ 자재 추가</button>
         </div>
-        <table>
+        <table class="only-desktop">
           <thead>
             <tr>
               <th style="width: 28%">부품코드</th>
@@ -148,6 +148,36 @@ async function submit() {
             </tr>
           </tbody>
         </table>
+
+        <!-- 좁은 화면: 입력칸 5개짜리 표는 폰에서 못 쓴다 → 라인마다 블록으로 -->
+        <div class="line-cards">
+          <div v-for="(l, idx) in form.lines" :key="idx" class="line-card">
+            <div class="line-card-head">
+              <span class="muted">자재 {{ idx + 1 }}</span>
+              <button type="button" class="del" @click="removeLine(idx)" :disabled="form.lines.length === 1">
+                ✕
+              </button>
+            </div>
+            <label>
+              부품코드
+              <input v-model="l.componentCode" placeholder="ITEM-…" />
+            </label>
+            <label>
+              부품명
+              <input v-model="l.componentName" placeholder="부품명" />
+            </label>
+            <div class="line-card-row">
+              <label>
+                소요량
+                <input v-model="l.requiredQty" type="number" min="0" />
+              </label>
+              <label>
+                단위
+                <input v-model="l.unit" placeholder="EA" />
+              </label>
+            </div>
+          </div>
+        </div>
         <p class="muted hint">자재 라인은 선택 사항입니다. 비워두면 자재 없이 접수됩니다.</p>
       </div>
 
@@ -229,9 +259,57 @@ td input {
 .form-actions a:hover {
   text-decoration: none;
 }
+/* ── 모바일 자재 입력 블록 (640px 이하에서만 켠다 — 아래 미디어쿼리) ── */
+.line-cards {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+}
+.line-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.line-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.line-card-row {
+  display: flex;
+  gap: 10px;
+}
+.line-card-row label {
+  flex: 1;
+  min-width: 0;
+}
+.line-card input {
+  width: 100%;
+}
+
 @media (max-width: 640px) {
+  .line-cards {
+    display: flex;
+  }
   .fields {
     grid-template-columns: 1fr;
+  }
+  .lines-head {
+    gap: 10px;
+  }
+  /* 접수·취소는 폭을 나눠 갖게 — 오른쪽 끝에 몰리면 한 손 조작이 어렵다 */
+  .form-actions {
+    justify-content: stretch;
+  }
+  .form-actions > * {
+    flex: 1;
+  }
+  .form-actions button {
+    width: 100%;
   }
 }
 </style>

@@ -71,6 +71,20 @@ button.primary:hover:not(:disabled) {
   margin: 0 auto;
   padding: 24px 20px 64px;
 }
+@media (max-width: 640px) {
+  .container {
+    padding: 20px 14px 48px;
+  }
+}
+
+/* 좁은 화면에서 표를 카드로 바꾸는 화면들이 쓰는 헬퍼.
+   짝이 되는 '모바일 전용' 쪽은 각 컴포넌트가 자기 미디어쿼리로 켠다.
+   (scoped 선택자가 이 전역 유틸보다 우선순위가 높아 display 를 덮어쓰기 때문) */
+@media (max-width: 640px) {
+  .only-desktop {
+    display: none;
+  }
+}
 
 .panel {
   background: var(--bg-panel);

@@ -31,8 +31,17 @@ hyunwoo.pro, www.hyunwoo.pro {
 }
 
 # ── MES — https://mes.hyunwoo.pro ────────────────────────────────────
+#   Vue3 SPA(정적) + Spring REST 백엔드를 한 도메인에서 경로로 분기한다.
+#     - /api/*      → mes:8082         (REST 백엔드, 무수정)
+#     - /actuator/* → mes:8082         (헬스 등)
+#     - 그 외 전부  → mes-frontend:80   (Vue dist 정적 서빙 + SPA 딥링크 폴백)
 mes.hyunwoo.pro {
 	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
 	encode gzip zstd
-	reverse_proxy mes:8082
+
+	@backend path /api/* /actuator/*
+	reverse_proxy @backend mes:8082
+
+	# 그 외(HTML·JS·CSS·라우트)는 정적 프론트 컨테이너로.
+	reverse_proxy mes-frontend:80
 }

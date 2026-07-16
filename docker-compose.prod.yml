@@ -141,6 +141,22 @@ services:
     ports:
       - "127.0.0.1:8082:8082"
 
+  # ── MES 프론트엔드 (Vue3 SPA 정적 서버) ───────────────────────
+  #   Vue 빌드 산출물(dist)만 서빙하는 초경량 정적 컨테이너(~20MB).
+  #   외부 포트를 열지 않는다 → 메인 Caddy 가 mes.hyunwoo.pro 의
+  #   '/api/*' 는 mes:8082 로, 그 외는 이 컨테이너로 프록시한다.
+  mes-frontend:
+    build:
+      context: ./hwlee-mes/frontend
+      dockerfile: Dockerfile
+    image: hwlee-mes-frontend:latest
+    container_name: hwlee-mes-frontend
+    restart: unless-stopped
+    depends_on:
+      - mes
+    environment:
+      TZ: Asia/Seoul
+
   # ── 리버스 프록시 (외부 공개 관문) ──────────────────────────────
   #   유일하게 외부(0.0.0.0)로 80/443 을 여는 컨테이너.
   #   Cloudflare(주황 구름) → 이 Caddy(443, Origin 인증서) → erp:8080.
@@ -152,6 +168,7 @@ services:
     depends_on:
       - erp
       - mes
+      - mes-frontend
     ports:
       - "80:80"
       - "443:443"

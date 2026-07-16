@@ -22,9 +22,6 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 
-	// Phase 13 — 현장 실적 입력 화면
-	implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
-
 	// 헬스체크/운영 지표
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 

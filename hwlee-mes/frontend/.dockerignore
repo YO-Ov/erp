@@ -1,0 +1,10 @@
+# 빌드 컨텍스트 최소화 — 아래는 이미지 빌드에 불필요(캐시 무효화·용량만 늘림)
+node_modules
+dist
+dist-ssr
+.vite
+*.local
+.env.local
+.env.*.local
+.DS_Store
+*.log

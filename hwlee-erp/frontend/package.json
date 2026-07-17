@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "ERP 프론트엔드 SPA (React 19 + Vite) — Thymeleaf에서 점진 전환",
+  "description": "ERP 프론트엔드 SPA (React 19 + TypeScript + Vite) — Thymeleaf에서 점진 전환",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "type-check": "tsc -b",
+    "build": "tsc -b && vite build",
+    "build-only": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -17,7 +19,11 @@
     "react-router-dom": "^7.1.1"
   },
   "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.9",
     "vite": "^6.0.7"
   }
 }

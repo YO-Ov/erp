@@ -4,5 +4,8 @@ dist-ssr
 *.local
 .vite
 
+# 타입 검사 증분 캐시(tsc -b 가 생성)
+*.tsbuildinfo
+
 # 에디터
 .DS_Store

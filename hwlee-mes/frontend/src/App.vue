@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 // 앱 셸: 상단 헤더 + 라우터 뷰.
 // 화면 전환은 vue-router 가 담당한다(<router-view/>).
 import { useRoute } from 'vue-router'
@@ -8,7 +8,7 @@ const route = useRoute()
 // router-link-active 는 라우트 '계층'으로 판정한다. /work-orders 와 /work-orders/:id 는
 // 서로 독립된 최상위 라우트라 부모·자식이 아니어서, 상세로 들어가면 탭 활성이 풀린다.
 // 탭은 '섹션' 단위로 켜져야 하므로 경로 접두사로 직접 판정한다.
-const inSection = (prefix) => route.path === prefix || route.path.startsWith(prefix + '/')
+const inSection = (prefix: string) => route.path === prefix || route.path.startsWith(prefix + '/')
 </script>
 
 <template>

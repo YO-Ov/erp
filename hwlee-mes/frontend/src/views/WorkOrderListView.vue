@@ -1,15 +1,16 @@
-<script setup>
+<script setup lang="ts">
 import { onMounted, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useWorkOrderStore } from '../stores/workOrders'
 import { workOrderStatus, WORK_ORDER_STATUS } from '../domain/status'
 import StatusBadge from '../components/StatusBadge.vue'
+import type { WorkOrderStatus } from '../types/api'
 
 const store = useWorkOrderStore()
 const { items, loading, error, countByStatus } = storeToRefs(store)
 
-// 요약 카드로 보여줄 상태 순서
-const summaryOrder = ['RECEIVED', 'IN_PROGRESS', 'PAUSED', 'COMPLETED']
+// 요약 카드로 보여줄 상태 순서(취소는 빼고 4개만)
+const summaryOrder: WorkOrderStatus[] = ['RECEIVED', 'IN_PROGRESS', 'PAUSED', 'COMPLETED']
 const summary = computed(() =>
   summaryOrder.map((code) => ({
     code,
@@ -18,11 +19,11 @@ const summary = computed(() =>
   })),
 )
 
-function fmtQty(q) {
+function fmtQty(q: number | null | undefined) {
   if (q == null) return '-'
   return Number(q).toLocaleString('ko-KR')
 }
-function fmtDate(d) {
+function fmtDate(d: string | null | undefined) {
   return d || '-'
 }
 

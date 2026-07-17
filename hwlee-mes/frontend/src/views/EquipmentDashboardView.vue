@@ -1,14 +1,16 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { equipmentApi } from '../api/workOrders'
+import { errorMessage } from '../api/client'
 import { equipmentStatus, EQUIPMENT_STATUS, EQUIPMENT_STATUS_CODES } from '../domain/status'
 import StatusBadge from '../components/StatusBadge.vue'
+import type { Equipment, EquipmentStatus } from '../types/api'
 
-const equipments = ref([])
-const utilByCode = ref({}) // equipmentCode → utilizationPercent
+const equipments = ref<Equipment[]>([])
+const utilByCode = ref<Record<string, number>>({}) // equipmentCode → utilizationPercent
 const loading = ref(false)
-const error = ref(null)
-const busyId = ref(null)
+const error = ref<string | null>(null)
+const busyId = ref<number | null>(null)
 
 // 상태별 설비 수 요약
 const summary = computed(() =>
@@ -30,19 +32,19 @@ async function load() {
         equipmentApi.utilization(e.id).catch(() => null),
       ),
     )
-    const map = {}
+    const map: Record<string, number> = {}
     for (const u of utils) {
       if (u) map[u.equipmentCode] = u.utilizationPercent
     }
     utilByCode.value = map
   } catch (e) {
-    error.value = e.message
+    error.value = errorMessage(e)
   } finally {
     loading.value = false
   }
 }
 
-async function changeStatus(eq, status) {
+async function changeStatus(eq: Equipment, status: EquipmentStatus) {
   if (eq.status === status) return
   busyId.value = eq.id
   error.value = null
@@ -53,15 +55,21 @@ async function changeStatus(eq, status) {
     const u = await equipmentApi.utilization(eq.id).catch(() => null)
     if (u) utilByCode.value = { ...utilByCode.value, [u.equipmentCode]: u.utilizationPercent }
   } catch (e) {
-    error.value = e.message
+    error.value = errorMessage(e)
   } finally {
     busyId.value = null
   }
 }
 
-function util(code) {
+function util(code: string): number | null {
   const v = utilByCode.value[code]
   return v == null ? null : Number(v)
+}
+
+/** 게이지 옆 숫자 — 아직 집계 전이면 null(템플릿이 '집계 전'으로 대체한다). */
+function utilText(code: string): string | null {
+  const v = util(code)
+  return v == null ? null : `${v.toFixed(1)}%`
 }
 
 // 가동률만 가볍게 다시 조회(설비 목록은 그대로 두고 게이지 값만 갱신).
@@ -69,7 +77,7 @@ async function refreshUtils() {
   const utils = await Promise.all(
     equipments.value.map((e) => equipmentApi.utilization(e.id).catch(() => null)),
   )
-  const map = { ...utilByCode.value }
+  const map: Record<string, number> = { ...utilByCode.value }
   for (const u of utils) {
     if (u) map[u.equipmentCode] = u.utilizationPercent
   }
@@ -81,7 +89,8 @@ async function refreshUtils() {
 // (가동 RUNNING 은 올리고, 고장 DOWN 은 내림), 그런 설비가 하나라도 있으면 2.5초마다 다시 읽어
 // 게이지가 움직이는 게 눈에 보이게 한다. 대기·정비만 있는 설비는 값이 안 변하므로 폴링을 멈춘다.
 const POLL_MS = 2500
-let timer = null
+// 브라우저의 setInterval 은 number 를 돌려주지만 @types/node 가 얹히면 Timeout 이 된다 → 환경에 맞게 추론시킨다.
+let timer: ReturnType<typeof setInterval> | null = null
 const anyLoading = computed(() =>
   equipments.value.some((e) => e.status === 'RUNNING' || e.status === 'DOWN'),
 )
@@ -134,7 +143,7 @@ onUnmounted(stopPolling) // 화면 떠날 때 타이머 정리(누수 방지)
         <div class="eq-util">
           <div class="util-head">
             <span class="muted">가동률(오늘)</span>
-            <span v-if="util(eq.code) != null" class="util-num">{{ util(eq.code).toFixed(1) }}%</span>
+            <span v-if="utilText(eq.code)" class="util-num">{{ utilText(eq.code) }}</span>
             <span v-else class="util-num muted" title="오늘 가동·고장 시간이 아직 없어 집계 전입니다">집계 전</span>
           </div>
           <div class="progress">

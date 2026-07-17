@@ -1,20 +1,26 @@
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { workOrderApi } from '../api/workOrders'
+import { errorMessage } from '../api/client'
 import { qualityResult } from '../domain/status'
 import StatusBadge from './StatusBadge.vue'
+import type { DefectReason, QualityInspection } from '../types/api'
 
 // 특정 작업지시의 품질검사 이력 + 신규 검사 등록.
-const props = defineProps({
-  workOrderId: { type: [String, Number], required: true },
-  defectReasons: { type: Array, default: () => [] },
-})
+const props = withDefaults(
+  defineProps<{
+    workOrderId: number | string
+    defectReasons?: DefectReason[]
+  }>(),
+  { defectReasons: () => [] },
+)
 
-const inspections = ref([])
+const inspections = ref<QualityInspection[]>([])
 const loading = ref(false)
-const error = ref(null)
+const error = ref<string | null>(null)
 const submitting = ref(false)
 
+// <input> 이 돌려주는 값은 늘 문자열이라 폼은 문자열로 들고 있다가 전송 직전에 숫자로 바꾼다.
 const form = reactive({ inspectedQty: '', passedQty: '', defectQty: '', defectReasonId: '', note: '' })
 
 async function load() {
@@ -23,7 +29,7 @@ async function load() {
   try {
     inspections.value = await workOrderApi.inspections(props.workOrderId)
   } catch (e) {
-    error.value = e.message
+    error.value = errorMessage(e)
   } finally {
     loading.value = false
   }
@@ -58,16 +64,16 @@ async function submit() {
     form.note = ''
     await load()
   } catch (e) {
-    error.value = e.message
+    error.value = errorMessage(e)
   } finally {
     submitting.value = false
   }
 }
 
-function fmt(q) {
+function fmt(q: number | null | undefined) {
   return q == null ? '-' : Number(q).toLocaleString('ko-KR')
 }
-function fmtDateTime(dt) {
+function fmtDateTime(dt: string | null | undefined) {
   return dt ? dt.replace('T', ' ').slice(0, 19) : '-'
 }
 

@@ -1,10 +1,16 @@
-<script setup>
+<script setup lang="ts">
+import type { Tone } from '../domain/status'
+
 // 상태 코드를 받아 색상 배지로 표시한다.
 // { label, tone } 형태를 그대로 받아 재사용(작업지시·설비 공용).
-defineProps({
-  label: { type: String, required: true },
-  tone: { type: String, default: 'neutral' },
-})
+// tone 은 Tone 유니온이라 오타나 없는 색상을 넘기면 타입 검사에서 걸린다.
+withDefaults(
+  defineProps<{
+    label: string
+    tone?: Tone
+  }>(),
+  { tone: 'neutral' },
+)
 </script>
 
 <template>

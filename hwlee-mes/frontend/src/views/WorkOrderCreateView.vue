@@ -1,11 +1,22 @@
-<script setup>
+<script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { workOrderApi } from '../api/workOrders'
+import { errorMessage } from '../api/client'
 import { useWorkOrderStore } from '../stores/workOrders'
+import type { ComponentLineRequest } from '../types/api'
 
 const router = useRouter()
 const store = useWorkOrderStore()
+
+// 자재 라인 한 줄의 입력 상태 — <input> 값이라 수량도 문자열이다(전송 직전에 숫자로 바꾼다).
+// 그래서 서버로 보내는 ComponentLineRequest 와는 별개의 타입이다.
+interface LineForm {
+  componentCode: string
+  componentName: string
+  requiredQty: string
+  unit: string
+}
 
 // 작업지시 헤더 + 소요자재(BOM) 라인.
 // lines 는 배열이고, v-for + push/splice 로 행을 동적으로 늘리고 줄인다(Vue 반응성).
@@ -15,20 +26,20 @@ const form = reactive({
   productName: '',
   quantity: '',
   plannedDate: '',
-  lines: [{ componentCode: '', componentName: '', requiredQty: '', unit: 'EA' }],
+  lines: [{ componentCode: '', componentName: '', requiredQty: '', unit: 'EA' }] as LineForm[],
 })
 
 const submitting = ref(false)
-const error = ref(null)
+const error = ref<string | null>(null)
 
 function addLine() {
   form.lines.push({ componentCode: '', componentName: '', requiredQty: '', unit: 'EA' })
 }
-function removeLine(idx) {
+function removeLine(idx: number) {
   form.lines.splice(idx, 1)
 }
 
-function validate() {
+function validate(): string | null {
   if (!form.erpOrderNo.trim()) return 'ERP 수주번호를 입력하세요.'
   if (!form.productCode.trim()) return '제품코드를 입력하세요.'
   if (!form.productName.trim()) return '제품명을 입력하세요.'
@@ -54,7 +65,7 @@ async function submit() {
   try {
     // 완전히 채워진 자재 라인만 전송.
     // ⚠️ 백엔드 WorkOrderReceiveRequest 의 필드명은 `components` (응답 DTO 는 `lines`).
-    const components = form.lines
+    const components: ComponentLineRequest[] = form.lines
       .filter((l) => l.componentCode.trim() && l.componentName.trim() && Number(l.requiredQty) > 0)
       .map((l) => ({
         componentCode: l.componentCode.trim(),
@@ -74,7 +85,7 @@ async function submit() {
     await store.fetchAll() // 목록 갱신
     router.push(`/work-orders/${created.id}`) // 방금 만든 상세로 이동
   } catch (e) {
-    error.value = e.message
+    error.value = errorMessage(e)
   } finally {
     submitting.value = false
   }

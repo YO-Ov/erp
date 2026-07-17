@@ -1,30 +1,30 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, reactive, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { workOrderApi, masterApi } from '../api/workOrders'
+import { errorMessage } from '../api/client'
 import { workOrderStatus, allowedActions } from '../domain/status'
 import { useWorkOrderStore } from '../stores/workOrders'
 import StatusBadge from '../components/StatusBadge.vue'
 import QualityInspectionPanel from '../components/QualityInspectionPanel.vue'
+import type { DefectReason, Equipment, Operator, WorkOrder } from '../types/api'
 
-const props = defineProps({ id: { type: [String, Number], required: true } })
-const router = useRouter()
+const props = defineProps<{ id: number | string }>()
 const store = useWorkOrderStore()
 
-const wo = ref(null)
+const wo = ref<WorkOrder | null>(null)
 const loading = ref(false)
-const error = ref(null)
+const error = ref<string | null>(null)
 const busy = ref(false) // 실행 액션 진행 중 잠금
 
 // 마스터 데이터(시작 시 설비·작업자 선택용)
-const equipments = ref([])
-const operators = ref([])
+const equipments = ref<Equipment[]>([])
+const operators = ref<Operator[]>([])
 
-// 시작 폼
+// 시작 폼 — <select> 값이라 id 도 문자열로 들어온다(전송 직전에 숫자로 바꾼다).
 const startForm = reactive({ equipmentId: '', operatorId: '' })
 // 실적 등록 폼
 const reportForm = reactive({ goodQty: '', defectQty: '', defectReasonId: '' })
-const defectReasons = ref([])
+const defectReasons = ref<DefectReason[]>([])
 
 const actions = computed(() => (wo.value ? allowedActions(wo.value.status) : []))
 const status = computed(() => workOrderStatus(wo.value?.status))
@@ -35,7 +35,7 @@ async function load() {
   try {
     wo.value = await workOrderApi.findById(props.id)
   } catch (e) {
-    error.value = e.message
+    error.value = errorMessage(e)
   } finally {
     loading.value = false
   }
@@ -50,12 +50,13 @@ async function loadMasters() {
     ])
   } catch (e) {
     // 마스터 로딩 실패는 치명적이지 않게 — 액션 시 서버가 다시 검증한다.
-    console.warn('마스터 데이터 로딩 실패:', e.message)
+    console.warn('마스터 데이터 로딩 실패:', errorMessage(e))
   }
 }
 
 // 액션 실행 공통 래퍼: busy 잠금 + 결과를 화면·목록 store 양쪽에 반영.
-async function run(fn) {
+// fn 은 '갱신된 작업지시'를 돌려줘야 한다 — 그래야 wo/목록에 그대로 넣을 수 있다.
+async function run(fn: () => Promise<WorkOrder>) {
   busy.value = true
   error.value = null
   try {
@@ -63,7 +64,7 @@ async function run(fn) {
     wo.value = updated
     store.replaceOne(updated) // 목록 화면도 최신 상태로
   } catch (e) {
-    error.value = e.message
+    error.value = errorMessage(e)
   } finally {
     busy.value = false
   }
@@ -93,23 +94,26 @@ function doReport() {
     error.value = '양품 수량을 입력하세요.'
     return
   }
-  run(() =>
-    workOrderApi.reportResult(props.id, {
+  // 실적 보고는 '등록된 실적'을 돌려주므로(작업지시가 아니다) 화면에 그대로 넣으면 안 된다.
+  // 실적이 반영된 작업지시를 다시 읽어서 넘긴다.
+  run(async () => {
+    await workOrderApi.reportResult(props.id, {
       goodQty: Number(reportForm.goodQty),
       defectQty: reportForm.defectQty === '' ? 0 : Number(reportForm.defectQty),
       defectReasonId: reportForm.defectReasonId ? Number(reportForm.defectReasonId) : null,
-    }),
-  ).then(() => {
+    })
+    return workOrderApi.findById(props.id)
+  }).then(() => {
     reportForm.goodQty = ''
     reportForm.defectQty = ''
     reportForm.defectReasonId = ''
   })
 }
 
-function fmt(q) {
+function fmt(q: number | null | undefined) {
   return q == null ? '-' : Number(q).toLocaleString('ko-KR')
 }
-function fmtDateTime(dt) {
+function fmtDateTime(dt: string | null | undefined) {
   return dt ? dt.replace('T', ' ').slice(0, 19) : '-'
 }
 
@@ -118,7 +122,8 @@ function fmtDateTime(dt) {
 // 진행 중일 때는 2.5초마다 조용히(스피너 없이) 다시 읽어 생산량이 차오르는 걸 실시간으로 보여준다.
 // 진행 중이 아니면 폴링을 멈춘다(불필요한 호출 방지).
 const POLL_MS = 2500
-let pollTimer = null
+// 브라우저의 setInterval 은 number 를 돌려주지만 @types/node 가 얹히면 Timeout 이 된다 → 환경에 맞게 추론시킨다.
+let pollTimer: ReturnType<typeof setInterval> | null = null
 
 async function silentReload() {
   try {

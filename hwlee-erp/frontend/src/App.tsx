@@ -84,24 +84,21 @@ const BOM_ROLES: readonly Role[] = ['PRODUCTION', 'ADMIN']
 // 관리자(사용자·역할)는 ADMIN 전용.
 const ADMIN_ROLES: readonly Role[] = ['ADMIN']
 
-// 좌측 사이드바 — 부서별 섹션으로 묶은 네비. 권한 있는 메뉴만 노출한다.
-// 섹션 헤더는 그 안에 보일 항목이 하나라도 있을 때만 렌더한다.
+// 좌측 사이드바 — 부서별 섹션으로 묶은 네비.
+// ⚠️ 메뉴 노출은 '부서 소속' 기준으로 좁게 보여준다(이전 Thymeleaf 방식).
+//    실제 접근 권한(ProtectedRoute·API)은 더 넓다 — 예: SALES 는 재고를 조회할 수 있지만
+//    사이드바에는 안 띄운다. 필요하면 URL 로 접근 가능. 여기선 화면을 부서별로 깔끔하게 유지한다.
 function Sidebar({ onNavigate }: { onNavigate: () => void }) {
   const { hasRole } = useAuth()
 
-  const canSD = hasRole(...SD_ROLES)
-  const canMMView = hasRole(...MM_VIEW_ROLES)
-  const canMMWrite = hasRole(...MM_WRITE_ROLES)
-  const canPP = hasRole(...PP_ROLES)
-  const canFI = hasRole(...FI_ROLES)
-  const canStock = hasRole(...STOCK_VIEW_ROLES)
-  const canStockMovement = hasRole(...STOCK_MOVEMENT_ROLES)
-  const canEmp = hasRole(...EMP_VIEW_ROLES)
-  const canHr = hasRole(...HR_ROLES)
-  const canReport = hasRole(...REPORT_ROLES)
-  const canCredit = hasRole(...CREDIT_ROLES)
-  const canBom = hasRole(...BOM_ROLES)
-  const canAdmin = hasRole(...ADMIN_ROLES)
+  const inSD = hasRole('SALES', 'ADMIN')
+  const inMM = hasRole('PURCHASING', 'ADMIN')
+  const inPP = hasRole('PRODUCTION', 'ADMIN')
+  const inFI = hasRole('FINANCE', 'ADMIN')
+  const inHR = hasRole('HR', 'ADMIN')
+  // 리포트는 재무 섹션에 두되 임원(DIRECTOR)도 열람하므로 조건을 조금 넓힌다.
+  const canReport = hasRole('FINANCE', 'DIRECTOR', 'ADMIN')
+  const canAdmin = hasRole('ADMIN')
 
   // 메뉴를 누르면(특히 모바일에서) 사이드바를 닫는다.
   const link = (to: string, label: string) => (
@@ -118,50 +115,50 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
       <nav className="sidebar-nav">
         {link('/dashboard', '대시보드')}
 
-        {(canSD || canCredit) && (
+        {inSD && (
           <>
             <div className="nav-section">영업 (SD)</div>
-            {canSD && link('/quotations', '견적')}
-            {canSD && link('/sales-orders', '수주')}
-            {canSD && link('/deliveries', '출하')}
-            {canSD && link('/invoices', '청구')}
-            {canCredit && link('/credit-requests', '여신')}
+            {link('/quotations', '견적')}
+            {link('/sales-orders', '수주')}
+            {link('/deliveries', '출하')}
+            {link('/invoices', '청구')}
+            {link('/credit-requests', '여신')}
           </>
         )}
 
-        {(canMMView || canMMWrite || canStock || canStockMovement) && (
+        {inMM && (
           <>
             <div className="nav-section">구매·자재 (MM)</div>
-            {canMMView && link('/purchase-orders', '발주')}
-            {canMMWrite && link('/goods-receipts', '입고')}
-            {canStock && link('/stocks', '현재고')}
-            {canStockMovement && link('/stock-movements', '이동이력')}
+            {link('/purchase-orders', '발주')}
+            {link('/goods-receipts', '입고')}
+            {link('/stocks', '현재고')}
+            {link('/stock-movements', '이동이력')}
           </>
         )}
 
-        {(canPP || canBom) && (
+        {inPP && (
           <>
             <div className="nav-section">생산 (PP)</div>
-            {canPP && link('/production-orders', '생산')}
-            {canBom && link('/boms', 'BOM')}
+            {link('/production-orders', '생산')}
+            {link('/boms', 'BOM')}
           </>
         )}
 
-        {(canFI || canReport) && (
+        {(inFI || canReport) && (
           <>
             <div className="nav-section">재무 (FI)</div>
-            {canFI && link('/journal-entries', '전표')}
-            {canFI && link('/payments', '입출금')}
-            {canFI && link('/accounts', '계정과목')}
+            {inFI && link('/journal-entries', '전표')}
+            {inFI && link('/payments', '입출금')}
+            {inFI && link('/accounts', '계정과목')}
             {canReport && link('/reports/sales', '리포트')}
           </>
         )}
 
-        {(canEmp || canHr) && (
+        {inHR && (
           <>
             <div className="nav-section">인사 (HR)</div>
-            {canEmp && link('/employees', '사원')}
-            {canHr && link('/payroll-runs', '급여대장')}
+            {link('/employees', '사원')}
+            {link('/payroll-runs', '급여대장')}
           </>
         )}
 

@@ -10,7 +10,6 @@
 #     - Hostnames:  *.hyunwoo.pro, hyunwoo.pro  (와일드카드 → www·mes 서브도메인 모두 커버)
 #     - 저장 위치:  서버  caddy/certs/origin.pem  (인증서),  caddy/certs/origin.key (개인키)
 # ═══════════════════════════════════════════════════════════════════
-
 {
 	# Cloudflare Origin 인증서를 직접 지정해 쓰므로 Caddy 의 자동 HTTPS(Let's Encrypt)를 끈다.
 	# (명시 tls 사이트는 어차피 자동발급 안 하지만, 80 포트 HTTP→HTTPS 리다이렉트도 불필요하므로 함께 비활성)
@@ -18,10 +17,21 @@
 }
 
 # ── ERP — https://erp.hyunwoo.pro (정식 주소) ────────────────────────
+#   React SPA(정적) + Spring REST 백엔드를 한 도메인에서 경로로 분기한다.
+#     - /api/*      → erp:8080          (REST 백엔드, 무수정. 로그인·챗봇 API 포함)
+#     - /actuator/* → erp:8080          (헬스 등)
+#     - 그 외 전부  → erp-frontend:80    (React dist 정적 서빙 + SPA 딥링크 폴백)
+#   ⚠️ 이전엔 루트를 erp:8080(Thymeleaf)로 통짜 프록시했으나, 루트=React SPA 로 전환.
+#      기존 Thymeleaf 화면(챗봇 페이지·리포트·관리자 등)은 대체된다.
 erp.hyunwoo.pro {
 	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
 	encode gzip zstd
-	reverse_proxy erp:8080
+
+	@backend path /api/* /actuator/*
+	reverse_proxy @backend erp:8080
+
+	# 그 외(HTML·JS·CSS·라우트)는 정적 프론트 컨테이너로.
+	reverse_proxy erp-frontend:80
 }
 
 # ── 루트·www → erp 서브도메인으로 301 리다이렉트 (경로 유지) ──────────

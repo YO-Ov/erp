@@ -1,0 +1,20 @@
+# ─────────────────────────────────────────────────────────────
+# ERP 프론트엔드 정적 서버 (컨테이너 내부 :80)
+#   - 바깥 메인 Caddy(erp.hyunwoo.pro)가 '/api/*'·'/actuator/*' 는 백엔드로,
+#     그 외 전부를 이 컨테이너로 프록시한다.
+#   - 여기서는 React(Vite) 빌드 산출물(/srv)만 서빙 + SPA 딥링크 폴백.
+#   - 내부 통신이므로 TLS 불필요(HTTP :80). 자동 HTTPS 비활성.
+# ─────────────────────────────────────────────────────────────
+{
+	auto_https off
+	admin off
+}
+
+:80 {
+	root * /srv
+	encode gzip zstd
+
+	# 존재하는 파일이면 그대로, 없으면 index.html 로 폴백(클라이언트 라우팅).
+	try_files {path} /index.html
+	file_server
+}

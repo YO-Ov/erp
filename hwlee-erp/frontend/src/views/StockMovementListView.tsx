@@ -7,12 +7,6 @@ import type { MovementReason } from '../types/api'
 
 const PAGE_SIZE = 15
 
-// 이동이력 배지 색 tone → CSS 클래스(입고=파랑, 출고=주황).
-const TONE_STYLE: Record<'done' | 'warn', { bg: string; color: string; border: string }> = {
-  done: { bg: 'rgba(56,189,248,0.15)', color: '#7dd3fc', border: '#38bdf8' },
-  warn: { bg: 'rgba(245,158,11,0.15)', color: '#fcd34d', border: '#f59e0b' },
-}
-
 // 재고 이동이력 조회 — 읽기 전용. 입고/출고/생산 트랜잭션이 남긴 원장을 본다.
 // 부호(qtyDelta)가 방향을 나타낸다: + 입고 / − 출고.
 export default function StockMovementListView() {
@@ -151,7 +145,8 @@ export default function StockMovementListView() {
             </thead>
             <tbody>
               {rows.map((m) => {
-                const s = TONE_STYLE[movementTone(m.reason)]
+                // 입고=done(파랑), 출고=warn(주황). 배지·부호 색은 CSS 변수(테마 대응).
+                const tone = movementTone(m.reason)
                 const inbound = m.qtyDelta > 0
                 return (
                   <tr key={m.id}>
@@ -159,19 +154,14 @@ export default function StockMovementListView() {
                       {(m.movedAt || '').replace('T', ' ').slice(0, 16)}
                     </td>
                     <td>
-                      <span
-                        className="badge"
-                        style={{ background: s.bg, color: s.color, borderColor: s.border }}
-                      >
-                        {MOVEMENT_REASON[m.reason]}
-                      </span>
+                      <span className={`badge tone-${tone}`}>{MOVEMENT_REASON[m.reason]}</span>
                     </td>
                     <td>
                       {m.itemName} <span className="muted mono">{m.itemCode}</span>
                     </td>
                     <td>{m.warehouseCode}</td>
-                    {/* 부호를 색으로도 강조 — 입고는 +파랑, 출고는 −주황. */}
-                    <td className="num mono" style={{ color: s.color }}>
+                    {/* 부호를 색으로도 강조 — 입고는 +파랑, 출고는 −주황(테마 변수). */}
+                    <td className="num mono" style={{ color: `var(--tone-${tone})` }}>
                       {inbound ? '+' : ''}
                       {formatMoney(m.qtyDelta)}
                     </td>

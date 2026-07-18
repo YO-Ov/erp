@@ -173,13 +173,8 @@ export default function ProductionOrderDetailView() {
         소요 자재 (BOM 전개)
         {avail && (
           <span
-            className="badge"
-            style={{
-              marginLeft: 8,
-              background: avail.producible ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
-              color: avail.producible ? '#86efac' : '#fca5a5',
-              borderColor: avail.producible ? '#22c55e' : '#ef4444',
-            }}
+            className={`badge tone-${avail.producible ? 'active' : 'danger'}`}
+            style={{ marginLeft: 8 }}
           >
             {avail.producible ? '생산 가능' : '자재 부족'}
           </span>

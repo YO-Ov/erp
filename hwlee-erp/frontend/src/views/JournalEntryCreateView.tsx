@@ -203,7 +203,7 @@ export default function JournalEntryCreateView() {
               </div>
               <div style={{ marginTop: 4 }}>
                 {balanced ? (
-                  <span style={{ color: 'var(--ok, green)' }}>✓ 차/대가 일치합니다</span>
+                  <span style={{ color: 'var(--tone-active)' }}>✓ 차/대가 일치합니다</span>
                 ) : (
                   <span className="error">
                     차/대 불일치 — 차액 {formatMoney(Math.abs(diff))} (

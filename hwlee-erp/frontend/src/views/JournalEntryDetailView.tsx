@@ -105,7 +105,7 @@ export default function JournalEntryDetailView() {
             <div className="v mono">
               {formatMoney(je.totalDebit)} / {formatMoney(je.totalCredit)}{' '}
               {balanced ? (
-                <span style={{ color: 'var(--ok, green)' }}>✓ 균형</span>
+                <span style={{ color: 'var(--tone-active)' }}>✓ 균형</span>
               ) : (
                 <span className="error">불균형</span>
               )}

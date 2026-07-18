@@ -109,6 +109,12 @@
 >   - **✅ e2e(실 API·AWS RDS)**: 사용자 16명·역할 7개(권한 수 표시). **역할 교체 쓰기 실동작**(kim=SALES → SALES+PURCHASING 추가 확인 → 원복, PUT 204). 권한: FINANCE→**403**·ADMIN→200. **passwordHash 미노출 확인**. `compileJava` 그린·`tsc -b` 0·build 그린·타입 스펙대조 4개(중첩 RoleRef 포함) 지어낸필드 0·SPA 라우트 2개 200.
 >   - ⚠️ **백엔드 변경분 = 미배포**(신규 `AdminController`·DTO·서비스 메서드). push 하면 배포됨.
 > - **⭐⭐ ERP React + TypeScript 전환 100% 완료 — Thymeleaf 화면 전부 대체.** (관리자가 마지막이었음)
+> - **✅ UI 개편 = 좌측 사이드바 + 반응형 + 다크/라이트 테마(2026-07-18, hwlee님 요청)**: "상단 가로 메뉴를 예전 왼쪽 메뉴바로 + 반응형 확인 + 테마 선택".
+>   - **⚠️ 확인 결과 = 전환 후 React 는 반응형이 아니었음**(main.css 미디어쿼리 0개). MES 는 반응형이었지만 ERP React 는 상단 가로 헤더로 단순화되며 빠졌던 것 → 이번에 넣음.
+>   - **좌측 사이드바**(`App.tsx` `Header`→`Sidebar`+`Topbar`): 예전 Thymeleaf 처럼 **부서별 섹션 그룹**(영업 SD·구매자재 MM·생산 PP·재무 FI·인사 HR·공통) — 섹션은 권한 있는 항목이 하나라도 있을 때만 렌더. 활성 메뉴 강조(`.nav-link.active`, accent 옅은 배경). 상단바에 사용자·테마토글·로그아웃(+모바일 햄버거).
+>   - **반응형**(≤768px 브레이크포인트): 데스크톱=사이드바 고정, 모바일=**오프캔버스**(transform translateX + 백드롭, 햄버거 토글). 페이지 이동/메뉴 클릭 시 자동 닫힘(`useEffect [location.pathname]`).
+>   - **다크/라이트 테마**(`theme.ts` + `main.css`): `:root[data-theme=light]` 로 **CSS 변수만 오버라이드**(화면 코드 무수정). 선택은 localStorage 저장, 없으면 `prefers-color-scheme`. FOUC 방지로 `main.tsx` 첫 페인트 전 적용. 상단바 ☀️/🌙 토글.
+>   - **✅ 검증(headless Chrome + CDP 실측)**: 320/768/1280px **가로 넘침 0**(scrollWidth==innerWidth), 모바일=사이드바 오프스크린+햄버거 표시, 데스크톱=사이드바 고정. 테마 전환 body 배경 dark(15,23,42)↔light(241,245,249). 스크린샷 3종(데스크톱 다크/라이트·모바일 오픈) 육안 확인. `tsc -b` 0·build 그린.
 > - ⬜ (선택) 마스터관리 CRUD 확장 · 구매/생산/재무 역할별 대시보드 · React 코드 워크스루(학습) · erp-agent 로컬 개발 세팅
 >
 > #### 🚀 ERP 프론트 정적 배포 구성 완료(2026-07-18) — 미푸시

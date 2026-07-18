@@ -1,6 +1,8 @@
-import { Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import type { Role } from './types/api'
 import { useAuth } from './auth/AuthContext'
+import { applyTheme, getInitialTheme, type Theme } from './theme'
 import ProtectedRoute from './auth/ProtectedRoute'
 import LoginView from './views/LoginView'
 import QuotationListView from './views/QuotationListView'
@@ -82,16 +84,14 @@ const BOM_ROLES: readonly Role[] = ['PRODUCTION', 'ADMIN']
 // 관리자(사용자·역할)는 ADMIN 전용.
 const ADMIN_ROLES: readonly Role[] = ['ADMIN']
 
-// 앱 셸: 로그인 상태에서만 상단 헤더(네비 + 로그아웃)를 보여준다.
-function Header() {
-  const { user, logout, hasRole } = useAuth()
-  const navigate = useNavigate()
-  if (!user) return null
+// 좌측 사이드바 — 부서별 섹션으로 묶은 네비. 권한 있는 메뉴만 노출한다.
+// 섹션 헤더는 그 안에 보일 항목이 하나라도 있을 때만 렌더한다.
+function Sidebar({ onNavigate }: { onNavigate: () => void }) {
+  const { hasRole } = useAuth()
 
-  // 권한 있는 메뉴만 노출한다.
   const canSD = hasRole(...SD_ROLES)
   const canMMView = hasRole(...MM_VIEW_ROLES)
-  const canMMWrite = hasRole(...MM_WRITE_ROLES) // 입고는 구매/관리자 전용
+  const canMMWrite = hasRole(...MM_WRITE_ROLES)
   const canPP = hasRole(...PP_ROLES)
   const canFI = hasRole(...FI_ROLES)
   const canStock = hasRole(...STOCK_VIEW_ROLES)
@@ -103,69 +103,116 @@ function Header() {
   const canBom = hasRole(...BOM_ROLES)
   const canAdmin = hasRole(...ADMIN_ROLES)
 
+  // 메뉴를 누르면(특히 모바일에서) 사이드바를 닫는다.
+  const link = (to: string, label: string) => (
+    <NavLink to={to} className="nav-link" onClick={onNavigate}>
+      {label}
+    </NavLink>
+  )
+
+  return (
+    <aside className="sidebar">
+      <NavLink to="/dashboard" className="sidebar-brand" onClick={onNavigate}>
+        ERP
+      </NavLink>
+      <nav className="sidebar-nav">
+        {link('/dashboard', '대시보드')}
+
+        {(canSD || canCredit) && (
+          <>
+            <div className="nav-section">영업 (SD)</div>
+            {canSD && link('/quotations', '견적')}
+            {canSD && link('/sales-orders', '수주')}
+            {canSD && link('/deliveries', '출하')}
+            {canSD && link('/invoices', '청구')}
+            {canCredit && link('/credit-requests', '여신')}
+          </>
+        )}
+
+        {(canMMView || canMMWrite || canStock || canStockMovement) && (
+          <>
+            <div className="nav-section">구매·자재 (MM)</div>
+            {canMMView && link('/purchase-orders', '발주')}
+            {canMMWrite && link('/goods-receipts', '입고')}
+            {canStock && link('/stocks', '현재고')}
+            {canStockMovement && link('/stock-movements', '이동이력')}
+          </>
+        )}
+
+        {(canPP || canBom) && (
+          <>
+            <div className="nav-section">생산 (PP)</div>
+            {canPP && link('/production-orders', '생산')}
+            {canBom && link('/boms', 'BOM')}
+          </>
+        )}
+
+        {(canFI || canReport) && (
+          <>
+            <div className="nav-section">재무 (FI)</div>
+            {canFI && link('/journal-entries', '전표')}
+            {canFI && link('/payments', '입출금')}
+            {canFI && link('/accounts', '계정과목')}
+            {canReport && link('/reports/sales', '리포트')}
+          </>
+        )}
+
+        {(canEmp || canHr) && (
+          <>
+            <div className="nav-section">인사 (HR)</div>
+            {canEmp && link('/employees', '사원')}
+            {canHr && link('/payroll-runs', '급여대장')}
+          </>
+        )}
+
+        <div className="nav-section">공통</div>
+        {link('/approvals', '전자결재')}
+        {link('/assistant', 'AI 챗봇')}
+        {canAdmin && link('/admin/users', '관리자')}
+      </nav>
+    </aside>
+  )
+}
+
+// 상단바 — 햄버거(모바일) · 사용자 · 테마 토글 · 로그아웃.
+function Topbar({
+  theme,
+  onToggleTheme,
+  onToggleNav,
+}: {
+  theme: Theme
+  onToggleTheme: () => void
+  onToggleNav: () => void
+}) {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
   async function onLogout() {
     await logout()
     navigate('/login', { replace: true })
   }
 
   return (
-    <header
-      style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)' }}
-    >
-      <div
-        className="container"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingTop: 14,
-          paddingBottom: 14,
-        }}
+    <div className="topbar">
+      <button className="hamburger sm" onClick={onToggleNav} aria-label="메뉴 열기">
+        ☰
+      </button>
+      <div className="topbar-spacer" />
+      <span className="muted" style={{ fontSize: 13 }}>
+        {user?.username} <span style={{ opacity: 0.7 }}>({user?.roles.join(', ')})</span>
+      </span>
+      <button
+        className="theme-toggle sm"
+        onClick={onToggleTheme}
+        aria-label="테마 전환"
+        title={theme === 'dark' ? '라이트 모드로' : '다크 모드로'}
       >
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 22 }}>
-          <NavLink
-            to="/quotations"
-            style={{ fontWeight: 800, fontSize: 18, color: 'var(--accent)' }}
-          >
-            ERP
-          </NavLink>
-          <nav style={{ display: 'flex', gap: 16 }}>
-            {/* 대시보드·전자결재는 역할 무관 — 결재선이 누가 처리할지 정한다. */}
-            <NavLink to="/dashboard">대시보드</NavLink>
-            {canSD && <NavLink to="/quotations">견적</NavLink>}
-            {canSD && <NavLink to="/sales-orders">수주</NavLink>}
-            {canSD && <NavLink to="/deliveries">출하</NavLink>}
-            {canSD && <NavLink to="/invoices">청구</NavLink>}
-            {canMMView && <NavLink to="/purchase-orders">발주</NavLink>}
-            {canMMWrite && <NavLink to="/goods-receipts">입고</NavLink>}
-            {canPP && <NavLink to="/production-orders">생산</NavLink>}
-            {canBom && <NavLink to="/boms">BOM</NavLink>}
-            {canStock && <NavLink to="/stocks">현재고</NavLink>}
-            {canStockMovement && <NavLink to="/stock-movements">이동이력</NavLink>}
-            {canFI && <NavLink to="/journal-entries">전표</NavLink>}
-            {canFI && <NavLink to="/payments">입출금</NavLink>}
-            {canFI && <NavLink to="/accounts">계정과목</NavLink>}
-            {canCredit && <NavLink to="/credit-requests">여신</NavLink>}
-            {canEmp && <NavLink to="/employees">사원</NavLink>}
-            {canHr && <NavLink to="/payroll-runs">급여대장</NavLink>}
-            {canReport && <NavLink to="/reports/sales">리포트</NavLink>}
-            <NavLink to="/approvals">전자결재</NavLink>
-            {/* AI 어시스턴트 — 로그인 전 부서 공용. */}
-            <NavLink to="/assistant">AI 챗봇</NavLink>
-            {canAdmin && <NavLink to="/admin/users">관리자</NavLink>}
-          </nav>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span className="muted" style={{ fontSize: 13 }}>
-            {user.username}{' '}
-            <span style={{ opacity: 0.7 }}>({user.roles.join(', ')})</span>
-          </span>
-          <button className="sm" onClick={onLogout}>
-            로그아웃
-          </button>
-        </div>
-      </div>
-    </header>
+        {theme === 'dark' ? '☀️' : '🌙'}
+      </button>
+      <button className="sm" onClick={onLogout}>
+        로그아웃
+      </button>
+    </div>
   )
 }
 
@@ -193,10 +240,23 @@ function Footer() {
 }
 
 export default function App() {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <Header />
-      <div style={{ flex: 1 }}>
+  const { user } = useAuth()
+  const [theme, setTheme] = useState<Theme>(getInitialTheme)
+  const [navOpen, setNavOpen] = useState(false)
+  const location = useLocation()
+
+  // 페이지를 이동하면 모바일에서 열려 있던 사이드바를 닫는다.
+  useEffect(() => {
+    setNavOpen(false)
+  }, [location.pathname])
+
+  function toggleTheme() {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    applyTheme(next)
+  }
+
+  const routes = (
       <Routes>
         <Route path="/login" element={<LoginView />} />
 
@@ -639,8 +699,24 @@ export default function App() {
         {/* 기본 진입 → 대시보드 (미인증이면 /login) */}
         <Route path="*" element={<HomeRedirect />} />
       </Routes>
+  )
+
+  // 미인증(로그인 화면)은 사이드바 셸 없이 렌더한다.
+  if (!user) return routes
+
+  return (
+    <div className={`app-shell${navOpen ? ' nav-open' : ''}`}>
+      <Sidebar onNavigate={() => setNavOpen(false)} />
+      <div className="sidebar-backdrop" onClick={() => setNavOpen(false)} />
+      <div className="app-main">
+        <Topbar
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onToggleNav={() => setNavOpen((v) => !v)}
+        />
+        <div style={{ flex: 1 }}>{routes}</div>
+        <Footer />
       </div>
-      <Footer />
     </div>
   )
 }

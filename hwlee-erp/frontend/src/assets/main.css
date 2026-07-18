@@ -1,4 +1,6 @@
-:root {
+/* 다크(기본) 팔레트. data-theme 미지정 또는 =dark 일 때. */
+:root,
+:root[data-theme='dark'] {
   --bg: #0f172a;
   --bg-panel: #1e293b;
   --bg-elevated: #273449;
@@ -15,6 +17,30 @@
   --tone-done: #38bdf8;
   --tone-muted: #475569;
   --tone-danger: #ef4444;
+
+  --sidebar-w: 232px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* 라이트 팔레트 — 같은 변수를 오버라이드하므로 화면 코드는 그대로다. */
+:root[data-theme='light'] {
+  --bg: #f1f5f9;
+  --bg-panel: #ffffff;
+  --bg-elevated: #f8fafc;
+  --border: #dbe2ea;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --accent: #0284c7;
+  --accent-strong: #0369a1;
+
+  --tone-neutral: #64748b;
+  --tone-active: #16a34a;
+  --tone-warn: #d97706;
+  --tone-done: #0284c7;
+  --tone-muted: #94a3b8;
+  --tone-danger: #dc2626;
+
+  --shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
 }
 
 * {
@@ -264,4 +290,135 @@ label {
 .login-card h1 {
   font-size: 22px;
   margin: 0 0 4px;
+}
+
+/* ───────────────── 앱 셸: 좌측 사이드바 + 본문 ───────────────── */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* 좌측 사이드바 */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--accent);
+  padding: 18px 18px 14px;
+}
+.sidebar-brand:hover {
+  text-decoration: none;
+}
+.sidebar-nav {
+  flex: 1;
+  padding: 4px 10px 16px;
+}
+.nav-section {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 14px 10px 6px;
+}
+.sidebar .nav-link {
+  display: block;
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 1px;
+}
+.sidebar .nav-link:hover {
+  background: var(--bg-elevated);
+  text-decoration: none;
+}
+/* 활성 메뉴(react-router NavLink 가 붙이는 active 클래스) */
+.sidebar .nav-link.active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* 본문 영역 */
+.app-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 상단바(햄버거 · 사용자 · 테마 · 로그아웃) */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.topbar-spacer {
+  flex: 1;
+}
+.hamburger {
+  display: none;
+  padding: 6px 10px;
+  font-size: 18px;
+  line-height: 1;
+}
+.theme-toggle {
+  padding: 6px 10px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* 모바일 오프캔버스용 백드롭 */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 40;
+}
+
+/* ── 반응형: ≤768px 에서 사이드바를 오프캔버스로 ── */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: var(--shadow);
+  }
+  .app-shell.nav-open .sidebar {
+    transform: translateX(0);
+  }
+  .app-shell.nav-open .sidebar-backdrop {
+    display: block;
+  }
+  .hamburger {
+    display: inline-block;
+  }
+  .container {
+    padding: 16px 14px 48px;
+  }
 }

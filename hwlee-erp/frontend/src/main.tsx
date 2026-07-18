@@ -4,7 +4,11 @@ import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './auth/AuthContext'
 import App from './App'
+import { applyTheme, getInitialTheme } from './theme'
 import './assets/main.css'
+
+// 첫 페인트 전에 저장된 테마를 적용해 깜빡임(FOUC)을 막는다.
+applyTheme(getInitialTheme())
 
 // 서버 상태(목록/상세 조회)는 TanStack Query가 캐시·로딩·에러를 관리한다.
 const queryClient = new QueryClient({

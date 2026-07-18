@@ -80,18 +80,48 @@
 >   - **✅ 검증**: `tsc -b` **에러 0** / `npm run build` 그린(193모듈, gzip 125KB) / dev 서버가 `main.tsx` 진입점 정상 서빙·타입 import 런타임 소거 확인 / SPA 라우트 8개 200 / **실 API 회귀 없음**(전표 균형 생성 POSTED·불균형 422 유지·입금 RECEIPT 등록 시 vendorId=null·SALES→FI 403).
 >   - **⚠️ 전환 중 겪은 함정**: ⓐ `useParams()` 의 `id` 는 타입상 `string | undefined` → `const { id = '' } = useParams()` 로 통일. ⓑ useQuery 의 `data` 는 로딩·에러 가드를 지나도 TS가 못 좁힘 → 상세뷰마다 `if (!x) return null` 추가. ⓒ `useMutation` 은 generics 없으면 변수 타입이 `void` 로 추론돼 엉뚱한 에러가 남(`'void' 와 'string' 비교` 등) → 반환/변수 타입 명시. ⓓ `Object.entries` 는 키를 `string` 으로 넓힘 → 파이프라인 집계에 `pipelineEntries()` 헬퍼.
 >
-> #### 📊 React 전환 도메인 현황 (2026-07-17 기준)
-> - ✅ **인증**(로그인·JWT Bearer·역할가드) / ✅ **영업 SD**(견적·수주·출하·청구) / ✅ **구매 MM**(발주·입고) / ✅ **생산 PP**(작업지시) / ✅ **재무 FI**(전표·입출금·계정과목) / ✅ **전자결재**(결재함·상신함·결재선·승인/반려/반송/회수/재상신) / ✅ **대시보드**(공통 위젯 + 영업 KPI) / ✅ **알림**(목록·읽음)
-> - ⬜ 인사 HR · 재고조회 · BOM/MRP · 마스터관리 · 구매/생산/재무 역할별 대시보드
+> - **✅ 재고 조회 추가(2026-07-18) = 읽기전용 2화면, MM 조회 완결**: 어제 정립한 TS 패턴 그대로 복제(types→api→domain→화면). ⓐ **현재고**(`/stocks`, `StockListView`) — 품목·창고 필터 + **"재고 있는 것만" 토글**(qtyGt=0), 수량 내림차순, **재고금액=수량×평균단가는 서버에 없어 프론트가 계산**. ⓑ **이동이력**(`/stock-movements`, `StockMovementListView`) — 품목·창고·사유·날짜 필터, **부호(qtyDelta)로 입/출고 방향 표시**(입고 +파랑 / 출고 −주황). 입고·출하·생산 트랜잭션이 재고에 어떻게 반영됐는지 보이는 화면.
+>   - **⚠️ 권한이 두 화면에서 갈린다**(백엔드와 동일하게 프론트도 분리): **현재고=SALES/PURCHASING/ADMIN**(영업도 출하 위해 재고를 봐야 함), **이동이력=PURCHASING/ADMIN 전용**. `STOCK_VIEW_ROLES`·`STOCK_MOVEMENT_ROLES` 로 라우트·네비 각각 반영.
+>   - **타입**: `types/api.ts` 에 `Stock`·`StockMovement`·`MovementReason`(입고+3/출고−4, 부호는 백엔드가 강제) 추가. `domain/status.ts` 에 `MOVEMENT_REASON` 라벨 + `movementTone()`(반환을 `'done'|'warn'` 2색으로 좁혀 쓰는 쪽이 2색 맵만 준비하게 함).
+>   - **✅ e2e(실 API·AWS RDS)**: 현재고 **122건**·이동이력 **5,880건**(어제 e2e 입고 GR#972 도 이력에 찍힘). **권한 매트릭스 정확히 일치** — SALES→현재고 200·이동이력 **403** / FINANCE→**둘 다 403** / PURCHASING→둘 다 200. 필터(reason=GOODS_RECEIPT 495건, qtyGt=0) 정상. `tsc -b` 에러 0 / build 그린(gzip 127KB) / Vite 프록시 경유 `/stocks`·`/stock-movements` 200.
+>
+> - **✅ 인사(HR) 추가(2026-07-18) = 마지막 큰 도메인, 4화면**: TS 패턴 그대로(types→api→domain→화면). ⓐ **사원 목록**(`/employees`, `EmployeeListView`) — 목록이 배열이라 이름·사번·이메일 검색 + 부서 필터를 **프론트에서 처리**(부서 목록도 사원 데이터에서 추출). ⓑ **사원 상세**(`/employees/:id`) — 기본정보(넓은 역할) + **급여계약 이력·근태 조회/등록은 HR/ADMIN 일 때만 로드**(`enabled: canHr`, 비-HR 은 백엔드도 403이라 안내문). 근태 등록 인라인 폼(소정 8h 초과분 자동 연장). ⓒ **급여대장 목록**(`/payroll-runs`, `PayrollListView`) — Page 검색 + **대상 월(YYYY-MM)만 받아 생성**(유효계약+근태로 명세 자동 계산). ⓓ **급여대장 상세**(`/payroll-runs/:id`) — 급여명세 표(기본급·연장수당·소득세·보험·실수령) + confirm/pay.
+>   - **⭐ 핵심 학습 포인트 = 발생주의 2단계**: 급여대장 **DRAFT →confirm(CONFIRMED, 인건비 전표) →pay(PAID, 지급 전표)**. `payrollActions()` 가 상태별 버튼 노출. 확정=비용 인식, 지급=현금 유출 — SD 견적처럼 상태전이지만 **각 전이가 FI 전표를 만든다**(⭐ HR→FI 연동).
+>   - **⚠️ 권한이 두 축으로 갈린다**(백엔드와 동일): 사원 **조회=SALES/PURCHASING/FINANCE/HR/ADMIN**(관리부서 전반)·쓰기=ADMIN만 / 급여계약·근태·급여대장=**HR/ADMIN 전용**(급여는 민감정보). `EMP_VIEW_ROLES`·`HR_ROLES` 로 라우트·네비·상세 섹션 각각 반영.
+>   - **타입**: `Employee`·`EmploymentContract`·`Attendance`·`PayrollRun`·`Payslip` + `Position`·`ContractStatus`·`PayrollStatus`. `domain/status.ts` 에 라벨·`payrollActions` + `formatMinutes()`(분→"8시간 30분"). ⚠️ 사원 목록도 계정과목처럼 **Page 아니라 배열**.
+>   - **✅ e2e(실 API·AWS RDS)**: 사원 **113명**. 근태 등록(09~20시 → worked 660분·**연장 180분 자동계산**). **급여대장 생성**(2026-07, PR-202607-001, **명세 113명** 자동, gross 3.57억) → **confirm→CONFIRMED+인건비 전표(JE-20260718-001)** → **pay→PAID+지급 전표(JE-20260718-002)** 실동작. **PAYROLL 전표 2건 생성 확인**(HR→FI 연동). 권한: FINANCE→사원 200·급여/근태 **403** / PRODUCTION→사원도 **403** / HR→전부 200. `tsc -b` 에러 0 / build 그린(gzip 130KB) / 타입 스펙 대조 10개 지어낸필드 0 / SPA 라우트 200.
+>   - ⚠️ **RDS에 e2e 데이터**: 사원1 근태(2026-07-01) 1건, 급여대장 PR-202607-001(PAID)·딸린 전표 JE-20260718-001·002. 데모용으로 둠.
+>
+> #### 📊 React 전환 도메인 현황 (2026-07-18 기준)
+> - ✅ **인증** / ✅ **영업 SD**(견적·수주·출하·청구) / ✅ **구매 MM**(발주·입고·재고조회) / ✅ **생산 PP**(작업지시) / ✅ **재무 FI**(전표·입출금·계정과목) / ✅ **인사 HR**(사원·근태·급여계약·급여대장) / ✅ **전자결재** / ✅ **대시보드**(공통+영업 KPI) / ✅ **알림** / ✅ **TypeScript 전면 전환**
+> - **✅ 리포트 3종 추가(2026-07-18) = 배포로 사라질 Thymeleaf 화면 중 첫 복원**: 배포에서 "루트=React" 선택으로 접근 끊길 리포트를 React 로 옮김. 백엔드 REST(`ReportController`)는 이미 있어 **프론트만** 작성. 권한 **FINANCE/DIRECTOR/ADMIN**(임원 열람 포함, `REPORT_ROLES`). ⓐ **매출**(`/reports/sales`) — 기간+집계단위(일별/월별) 선택, 구간별 건수·공급가·부가세·합계 + 합계행(tfoot). ⓑ **재고 현황**(`/reports/inventory`) — 품목·창고 필터, (품목,창고)별 평가액 + **평가액 총계**(재고조회 화면과 달리 평가액 중심). ⓒ **손익계산서**(`/reports/income-statement`) — 매출→매출총이익→영업이익→당기순이익 요약 + 수익·비용 계정 명세. 3화면이 공통 `ReportTabs` 컴포넌트로 탭 전환.
+>   - **✅ e2e(실 API·AWS RDS)**: 매출 상반기 **187억**(월별 6행+합계 255건)·일별도 정상 / 재고 평가액 **69억**(122행) / 손익 매출총이익 **50억**. 권한 정확: SALES·HR→**403** / FINANCE·DIRECTOR→200. `tsc -b` 0·build 그린(gzip 131KB)·타입 스펙대조 6개 지어낸필드 0·SPA 라우트 3개 200.
+> - **✅ AI 챗봇 React 전환(2026-07-18) = 배포로 사라질 화면 2번째 복원**: hwlee님이 "챗봇 아예 없애냐"고 확인 → **기능/백엔드/에이전트는 그대로고 화면(진입점)만 사라지는 것**임을 정리하고 화면을 React 로 옮김. 백엔드 무수정(`AssistantController` `/api/assistant/chat`·에이전트·Cloudflare Tunnel 다 그대로). `AssistantView.tsx` 신설 — 기존 `chat.html` UI/UX 그대로: 말풍선 로그·예시 칩·입력창(Enter 전송/Shift+Enter 줄바꿈)·**plan 확인 플로우**(쓰기 작업 미리보기 → [실행]=intent를 confirm:true로 재전송 / [취소]). 응답 4종(message·result·error·plan) 분기 렌더. **XSS 안전**(React 텍스트 렌더 — 원본도 textContent 썼음). 라우트 `/assistant`, **로그인 전 부서 공용**(역할 가드 없음, 백엔드도 isAuthenticated). 예시 칩은 운영 작동 조회 질문으로.
+>   - **✅ 검증**: `tsc -b` 0·build 그린(gzip 133KB)·SPA `/assistant` 200. **프록시 계약 확인**: 인증 시 200+`{type,lines}` 정상 렌더, 미인증 **401**. ⚠️ **에이전트 실데이터는 별도 이슈** — 현재 에이전트가 "🔒 인증이 만료되었습니다" 응답을 줌(erp-agent 세션/ERP_TARGET 구성 문제, 저장소 밖 별도 트랙). **프론트는 에이전트가 주는 lines 를 그대로 렌더하므로 화면 계약과 무관** — 에이전트 재구성하면 실데이터 나옴.
+> - **✅ 여신 상향 요청 + BOM 조회 React 전환(2026-07-18)**: 배포로 사라질 화면 3·4번째 복원. 둘 다 백엔드 REST 이미 있어 프론트만.
+>   - **여신 상향 요청**(`/credit-requests`) — 목록(status 필터)·상세·작성. 조회 **SALES/FINANCE/ADMIN**, 생성 **SALES/ADMIN**(화면 내 분기). ⭐ **승인/거부는 전자결재로 이관** — 생성하면 서버가 CREDIT_LIMIT 결재를 자동 상신, 재무팀장이 결재함에서 처리. 상세가 `getApprovalForDoc('CREDIT_LIMIT', id)` 로 **연결 결재를 역조회해 링크**. **⭐ 지난번 `approvalDocLink` 의 CREDIT_LIMIT=null('화면 없음')을 `/credit-requests/` 로 살림** — 결재함에서 여신 문서로 가는 링크가 이제 동작. 작성 시 고객 선택하면 여신현황(한도·사용·잔여) 표시.
+>   - **BOM 조회**(`/boms`) — 완제품 선택 → 부품 소요량(읽기전용). 권한 **PRODUCTION/ADMIN**. 완제품(FINISHED)만 드롭다운. 생산 작업지시가 이 BOM 을 전개하는 그 데이터.
+>   - **✅ e2e(실 API·AWS RDS)**: 여신 요청 목록(CLR-20260705-001 신원전자 APPROVED) / **여신 생성→전자결재 자동 상신 확인**(CLR-20260718-001 → APV-20260718-001, docType=CREDIT_LIMIT, refId 역조회 200) / BOM 5종(올인원PC=패널·메인보드·메모리×2·SSD). 권한: 여신 PRODUCTION→403·FINANCE→200 / BOM FINANCE·SALES→403. `tsc -b` 0·build 그린·타입 스펙대조 5개 지어낸필드 0·SPA 라우트 3개 200.
+>   - ⚠️ RDS e2e 데이터: 여신 CLR-20260718-001(PENDING)·결재 APV-20260718-001. 데모용.
+> - **⭐ SD·MM·PP·FI·HR 6대 도메인 + 리포트 + 챗봇 + 여신 + BOM 전환 완료.** React 미전환 남은 것은 **관리자(사용자·역할)뿐**.
+> - ⬜ **관리자(사용자·역할)** — ⚠️ **REST 엔드포인트 없음**(Thymeleaf 뷰 전용, `AdminViewController`+`AppUserAdminService`만) → 옮기려면 **백엔드 REST 신설 먼저 필요**(다른 화면들과 다른 점). · 마스터관리(CRUD) · React 코드 워크스루
+>
+> #### 🚀 ERP 프론트 정적 배포 구성 완료(2026-07-18) — 미푸시
+> **hwlee님 결정 = "루트를 React로 전환(챗봇·리포트 포기)"**. MES와 동일한 경로 분기 방식(방식 B)으로 `erp.hyunwoo.pro` 를 React SPA 로 서빙하도록 인프라 구성.
+> - **⚠️ 이 전환의 트레이드오프**: ERP 는 MES 와 달리 **Thymeleaf 화면이 아직 많이 남아있다**(챗봇 `assistant/chat.html`·리포트 재고/손익/매출·관리자 사용자/역할·BOM/생산계획·여신 — 전부 React 미전환). 루트를 React SPA 로 덮으면 **이것들이 접근 불가**가 된다. hwlee님이 알고 선택함(운영 챗봇 데모 포함 포기).
+> - **신규 파일**: `hwlee-erp/frontend/Dockerfile`(멀티스테이지 node22 빌드→`caddy:2-alpine` 정적, build 에 `tsc -b` 포함이라 타입에러 시 이미지 빌드 실패) · `frontend/Caddyfile`(:80, `try_files→/index.html` SPA 폴백, `auto_https off`) · `frontend/.dockerignore`. **MES 파일 그대로 복제**(Vue→React 차이는 baseURL '/api' 고정이라 무관).
+> - **수정**: `docker-compose.prod.yml`(`erp-frontend` 서비스 추가, 외부포트 없음·`depends_on: erp`, caddy `depends_on` 에 추가) · `caddy/Caddyfile`(erp 블록을 통짜 프록시 → **경로 분기**: `/api/*`·`/actuator/*`→`erp:8080`(백엔드 무수정, 로그인·챗봇 API 는 살아있음), 그 외→`erp-frontend:80`).
+> - **✅ 로컬 검증**: `docker compose config` OK(erp-frontend 인식) · 메인 Caddyfile `caddy adapt` 문법 통과(fmt 정리) · **erp-frontend 이미지 빌드 성공**(=타입검사 통과) → 컨테이너 기동 → **루트 200**(React `<title>ERP` +`#root`)·**SPA 딥링크 `/employees`·`/payroll-runs`·`/stocks` 200**·JS asset 200(text/javascript)·딥링크가 index.html 폴백 확인.
+> - **⚠️ 미푸시 = 실제 운영 배포 안 됨**. push 하면 GitHub Actions 자동배포(SSH→git pull+compose up -d --build)로 `erp-frontend` 컨테이너가 뜨고 `erp.hyunwoo.pro` 루트가 React 로 바뀐다. **푸시는 hwlee님이 직접**(커밋·푸시 규칙). 배포 후 브라우저 육안 확인 권장(딥링크·`/api` 로그인 실데이터). ⚠️ **운영 챗봇(agent.hyunwoo.pro 연결)이 이 배포로 화면에서 사라짐** — 필요하면 별도 유지 방안 논의.
 > - 공통 패턴 정립됨: `api/*`(REST 1:1) · `domain/status.js`(enum 한글라벨·상태액션) · 목록(useQuery+검색+페이징)/상세(useMutation+캐시무효화+상태액션)/작성·수정(겸용 폼) · `ProtectedRoute roles=` 역할가드 · Header 네비 hasRole 노출.
 >
 > #### ▶▶ 다음 세션 시작점 — ERP React 전환 이어가기 (2026-07-17 저장)
 > **지금까지**: ERP React SPA = 인증 + **영업(SD) + 구매(MM) + 생산(PP) + 재무(FI) + 전자결재 + 대시보드/알림** 완성·실 API e2e 검증 끝. **업무 흐름이 상신→승인→원본문서 자동진행까지 화면에서 닫힘.** 위 "React 전환 도메인 현황"이 전체 지도.
 > - **▶ 다음 진도(택1, 권장 순서)**:
 >   0. **⭐ ERP React → TypeScript 전환**(2026-07-17 hwlee님 결정, MES 는 전환 완료 — 위 🔷 항목) — **새 도메인을 더 얹기 전에 하는 게 싸다**(나중일수록 고칠 파일이 는다). MES 패턴 그대로: `src/types/api.ts` 로 백엔드 계약 고정 → `api/` → `domain/status` → 화면. **⚠️ `typescript@~5.9` 고정**(TS 7 은 도구 비호환). React 는 `.tsx` + `@types/react`·`@types/react-dom` 필요. **⚠️ 먼저 미커밋분(FI·전자결재)을 커밋**해야 "기능 추가"와 "TS 전환"이 diff 에서 안 섞인다.
->   1. **재고 조회**(현재고 stocks·이동이력 stock-movements) — 읽기전용이라 빠름. 입고/출하/생산이 재고에 어떻게 반영됐는지 보이는 화면. 지금 e2e로 입고·생산을 여러 번 태워서 이동이력 데이터가 쌓여 있음.
->   2. **인사(HR)** — 사원·근태·급여. 권한 HR/ADMIN. 남은 마지막 큰 도메인.
->   3. **정적 빌드 Caddy 배포** — MES(mes.hyunwoo.pro)와 같은 방식으로 ERP도 SPA 배포(`erp.hyunwoo.pro`). MES에서 한 번 해봤으니 패턴 그대로.
+>   1. ~~재고 조회~~ ✅ **완료(2026-07-18, 위 항목)**.
+>   2. ~~인사(HR)~~ ✅ **완료(2026-07-18, 위 항목)** — 6대 업무 도메인 전환 끝.
+>   3. ~~정적 빌드 Caddy 배포~~ ✅ **구성 완료(2026-07-18, 위 🚀 항목) — 미푸시**(hwlee님이 푸시하면 운영 반영). — MES(mes.hyunwoo.pro)와 같은 방식으로 ERP도 SPA 배포(`erp.hyunwoo.pro`). MES에서 한 번 해봤으니 패턴 그대로. **⚠️ ERP 프론트는 아직 `docker-compose.prod.yml` 에 없음** — 지금은 push 해도 운영 배포 안 됨(MES 프론트만 배포됨).
 >   4. **역할별 대시보드 확장** — 지금은 공통 위젯 + 영업 KPI만. 구매·생산·재무는 각 집계 API 1개씩 신설 필요(백엔드 작업 포함, `sd/dashboard` 패턴 복제).
 >   5. **React 코드 워크스루(학습)** — 미뤄둔 학습 페이즈. 전환이 거의 끝나가므로 슬슬 시점.
 > - **재개 방법**: ⓐ **백엔드는 `aws` 프로필로 기동**(로컬 docker DB는 깨져 있음, 위 ⚠️ 참조) — `cd hwlee-erp && set -a && . ./secret.properties && set +a && SPRING_PROFILES_ACTIVE=aws ./gradlew bootRun` ⓑ `cd hwlee-erp/frontend && npm run dev` → http://localhost:5174 ⓒ 로그인 빠른선택에서 역할 골라 확인(재무=`finance.mgr@hyunwoo.com`/pass1234). **새 도메인은 정립된 공통 패턴 그대로** 복제 = api/ + domain status + 목록/상세/작성 + App 라우트·네비·권한.

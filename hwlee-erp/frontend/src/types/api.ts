@@ -724,3 +724,310 @@ export interface SdDashboard {
   pipeline: Record<SalesOrderStatus, number>
   recentOrders: RecentOrder[]
 }
+
+// ── 재고: 현재고 (mm/stock) ──────────────────────────
+
+/** StockResponse — 조회 전용. 변경은 입고/출고/조정만 수행한다. */
+export interface Stock {
+  id: number
+  itemId: number
+  itemCode: string
+  itemName: string
+  warehouseId: number
+  warehouseCode: string
+  warehouseName: string
+  qtyOnHand: number
+  /** 가중평균 단가(입고 시 갱신). */
+  averageCost: number
+  /** 낙관적 락 버전. */
+  version: number
+  updatedAt: string
+}
+
+// ── 재고: 이동이력 (mm/stock-movement) ───────────────
+
+/**
+ * StockMovement 의 발생 사유 — 부호 방향이 정해져 있다(도메인이 강제).
+ *  입고(+): GOODS_RECEIPT, ADJUSTMENT_PLUS, PRODUCTION_IN
+ *  출고(−): GOODS_ISSUE, ADJUSTMENT_MINUS, SCRAP, PRODUCTION_OUT
+ */
+export type MovementReason =
+  | 'GOODS_RECEIPT'
+  | 'GOODS_ISSUE'
+  | 'ADJUSTMENT_PLUS'
+  | 'ADJUSTMENT_MINUS'
+  | 'SCRAP'
+  | 'PRODUCTION_OUT'
+  | 'PRODUCTION_IN'
+
+/** StockMovementResponse — 이동 원장 한 행. 입고/출고 트랜잭션이 자동으로 남긴다. */
+export interface StockMovement {
+  id: number
+  itemId: number
+  itemCode: string
+  itemName: string
+  warehouseId: number
+  warehouseCode: string
+  /** 부호가 방향을 나타낸다(+입고 / −출고). */
+  qtyDelta: number
+  unitCost: number
+  reason: MovementReason
+  /** 출처 문서 종류(GR·GI·PROD 등) + id — 다형성 참조(FK 아님). */
+  refType: string | null
+  refId: number | null
+  movedAt: string
+}
+
+// ── 인사: 사원 (master/employee) ─────────────────────
+
+/** EmployeeResponse — 조회는 넓은 역할, 쓰기는 ADMIN 전용. 목록은 배열(Page 아님). */
+export interface Employee extends Audited {
+  id: number
+  code: string
+  name: string
+  email: string | null
+  departmentCode: string | null
+  departmentName: string | null
+  hireDate: string
+  status: MasterStatus
+}
+
+// ── 인사: 급여계약 (hr/contract) ─────────────────────
+
+/** 직급 4단계 — 조회/리포트용 메타. 급여 계산엔 기본급이 진실. */
+export type Position = 'STAFF' | 'SENIOR' | 'MANAGER' | 'DIRECTOR'
+
+/** ACTIVE → terminate() → INACTIVE. */
+export type ContractStatus = 'ACTIVE' | 'INACTIVE'
+
+/** EmploymentContractResponse — 발효일 기준 급여 조건 이력. HR/ADMIN 전용. */
+export interface EmploymentContract extends Audited {
+  id: number
+  employeeId: number
+  employeeCode: string
+  employeeName: string
+  position: Position
+  baseSalary: number
+  contractedHours: number
+  /** 시급 = baseSalary / contractedHours (서버 계산). */
+  hourlyWage: number
+  effectiveFrom: string
+  /** null 이면 현재 유효(만료 안 됨). */
+  effectiveTo: string | null
+  status: ContractStatus
+}
+
+export interface EmploymentContractCreateRequest {
+  employeeId: number
+  position: Position
+  baseSalary: number
+  contractedHours: number
+  effectiveFrom: string
+}
+
+// ── 인사: 근태 (hr/attendance) ───────────────────────
+
+/**
+ * AttendanceResponse — 하루 한 건. 소정근로 8h(480분) 초과분이 연장(overtime).
+ * 조회는 employeeId + from~to 필수, 응답은 배열.
+ */
+export interface Attendance extends Audited {
+  id: number
+  employeeId: number
+  employeeName: string
+  workDate: string
+  /** 'HH:mm:ss'. */
+  clockIn: string
+  clockOut: string
+  workedMinutes: number
+  overtimeMinutes: number
+}
+
+export interface AttendanceCreateRequest {
+  employeeId: number
+  workDate: string
+  clockIn: string
+  clockOut: string
+}
+
+// ── 인사: 급여대장 (hr/payroll) ──────────────────────
+
+/**
+ * PayrollStatus — DRAFT →confirm(인건비 전표) → CONFIRMED →pay(지급 전표) → PAID.
+ * 확정=비용 인식, 지급=현금 유출 — 발생주의의 2단계.
+ */
+export type PayrollStatus = 'DRAFT' | 'CONFIRMED' | 'PAID'
+
+/** PayslipResponse — 급여대장 한 사람 몫의 명세. */
+export interface Payslip {
+  id: number
+  employeeId: number
+  employeeCode: string
+  employeeName: string
+  basePay: number
+  overtimePay: number
+  grossPay: number
+  incomeTax: number
+  insuranceEmployee: number
+  /** 회사 부담분(공제 아님, 참고). */
+  insuranceCompany: number
+  totalDeduction: number
+  netPay: number
+}
+
+export interface PayrollRun extends Audited {
+  id: number
+  number: string
+  /** 대상 월 'YYYY-MM'. */
+  period: string
+  runDate: string
+  status: PayrollStatus
+  totalGross: number
+  totalDeduction: number
+  totalNet: number
+  confirmedAt: string | null
+  paidAt: string | null
+  payslips: Payslip[]
+}
+
+/** 대상 월(YYYY-MM)만 받는다 — 명세는 유효계약 + 근태로 자동 계산. */
+export interface PayrollRunCreateRequest {
+  period: string
+}
+
+export type PayrollAction = 'confirm' | 'pay'
+
+// ── 리포트 (report) — 매출·재고·손익. 조회 전용, FINANCE/DIRECTOR/ADMIN ──
+
+/** 매출 리포트 집계 단위. */
+export type SalesReportUnit = 'DAY' | 'MONTH'
+
+/** 매출 리포트 한 행 — period 는 일별 'yyyy-MM-dd', 월별 'yyyy-MM', 합계행은 '합계'. */
+export interface SalesReportRow {
+  period: string
+  invoiceCount: number
+  subtotal: number
+  taxAmount: number
+  totalAmount: number
+}
+
+export interface SalesReport {
+  unit: SalesReportUnit
+  from: string
+  to: string
+  rows: SalesReportRow[]
+  /** 전체 합계행(period='합계'). */
+  total: SalesReportRow
+}
+
+/** 재고 현황 리포트 한 행 — (품목, 창고)별 평가액. */
+export interface InventoryReportRow {
+  itemCode: string
+  itemName: string
+  warehouseName: string
+  qtyOnHand: number
+  averageCost: number
+  /** 평가액 = 수량 × 평균단가(서버 계산). */
+  valuationAmount: number
+}
+
+export interface InventoryReport {
+  rows: InventoryReportRow[]
+  totalValuation: number
+}
+
+/** 손익계산서 명세 한 줄 — 계정 단위 정상방향 순액. */
+export interface IncomeStatementLine {
+  accountCode: string
+  accountName: string
+  amount: number
+}
+
+/**
+ * 손익계산서(미니).
+ *   매출총이익 = 매출 − 매출원가
+ *   영업이익   = 매출총이익 − 판관비
+ *   당기순이익 = 수익총계 − 비용총계 (영업외 없는 미니 버전이라 영업이익과 동일)
+ */
+export interface IncomeStatement {
+  from: string
+  to: string
+  revenue: number
+  costOfGoodsSold: number
+  grossProfit: number
+  sgaExpense: number
+  operatingProfit: number
+  netIncome: number
+  revenueLines: IncomeStatementLine[]
+  expenseLines: IncomeStatementLine[]
+}
+
+// ── AI 어시스턴트 챗봇 (assistant) ───────────────────
+// POST /api/assistant/chat → ERP 가 로컬 LLM 에이전트로 프록시. 로그인 전 부서 공용.
+
+/** 1차 요청은 {message}, plan 확인 재전송은 {intent, confirm:true}. */
+export interface AssistantRequest {
+  message?: string
+  /** plan 응답의 intent 를 그대로 되돌려 보낸다. 에이전트가 해석하므로 프론트는 통과만. */
+  intent?: unknown
+  confirm?: boolean
+}
+
+/**
+ * 에이전트 응답. type 에 따라 렌더가 갈린다:
+ *   message — 일반 답변(lines)
+ *   result  — 조회/실행 결과(lines)
+ *   error   — 오류·연결 실패(lines). 에이전트 미기동 시 백엔드가 503 으로 이 모양을 만든다.
+ *   plan    — 쓰기 작업 미리보기(summary) + [실행]/[취소]. 실행 시 intent 를 confirm 재전송.
+ */
+export interface AssistantResponse {
+  type: 'message' | 'result' | 'error' | 'plan'
+  lines?: string[]
+  summary?: string[]
+  intent?: unknown
+}
+
+// ── 여신 상향 요청 (fi/credit) ───────────────────────
+// 조회 SALES/FINANCE/ADMIN, 생성 SALES/ADMIN. 승인/거부는 전자결재(CREDIT_LIMIT)로 이관.
+
+export type CreditRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+
+/** CreditLimitRequestResponse — 고객 여신 한도 상향 요청. */
+export interface CreditLimitRequest {
+  id: number
+  number: string
+  customerId: number
+  customerName: string
+  /** 현재 한도. */
+  currentLimit: number
+  /** 요청 한도. */
+  requestedLimit: number
+  reason: string | null
+  status: CreditRequestStatus
+  requestedBy: string
+  createdAt: string
+  decidedBy: string | null
+  decidedAt: string | null
+  decisionNote: string | null
+}
+
+export interface CreditLimitRequestCreateRequest {
+  customerId: number
+  requestedLimit: number
+  reason: string | null
+}
+
+// ── BOM (pp/bom) ─────────────────────────────────────
+// 조회 PRODUCTION/ADMIN. 완제품별 부품 소요량.
+
+/** BomResponse — 완제품 1개당 부품 소요량 한 줄. */
+export interface Bom {
+  id: number
+  productItemId: number
+  productCode: string
+  productName: string
+  componentItemId: number
+  componentCode: string
+  componentName: string
+  quantity: number
+}

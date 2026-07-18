@@ -24,8 +24,14 @@ import type {
   InvoiceStatus,
   JournalEntryStatus,
   JournalSource,
+  MovementReason,
   NormalSide,
   NotificationType,
+  CreditRequestStatus,
+  ContractStatus,
+  PayrollAction,
+  PayrollStatus,
+  Position,
   PaymentStatus,
   PaymentType,
   ProductionOrderStatus,
@@ -302,14 +308,13 @@ export const APPROVAL_STEP_TYPE: Record<ApprovalStepType, string> = {
 // 결재 대상 문서 → 원본 문서 React 경로.
 // ⚠️ 백엔드 ApprovalResponse.docLink 는 옛 Thymeleaf 경로(/fi/payments/1)라 쓸 수 없다.
 //    React 라우트와 다르므로 여기서 직접 매핑한다.
-//    CREDIT_LIMIT 은 아직 React 화면이 없어 null.
 const APPROVAL_DOC_ROUTE: Record<ApprovalDocType, string | null> = {
   QUOTATION: '/quotations/',
   SALES_ORDER: '/sales-orders/',
   PURCHASE_ORDER: '/purchase-orders/',
   PAYMENT: '/payments/',
   JOURNAL: '/journal-entries/',
-  CREDIT_LIMIT: null,
+  CREDIT_LIMIT: '/credit-requests/',
 }
 
 // 원본 문서로 가는 링크. 화면이 아직 없는 문서(여신 상향 등)는 null.
@@ -400,4 +405,80 @@ export function formatMoney(v: number | null | undefined): string {
 
 export function statusMeta<K extends string>(map: StatusMap<K>, status: K): StatusMeta {
   return map[status] || { label: status || '-', tone: 'neutral' }
+}
+
+// ── 재고 이동사유 (MM) ───────────────────────────────
+// 부호 방향이 정해져 있다(백엔드가 강제). 화면은 라벨 + 입/출고 방향만 판단한다.
+export const MOVEMENT_REASON: Record<MovementReason, string> = {
+  GOODS_RECEIPT: '매입 입고',
+  GOODS_ISSUE: '출고',
+  ADJUSTMENT_PLUS: '조정(+)',
+  ADJUSTMENT_MINUS: '조정(−)',
+  SCRAP: '폐기',
+  PRODUCTION_OUT: '생산 투입',
+  PRODUCTION_IN: '생산 산출',
+}
+
+// 입고(+)면 done(파랑), 출고(−)면 warn(주황) 계열로 배지 색을 나눈다.
+// 반환은 이 둘로만 좁혀서, 쓰는 쪽이 2색 스타일 맵만 준비하면 되게 한다.
+export function movementTone(reason: MovementReason): 'done' | 'warn' {
+  const inbound: MovementReason[] = ['GOODS_RECEIPT', 'ADJUSTMENT_PLUS', 'PRODUCTION_IN']
+  return inbound.includes(reason) ? 'done' : 'warn'
+}
+
+// ── 인사(HR) ─────────────────────────────────────────
+
+// 직급 — 조회/리포트용 메타(급여 계산엔 안 쓰임).
+export const POSITION: Record<Position, string> = {
+  STAFF: '사원',
+  SENIOR: '선임',
+  MANAGER: '책임/과장',
+  DIRECTOR: '임원/이사',
+}
+
+// 급여계약 상태.
+export const CONTRACT_STATUS: StatusMap<ContractStatus> = {
+  ACTIVE: { label: '유효', tone: 'active' },
+  INACTIVE: { label: '종료', tone: 'muted' },
+}
+
+// 급여대장 상태.
+// DRAFT →confirm(인건비 전표) → CONFIRMED →pay(지급 전표) → PAID. 발생주의 2단계.
+export const PAYROLL_STATUS: StatusMap<PayrollStatus> = {
+  DRAFT: { label: '작성중', tone: 'neutral' },
+  CONFIRMED: { label: '확정', tone: 'active' },
+  PAID: { label: '지급완료', tone: 'done' },
+}
+
+export function payrollActions(status: PayrollStatus): PayrollAction[] {
+  switch (status) {
+    case 'DRAFT':
+      return ['confirm']
+    case 'CONFIRMED':
+      return ['pay']
+    default:
+      return []
+  }
+}
+
+export const PAYROLL_ACTION_LABEL: Record<PayrollAction, string> = {
+  confirm: '확정(인건비 전표)',
+  pay: '지급(지급 전표)',
+}
+
+// 근무시간(분) → "8시간 30분" 표기. 근태·연장근로 표시용.
+export function formatMinutes(min: number | null | undefined): string {
+  if (min == null) return '-'
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  if (h === 0) return `${m}분`
+  return m === 0 ? `${h}시간` : `${h}시간 ${m}분`
+}
+
+// ── 여신 상향 요청(FI) ───────────────────────────────
+// PENDING →(전자결재 승인) APPROVED / →(거부) REJECTED. 실제 결정은 결재함에서.
+export const CREDIT_REQUEST_STATUS: StatusMap<CreditRequestStatus> = {
+  PENDING: { label: '검토중', tone: 'warn' },
+  APPROVED: { label: '승인', tone: 'done' },
+  REJECTED: { label: '거부', tone: 'danger' },
 }

@@ -1,5 +1,7 @@
 package com.hwlee.erp.security.admin;
 
+import com.hwlee.erp.security.admin.dto.AdminRoleResponse;
+import com.hwlee.erp.security.admin.dto.AdminUserResponse;
 import com.hwlee.erp.security.user.AppUser;
 import com.hwlee.erp.security.user.AppUserRepository;
 import com.hwlee.erp.security.user.Role;
@@ -40,6 +42,38 @@ public class AppUserAdminService {
         List<Role> roles = roleRepository.findAll();
         roles.forEach(role -> role.getPermissions().size()); // 권한 컬렉션 초기화
         return roles;
+    }
+
+    // ── REST 용 DTO 변환 (Thymeleaf 는 위 엔티티 메서드, React 는 아래 DTO 메서드) ──
+    // 지연 연관(employee·roles·permissions)을 트랜잭션 경계 안에서 DTO 로 옮긴다.
+    // passwordHash 는 담지 않는다.
+
+    public List<AdminUserResponse> listUsers() {
+        return appUserRepository.findAll().stream()
+                .map(u -> new AdminUserResponse(
+                        u.getId(),
+                        u.getUsername(),
+                        u.getEmployee() != null ? u.getEmployee().getName() : null,
+                        u.isEnabled(),
+                        u.isAccountLocked(),
+                        u.getRoles().stream()
+                                .map(r -> new AdminUserResponse.RoleRef(r.getId(), r.getCode(), r.getName()))
+                                .sorted(java.util.Comparator.comparing(AdminUserResponse.RoleRef::code))
+                                .toList()))
+                .toList();
+    }
+
+    public List<AdminRoleResponse> listRoles() {
+        return roleRepository.findAll().stream()
+                .map(r -> new AdminRoleResponse(
+                        r.getId(),
+                        r.getCode(),
+                        r.getName(),
+                        r.getPermissions().stream()
+                                .map(p -> p.getCode())
+                                .sorted()
+                                .toList()))
+                .toList();
     }
 
     /** 사용자의 역할 집합을 통째로 교체 (체크박스 선택분으로). */

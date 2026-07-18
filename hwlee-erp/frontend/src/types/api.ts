@@ -1031,3 +1031,36 @@ export interface Bom {
   componentName: string
   quantity: number
 }
+
+// ── 관리자: 사용자·역할 (security/admin) ─────────────
+// ADMIN 전용. 사용자 목록·역할 목록·사용자 역할 교체.
+
+/** 사용자에게 부여된 역할 요약(역할 편집 체크박스와 맞춤). */
+export interface RoleRef {
+  id: number
+  code: string
+  name: string
+}
+
+/** AdminUserResponse — ⚠️ passwordHash 는 서버가 응답에 담지 않는다. */
+export interface AdminUser {
+  id: number
+  username: string
+  employeeName: string | null
+  enabled: boolean
+  accountLocked: boolean
+  roles: RoleRef[]
+}
+
+/** AdminRoleResponse — 역할 + 가진 권한 코드 목록. */
+export interface AdminRole {
+  id: number
+  code: string
+  name: string
+  permissions: string[]
+}
+
+/** 사용자 역할 교체 — 선택된 역할 id 집합으로 통째 교체(비면 모든 역할 회수). */
+export interface UpdateRolesRequest {
+  roleIds: number[]
+}

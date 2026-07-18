@@ -103,8 +103,13 @@
 >   - **BOM 조회**(`/boms`) — 완제품 선택 → 부품 소요량(읽기전용). 권한 **PRODUCTION/ADMIN**. 완제품(FINISHED)만 드롭다운. 생산 작업지시가 이 BOM 을 전개하는 그 데이터.
 >   - **✅ e2e(실 API·AWS RDS)**: 여신 요청 목록(CLR-20260705-001 신원전자 APPROVED) / **여신 생성→전자결재 자동 상신 확인**(CLR-20260718-001 → APV-20260718-001, docType=CREDIT_LIMIT, refId 역조회 200) / BOM 5종(올인원PC=패널·메인보드·메모리×2·SSD). 권한: 여신 PRODUCTION→403·FINANCE→200 / BOM FINANCE·SALES→403. `tsc -b` 0·build 그린·타입 스펙대조 5개 지어낸필드 0·SPA 라우트 3개 200.
 >   - ⚠️ RDS e2e 데이터: 여신 CLR-20260718-001(PENDING)·결재 APV-20260718-001. 데모용.
-> - **⭐ SD·MM·PP·FI·HR 6대 도메인 + 리포트 + 챗봇 + 여신 + BOM 전환 완료.** React 미전환 남은 것은 **관리자(사용자·역할)뿐**.
-> - ⬜ **관리자(사용자·역할)** — ⚠️ **REST 엔드포인트 없음**(Thymeleaf 뷰 전용, `AdminViewController`+`AppUserAdminService`만) → 옮기려면 **백엔드 REST 신설 먼저 필요**(다른 화면들과 다른 점). · 마스터관리(CRUD) · React 코드 워크스루
+> - **✅ 관리자(사용자·역할) React 전환(2026-07-18) = 마지막 Thymeleaf 화면, ⭐ 백엔드 REST 신설 포함**: 다른 화면들과 달리 REST 가 없어(Thymeleaf 뷰 전용) **백엔드부터 만들고** 옮김.
+>   - **백엔드 신설(무회귀)**: `AdminController`(`/api/admin`, `hasRole('ADMIN')`) — GET `/users`·`/roles`, PUT `/users/{id}/roles`. **기존 `AppUserAdminService` 로직 재사용**하고 DTO 변환 메서드(`listUsers`/`listRoles`)만 추가 — 지연 연관(employee·roles·permissions)을 **@Transactional 경계 안에서 DTO 로 옮겨** OSIV=false 예외 회피. **⚠️ passwordHash 는 응답에 안 담음**(엔티티 직접 노출 금지). DTO 3종(`AdminUserResponse`+중첩 `RoleRef`·`AdminRoleResponse`·`UpdateRolesRequest`). 기존 `AdminViewController`(Thymeleaf)는 그대로 둠(코드 잔존, 화면은 대체).
+>   - **프론트**: 사용자 목록(역할 배지 + **인라인 역할 편집** = 전체 역할 체크박스로 통째 교체)·역할·권한 목록(읽기전용). 공통 `AdminTabs`. **ADMIN 전용**(`ADMIN_ROLES`).
+>   - **✅ e2e(실 API·AWS RDS)**: 사용자 16명·역할 7개(권한 수 표시). **역할 교체 쓰기 실동작**(kim=SALES → SALES+PURCHASING 추가 확인 → 원복, PUT 204). 권한: FINANCE→**403**·ADMIN→200. **passwordHash 미노출 확인**. `compileJava` 그린·`tsc -b` 0·build 그린·타입 스펙대조 4개(중첩 RoleRef 포함) 지어낸필드 0·SPA 라우트 2개 200.
+>   - ⚠️ **백엔드 변경분 = 미배포**(신규 `AdminController`·DTO·서비스 메서드). push 하면 배포됨.
+> - **⭐⭐ ERP React + TypeScript 전환 100% 완료 — Thymeleaf 화면 전부 대체.** (관리자가 마지막이었음)
+> - ⬜ (선택) 마스터관리 CRUD 확장 · 구매/생산/재무 역할별 대시보드 · React 코드 워크스루(학습) · erp-agent 로컬 개발 세팅
 >
 > #### 🚀 ERP 프론트 정적 배포 구성 완료(2026-07-18) — 미푸시
 > **hwlee님 결정 = "루트를 React로 전환(챗봇·리포트 포기)"**. MES와 동일한 경로 분기 방식(방식 B)으로 `erp.hyunwoo.pro` 를 React SPA 로 서빙하도록 인프라 구성.

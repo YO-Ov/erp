@@ -48,6 +48,8 @@ import CreditRequestListView from './views/CreditRequestListView'
 import CreditRequestDetailView from './views/CreditRequestDetailView'
 import CreditRequestCreateView from './views/CreditRequestCreateView'
 import BomListView from './views/BomListView'
+import AdminUserListView from './views/AdminUserListView'
+import AdminRoleListView from './views/AdminRoleListView'
 
 // SD 전 모듈(견적·수주·출하·청구)은 백엔드가 SALES/ADMIN 만 허용한다.
 const SD_ROLES: readonly Role[] = ['SALES', 'ADMIN']
@@ -77,6 +79,8 @@ const REPORT_ROLES: readonly Role[] = ['FINANCE', 'DIRECTOR', 'ADMIN']
 const CREDIT_ROLES: readonly Role[] = ['SALES', 'FINANCE', 'ADMIN']
 // BOM 조회는 생산·관리자.
 const BOM_ROLES: readonly Role[] = ['PRODUCTION', 'ADMIN']
+// 관리자(사용자·역할)는 ADMIN 전용.
+const ADMIN_ROLES: readonly Role[] = ['ADMIN']
 
 // 앱 셸: 로그인 상태에서만 상단 헤더(네비 + 로그아웃)를 보여준다.
 function Header() {
@@ -97,6 +101,7 @@ function Header() {
   const canReport = hasRole(...REPORT_ROLES)
   const canCredit = hasRole(...CREDIT_ROLES)
   const canBom = hasRole(...BOM_ROLES)
+  const canAdmin = hasRole(...ADMIN_ROLES)
 
   async function onLogout() {
     await logout()
@@ -147,6 +152,7 @@ function Header() {
             <NavLink to="/approvals">전자결재</NavLink>
             {/* AI 어시스턴트 — 로그인 전 부서 공용. */}
             <NavLink to="/assistant">AI 챗봇</NavLink>
+            {canAdmin && <NavLink to="/admin/users">관리자</NavLink>}
           </nav>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -572,6 +578,24 @@ export default function App() {
           element={
             <ProtectedRoute roles={BOM_ROLES}>
               <BomListView />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 관리자 (사용자·역할) — ADMIN 전용 */}
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute roles={ADMIN_ROLES}>
+              <AdminUserListView />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/roles"
+          element={
+            <ProtectedRoute roles={ADMIN_ROLES}>
+              <AdminRoleListView />
             </ProtectedRoute>
           }
         />

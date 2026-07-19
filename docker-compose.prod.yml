@@ -121,6 +121,19 @@ services:
     ports:
       - "127.0.0.1:8080:8080"   # 서버 내부 curl 확인용. 외부는 리버스 프록시로.
 
+  # ── 포트폴리오 (hyunwoo.pro 정적 사이트) ──────────────────────
+  #   순수 HTML/CSS/JS 단일 페이지. 외부 포트 없음 → 메인 Caddy 가
+  #   hyunwoo.pro 를 이 컨테이너로 프록시(이전엔 erp 서브도메인으로 301 리다이렉트).
+  portfolio:
+    build:
+      context: ./hwlee-portfolio
+      dockerfile: Dockerfile
+    image: hwlee-portfolio:latest
+    container_name: hwlee-portfolio
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Seoul
+
   # ── ERP 프론트엔드 (React SPA 정적 서버) ──────────────────────
   #   React(Vite) 빌드 산출물(dist)만 서빙하는 초경량 정적 컨테이너.
   #   외부 포트를 열지 않는다 → 메인 Caddy 가 erp.hyunwoo.pro 의
@@ -187,6 +200,7 @@ services:
       - erp-frontend
       - mes
       - mes-frontend
+      - portfolio
     ports:
       - "80:80"
       - "443:443"

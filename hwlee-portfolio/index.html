@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>이현우 · 백엔드/풀스택 개발자</title>
+  <meta name="description" content="공공기관·ERP·물류·플랫폼 10년+ 실무 경력. ERP·MES·AI 에이전트 세 개의 서비스를 도메인 설계부터 배포·운영까지 직접 만들어 운영 중입니다." />
+  <meta name="author" content="이현우" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="이현우 · 백엔드/풀스택 개발자" />
+  <meta property="og:description" content="ERP·MES·AI 세 개의 라이브 서비스를 직접 설계·운영하는 개발자" />
+  <meta property="og:url" content="https://hyunwoo.pro" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='88'%3E%F0%9F%A7%91%E2%80%8D%F0%9F%92%BB%3C/text%3E%3C/svg%3E" />
+</head>
+<body>
+<style>
+  :root {
+    /* slate 계열 뉴트럴(blue-bias) + sky accent — ERP/MES 서비스와 같은 세계 */
+    --bg: #f6f8fb;
+    --panel: #ffffff;
+    --elevated: #eef2f7;
+    --border: #dbe3ec;
+    --text: #0f1b2d;
+    --muted: #5b6b80;
+    --faint: #8a99ab;
+    --accent: #0284c7;
+    --accent-soft: rgba(2, 132, 199, 0.1);
+    --live: #16a34a;
+    --live-soft: rgba(22, 163, 74, 0.12);
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+      "Malgun Gothic", "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1220;
+      --panel: #131c2b;
+      --elevated: #1b2739;
+      --border: #263447;
+      --text: #e6edf5;
+      --muted: #9fb0c3;
+      --faint: #6b7d92;
+      --accent: #38bdf8;
+      --accent-soft: rgba(56, 189, 248, 0.13);
+      --live: #34d399;
+      --live-soft: rgba(52, 211, 153, 0.14);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f8fb; --panel: #ffffff; --elevated: #eef2f7; --border: #dbe3ec;
+    --text: #0f1b2d; --muted: #5b6b80; --faint: #8a99ab;
+    --accent: #0284c7; --accent-soft: rgba(2, 132, 199, 0.1);
+    --live: #16a34a; --live-soft: rgba(22, 163, 74, 0.12);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b1220; --panel: #131c2b; --elevated: #1b2739; --border: #263447;
+    --text: #e6edf5; --muted: #9fb0c3; --faint: #6b7d92;
+    --accent: #38bdf8; --accent-soft: rgba(56, 189, 248, 0.13);
+    --live: #34d399; --live-soft: rgba(52, 211, 153, 0.14);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── 상단 네비 ── */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner { display: flex; align-items: center; gap: 20px; height: 58px; }
+  .brand { font-family: var(--mono); font-weight: 700; letter-spacing: -0.02em; font-size: 15px; }
+  .brand .dot { color: var(--accent); }
+  .nav-links { margin-left: auto; display: flex; gap: 22px; align-items: center; }
+  .nav-links a { font-size: 13.5px; color: var(--muted); transition: color .15s; }
+  .nav-links a:hover { color: var(--text); }
+  .theme-btn {
+    font: inherit; cursor: pointer; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text);
+    width: 34px; height: 34px; border-radius: 9px; font-size: 15px; line-height: 1;
+    display: grid; place-items: center;
+  }
+  .theme-btn:hover { border-color: var(--accent); }
+  @media (max-width: 640px) { .nav-links a:not(.nav-cta) { display: none; } }
+
+  /* ── 히어로 ── */
+  .hero { padding: 80px 0 56px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12.5px; letter-spacing: 0.06em;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-size: clamp(34px, 6vw, 58px); line-height: 1.08; letter-spacing: -0.03em;
+    font-weight: 800; margin: 0 0 22px; text-wrap: balance;
+  }
+  .hero h1 .accent { color: var(--accent); }
+  .hero .lead {
+    font-size: clamp(16px, 2.3vw, 20px); color: var(--muted);
+    max-width: 60ch; margin: 0 0 34px;
+  }
+  .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .btn {
+    font: inherit; font-size: 14.5px; font-weight: 600;
+    padding: 11px 20px; border-radius: 10px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    transition: border-color .15s, transform .05s;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #06232f; }
+  :root[data-theme="light"] .btn.primary { color: #ffffff; }
+
+  /* 라이브 상태 스트립 */
+  .live-strip { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 40px; }
+  .live-chip {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 12.5px; color: var(--muted);
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 7px 12px; border-radius: 999px;
+  }
+  .live-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--live);
+    box-shadow: 0 0 0 0 var(--live-soft); animation: pulse 2.4s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 var(--live-soft); }
+    70% { box-shadow: 0 0 0 7px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
+  @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+
+  /* ── 섹션 공통 ── */
+  section { padding: 56px 0; border-top: 1px solid var(--border); }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 34px; }
+  .sec-num { font-family: var(--mono); font-size: 13px; color: var(--faint); }
+  .sec-head h2 { font-size: 24px; letter-spacing: -0.02em; margin: 0; font-weight: 750; }
+  .sec-head .sub { margin-left: auto; font-size: 13.5px; color: var(--muted); }
+
+  /* ── 핵심 역량 ── */
+  .caps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 720px) { .caps { grid-template-columns: 1fr; } }
+  .cap { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 22px; }
+  .cap .ico { font-family: var(--mono); font-size: 12px; color: var(--accent); margin-bottom: 12px; }
+  .cap h3 { margin: 0 0 8px; font-size: 16px; letter-spacing: -0.01em; }
+  .cap p { margin: 0; font-size: 14px; color: var(--muted); }
+
+  /* ── 프로젝트 (주인공) ── */
+  .proj { display: grid; gap: 22px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 18px; overflow: hidden;
+    display: grid; grid-template-columns: 1.05fr 1fr;
+  }
+  @media (max-width: 760px) { .card { grid-template-columns: 1fr; } }
+  .card-body { padding: 30px; display: flex; flex-direction: column; }
+  .card-top { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .card-kind { font-family: var(--mono); font-size: 12px; color: var(--faint); letter-spacing: 0.04em; }
+  .badge-live {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 11.5px; color: var(--live);
+    background: var(--live-soft); padding: 4px 10px; border-radius: 999px;
+  }
+  .badge-live .live-dot { width: 6px; height: 6px; }
+  .card h3 { margin: 0 0 6px; font-size: 22px; letter-spacing: -0.02em; }
+  .card .domain { font-size: 13px; color: var(--accent); font-family: var(--mono); margin-bottom: 14px; }
+  .card p { margin: 0 0 18px; font-size: 14.5px; color: var(--muted); }
+  .stack { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 20px; }
+  .tag {
+    font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+    border: 1px solid var(--border); padding: 4px 9px; border-radius: 7px; background: var(--elevated);
+  }
+  .card-links { margin-top: auto; display: flex; gap: 16px; }
+  .card-links a { font-size: 13.5px; font-weight: 600; color: var(--accent); }
+  .card-links a:hover { text-decoration: underline; }
+
+  /* CSS 미니 프리뷰 (스크린샷 자리) */
+  .preview { background: var(--elevated); border-left: 1px solid var(--border); padding: 22px; display: grid; }
+  @media (max-width: 760px) { .preview { border-left: none; border-top: 1px solid var(--border); min-height: 200px; } }
+  .win { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.12); align-self: center; width: 100%; }
+  .win-bar { display: flex; gap: 5px; padding: 8px 10px; border-bottom: 1px solid var(--border); background: var(--elevated); }
+  .win-bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); opacity: .5; }
+  .win-body { display: flex; min-height: 118px; }
+  .side { width: 34%; border-right: 1px solid var(--border); padding: 9px; display: grid; gap: 6px; align-content: start; }
+  .side b { height: 7px; border-radius: 3px; background: var(--border); }
+  .side b.on { background: var(--accent); opacity: .8; width: 80%; }
+  .main-a { flex: 1; padding: 10px; display: grid; gap: 7px; align-content: start; }
+  .rowline { display: flex; align-items: center; gap: 6px; }
+  .rowline b { height: 6px; border-radius: 3px; background: var(--border); flex: 1; }
+  .pill { width: 26px; height: 11px; border-radius: 999px; background: var(--accent-soft); border: 1px solid var(--accent); }
+  .pill.g { background: var(--live-soft); border-color: var(--live); }
+  /* MES 카드 그리드 프리뷰 */
+  .grid2 { flex: 1; padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .mini { background: var(--elevated); border: 1px solid var(--border); border-radius: 6px; padding: 7px; display: grid; gap: 5px; }
+  .mini b { height: 5px; border-radius: 3px; background: var(--border); }
+  .bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); }
+  /* AI 챗 프리뷰 */
+  .chat { flex: 1; padding: 11px; display: grid; gap: 8px; align-content: end; }
+  .bub { max-width: 78%; padding: 7px 10px; border-radius: 10px; font-family: var(--mono); font-size: 9px; color: var(--muted); }
+  .bub.me { justify-self: end; background: var(--accent); color: #06232f; }
+  :root[data-theme="light"] .bub.me { color: #fff; }
+  .bub.bot { background: var(--elevated); border: 1px solid var(--border); }
+
+  /* ── 기술 스택 ── */
+  .stack-grid { display: flex; flex-wrap: wrap; gap: 9px; }
+  .chip {
+    font-family: var(--mono); font-size: 13px; color: var(--text);
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 8px 13px; border-radius: 9px;
+  }
+  .chip .k { color: var(--faint); }
+
+  /* ── 경력·교육 ── */
+  .tl { display: grid; gap: 4px; }
+  .tl-row {
+    display: grid; grid-template-columns: 130px 1fr; gap: 18px;
+    padding: 16px 0; border-bottom: 1px solid var(--border);
+  }
+  @media (max-width: 640px) { .tl-row { grid-template-columns: 1fr; gap: 4px; } }
+  .tl-when { font-family: var(--mono); font-size: 13px; color: var(--faint); padding-top: 2px; }
+  .tl-what h4 { margin: 0 0 3px; font-size: 15.5px; }
+  .tl-what p { margin: 0; font-size: 13.5px; color: var(--muted); }
+  .ph { color: var(--faint); font-style: italic; }
+
+  /* ── 푸터 ── */
+  footer { border-top: 1px solid var(--border); padding: 46px 0 60px; }
+  .foot-cta { font-size: clamp(22px, 4vw, 34px); font-weight: 800; letter-spacing: -0.02em; margin: 0 0 20px; }
+  .foot-links { display: flex; flex-wrap: wrap; gap: 14px; }
+  .foot-links a {
+    font-family: var(--mono); font-size: 13.5px; color: var(--muted);
+    border: 1px solid var(--border); padding: 9px 15px; border-radius: 10px; transition: border-color .15s, color .15s;
+  }
+  .foot-links a:hover { border-color: var(--accent); color: var(--text); }
+  .copy { margin-top: 34px; font-family: var(--mono); font-size: 12px; color: var(--faint); }
+
+  .note {
+    font-family: var(--mono); font-size: 11px; color: var(--faint);
+    background: var(--accent-soft); border: 1px dashed var(--accent);
+    padding: 2px 7px; border-radius: 6px; white-space: nowrap;
+  }
+</style>
+
+<nav class="nav">
+  <div class="wrap nav-inner">
+    <span class="brand">hyunwoo<span class="dot">.</span>pro</span>
+    <div class="nav-links">
+      <a href="#work">프로젝트</a>
+      <a href="#stack">기술</a>
+      <a href="#about">경력</a>
+      <a href="#contact" class="nav-cta">연락</a>
+      <button class="theme-btn" onclick="toggleTheme()" aria-label="테마 전환" id="tbtn">◐</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">이현우 · 백엔드 · 풀스택 개발자 · 경력 10년+</div>
+    <h1>업무 시스템을 직접 설계하고,<br /><span class="accent">운영까지</span> 하는 개발자</h1>
+    <p class="lead">
+      공공기관·ERP·물류·플랫폼까지 10년 넘게 실무 시스템을 만들어 왔습니다. 여기에 더해
+      ERP·MES·AI 에이전트 세 개의 서비스를 도메인 설계부터 배포·운영까지 직접 만들어 운영 중입니다.
+      복식부기 회계, 생산 작업지시, 전자결재 같은 실제 업무 규칙을 코드로 옮기는 일을 합니다.
+    </p>
+    <div class="hero-cta">
+      <a class="btn primary" href="#work">프로젝트 보기</a>
+      <a class="btn" href="https://github.com/YO-Ov" target="_blank" rel="noopener">GitHub ↗</a>
+    </div>
+    <div class="live-strip">
+      <span class="live-chip"><span class="live-dot"></span>erp.hyunwoo.pro 운영중</span>
+      <span class="live-chip"><span class="live-dot"></span>mes.hyunwoo.pro 운영중</span>
+      <span class="live-chip"><span class="live-dot"></span>agent.hyunwoo.pro 운영중</span>
+    </div>
+  </div>
+</header>
+
+<section id="cap">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">01</span><h2>이런 걸 합니다</h2></div>
+    <div class="caps">
+      <div class="cap">
+        <div class="ico">// domain</div>
+        <h3>도메인을 코드로</h3>
+        <p>복식부기 차대 균형, 생산 상태 전이, 결재선 — 업무 규칙을 불변식으로 지키는 백엔드를 설계합니다.</p>
+      </div>
+      <div class="cap">
+        <div class="ico">// full-stack</div>
+        <h3>백엔드부터 화면까지</h3>
+        <p>Spring 백엔드와 React·Vue 프론트를 TypeScript로. 계약(OpenAPI)을 타입으로 고정해 어긋남을 컴파일에서 잡습니다.</p>
+      </div>
+      <div class="cap">
+        <div class="ico">// ops</div>
+        <h3>배포하고 운영</h3>
+        <p>Docker·Caddy·Cloudflare로 실제 도메인에 올리고, CI 자동배포까지. 데모가 아니라 도는 서비스를 만듭니다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="work">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">02</span><h2>프로젝트</h2><span class="sub">세 개 모두 라이브 · 직접 눌러볼 수 있습니다</span></div>
+    <div class="proj">
+
+      <article class="card">
+        <div class="card-body">
+          <div class="card-top">
+            <span class="card-kind">ERP</span>
+            <span class="badge-live"><span class="live-dot"></span>LIVE</span>
+          </div>
+          <h3>전사 자원관리 시스템</h3>
+          <div class="domain">영업 · 구매 · 생산 · 재무 · 인사</div>
+          <p>6대 업무 도메인 + 전자결재·대시보드·리포트. 복식부기 회계(차대 균형 검증), 결재선 워크플로우, 역할 기반 접근제어를 갖춘 통합 ERP. Thymeleaf에서 React+TS로 전면 전환하고 운영 배포했습니다.</p>
+          <div class="stack">
+            <span class="tag">Spring Boot</span><span class="tag">React 19</span><span class="tag">TypeScript</span>
+            <span class="tag">JWT</span><span class="tag">MySQL</span><span class="tag">Kafka</span>
+          </div>
+          <div class="card-links">
+            <a href="https://erp.hyunwoo.pro" target="_blank" rel="noopener">라이브 ↗</a>
+            <a href="https://github.com/YO-Ov/erp/tree/main/hwlee-erp" target="_blank" rel="noopener">코드 ↗</a>
+          </div>
+        </div>
+        <div class="preview" aria-hidden="true">
+          <div class="win">
+            <div class="win-bar"><i></i><i></i><i></i></div>
+            <div class="win-body">
+              <div class="side"><b class="on"></b><b></b><b></b><b></b><b></b></div>
+              <div class="main-a">
+                <div class="rowline"><b></b><span class="pill"></span></div>
+                <div class="rowline"><b></b><span class="pill g"></span></div>
+                <div class="rowline"><b></b><span class="pill"></span></div>
+                <div class="rowline"><b></b><span class="pill g"></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-body">
+          <div class="card-top">
+            <span class="card-kind">MES</span>
+            <span class="badge-live"><span class="live-dot"></span>LIVE</span>
+          </div>
+          <h3>제조 실행 시스템</h3>
+          <div class="domain">작업지시 · 설비 · 품질 · 생산</div>
+          <p>작업지시 접수부터 설비 배정·실적 등록·품질검사까지 현장 실행 흐름. "설비를 가동하면 제품이 차오르는" 생산 시뮬레이터와 실시간 가동률 대시보드. Vue 3 + TypeScript로 구현했습니다.</p>
+          <div class="stack">
+            <span class="tag">Spring Boot</span><span class="tag">Vue 3</span><span class="tag">TypeScript</span>
+            <span class="tag">Pinia</span><span class="tag">Kafka</span>
+          </div>
+          <div class="card-links">
+            <a href="https://mes.hyunwoo.pro" target="_blank" rel="noopener">라이브 ↗</a>
+            <a href="https://github.com/YO-Ov/erp/tree/main/hwlee-mes" target="_blank" rel="noopener">코드 ↗</a>
+          </div>
+        </div>
+        <div class="preview" aria-hidden="true">
+          <div class="win">
+            <div class="win-bar"><i></i><i></i><i></i></div>
+            <div class="win-body">
+              <div class="grid2">
+                <div class="mini"><b></b><div class="bar"><i style="width:72%"></i></div></div>
+                <div class="mini"><b></b><div class="bar"><i style="width:40%"></i></div></div>
+                <div class="mini"><b></b><div class="bar"><i style="width:88%"></i></div></div>
+                <div class="mini"><b></b><div class="bar"><i style="width:20%"></i></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-body">
+          <div class="card-top">
+            <span class="card-kind">AI AGENT</span>
+            <span class="badge-live"><span class="live-dot"></span>LIVE</span>
+          </div>
+          <h3>자연어 ERP 어시스턴트</h3>
+          <div class="domain">LLM · Text-to-SQL · RBAC</div>
+          <p>"이번 달 수주 합계 알려줘" 같은 자연어를 로컬 LLM이 해석해 ERP를 조회·실행합니다. 사용자 권한(RBAC)을 그대로 적용하고, 자유 분석 질문은 가드레일 있는 Text-to-SQL로. Python·FastAPI·Ollama.</p>
+          <div class="stack">
+            <span class="tag">Python</span><span class="tag">FastAPI</span><span class="tag">Ollama</span>
+            <span class="tag">Text-to-SQL</span><span class="tag">Cloudflare Tunnel</span>
+          </div>
+          <div class="card-links">
+            <a href="https://erp.hyunwoo.pro" target="_blank" rel="noopener">데모 ↗</a>
+          </div>
+        </div>
+        <div class="preview" aria-hidden="true">
+          <div class="win">
+            <div class="win-bar"><i></i><i></i><i></i></div>
+            <div class="win-body">
+              <div class="chat">
+                <div class="bub me">이번 달 수주 합계 알려줘</div>
+                <div class="bub bot">📊 이번 달 수주 12,000,000원 · 3건</div>
+                <div class="bub me">고객 총 몇 곳이야?</div>
+                <div class="bub bot">👥 고객 총 100건</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<section id="stack">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">03</span><h2>기술 스택</h2></div>
+    <div class="stack-grid">
+      <span class="chip"><span class="k">lang/</span> Java</span>
+      <span class="chip"><span class="k">lang/</span> TypeScript</span>
+      <span class="chip"><span class="k">lang/</span> Python</span>
+      <span class="chip"><span class="k">be/</span> Spring Boot</span>
+      <span class="chip"><span class="k">be/</span> JPA · MySQL</span>
+      <span class="chip"><span class="k">be/</span> Kafka</span>
+      <span class="chip"><span class="k">fe/</span> React</span>
+      <span class="chip"><span class="k">fe/</span> Vue 3</span>
+      <span class="chip"><span class="k">fe/</span> Vite</span>
+      <span class="chip"><span class="k">ai/</span> Ollama · LLM</span>
+      <span class="chip"><span class="k">ops/</span> Docker</span>
+      <span class="chip"><span class="k">ops/</span> Caddy</span>
+      <span class="chip"><span class="k">ops/</span> Cloudflare</span>
+      <span class="chip"><span class="k">ops/</span> GitHub Actions</span>
+    </div>
+  </div>
+</section>
+
+<section id="about">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">04</span><h2>경력</h2><span class="sub">10년 9개월 · 백엔드/풀스택</span></div>
+    <div class="tl">
+      <div class="tl-row">
+        <div class="tl-when">2025.04 – 현재</div>
+        <div class="tl-what"><h4>딱플 · 웹개발</h4><p>시설예약·대회신청 플랫폼 운영. 대회 정보 통합 검색 API(Spring Boot·배치·CI/CD)와 커뮤니티 앱(React Native) 개발. AWS 자원 정리로 서버 비용 40% 절감.</p></div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-when">2023.08 – 2025.02</div>
+        <div class="tl-what"><h4>위두쉽 연구소 · 과장</h4><p>물류배송 예약 서비스(웹·키오스크) 운영, 지점 매출·사용량 통계 관리자 시스템, 고객사 그룹웨어 연동 예약 API 개발.</p></div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-when">2022.05 – 2023.07</div>
+        <div class="tl-what"><h4>우정항공 시스템개발팀 · 대리</h4><p>ERP 커스터마이징·쿼리 최적화·서버 안정화. 삼성 SDS 첼로스퀘어(Cello Square) 연동 인터페이스 API 설계·개발.</p></div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-when">2019.02 – 2022.05</div>
+        <div class="tl-what"><h4>웰텍 연구1부 · 대리</h4><p>키오스크 QR 사전예약 연동 프로세스로 현장 접수 시간 단축. 다국어 반응형 공식 웹사이트 구축(해외 문의 유입).</p></div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-when">2017.01 – 2019.02</div>
+        <div class="tl-what"><h4>엑스아이티 웹팀 · 주임</h4><p>서울시청·구청 등 공공기관 주정차·버스전용차로 단속 시스템 유지보수. KISA 지침 기반 보안 취약점 개선·고도화.</p></div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-when">2015.12 – 2016.12</div>
+        <div class="tl-what"><h4>토모소프트 · 워터정보</h4><p>SI 파견 및 자체 솔루션 유지보수로 실무를 시작했습니다.</p></div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-when">학력</div>
+        <div class="tl-what"><h4>영진사이버대학교 · 컴퓨터공학과</h4><p>2013년 졸업.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer id="contact">
+  <div class="wrap">
+    <p class="foot-cta">같이 만들 이야기가 있다면.</p>
+    <div class="foot-links">
+      <a href="mailto:dev.hwlee@gmail.com">✉ dev.hwlee@gmail.com</a>
+      <a href="https://github.com/YO-Ov" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://erp.hyunwoo.pro" target="_blank" rel="noopener">erp.hyunwoo.pro</a>
+      <a href="https://mes.hyunwoo.pro" target="_blank" rel="noopener">mes.hyunwoo.pro</a>
+    </div>
+    <div class="copy">© 2026 hyunwoo.pro · 시안(mockup) — 콘텐츠는 자유롭게 교체하세요</div>
+  </div>
+</footer>
+
+<script>
+  function applyInit() {
+    try {
+      var s = localStorage.getItem("pf_theme");
+      if (s) document.documentElement.setAttribute("data-theme", s);
+    } catch (e) {}
+  }
+  function toggleTheme() {
+    var cur = document.documentElement.getAttribute("data-theme");
+    if (!cur) cur = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    var next = cur === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("pf_theme", next); } catch (e) {}
+  }
+  applyInit();
+</script>
+
+</body>
+</html>

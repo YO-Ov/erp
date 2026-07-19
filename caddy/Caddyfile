@@ -34,10 +34,19 @@ erp.hyunwoo.pro {
 	reverse_proxy erp-frontend:80
 }
 
-# ── 루트·www → erp 서브도메인으로 301 리다이렉트 (경로 유지) ──────────
-hyunwoo.pro, www.hyunwoo.pro {
+# ── 루트 hyunwoo.pro → 포트폴리오 정적 사이트 ────────────────────────
+#   이전엔 erp 서브도메인으로 301 리다이렉트했으나, 루트를 개인 포트폴리오로.
+#   (ERP·MES·AI 는 서브도메인 erp/mes/agent 로 그대로 유지)
+hyunwoo.pro {
 	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
-	redir https://erp.hyunwoo.pro{uri} permanent
+	encode gzip zstd
+	reverse_proxy portfolio:80
+}
+
+# ── www → 루트로 301 (정규화) ────────────────────────────────────────
+www.hyunwoo.pro {
+	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
+	redir https://hyunwoo.pro{uri} permanent
 }
 
 # ── MES — https://mes.hyunwoo.pro ────────────────────────────────────

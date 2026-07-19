@@ -119,6 +119,12 @@
 >   - **생성 = 작업지시 11건**(상태 분포: COMPLETED 5·IN_PROGRESS 2·PAUSED 1·RECEIVED 3), 제품 4종(노트북·모니터·태블릿·올인원PC) + BOM 부품, 설비·작업자 배정, 실적(총 생산 514·불량 11), 품질검사 5건(FAIL 4·PASS 1). erpOrderNo `DEMO-YYYYMMDD-NNN`.
 >   - **방법**: 접수 `POST /work-orders` → `start`(설비·작업자) → `results`(실적) → `complete`/`pause`. 스크립트 `scratchpad/seed-mes.sh`. ⚠️ **python urllib 이 201 을 예외로 처리**해서 curl 기반 bash 로 전환(재사용 시 주의). ⚠️ 초기 테스트 1건 `WO-WO-DEMO-TEST-001`(workOrderNo 에 WO 중복)이 남음 — MES 에 삭제 API 없어 정리하려면 서버 SSH 로 DB 삭제 필요(데모엔 지장 없음).
 >   - **⚠️ 시뮬레이터 주의**: 설비는 전부 IDLE 유지(가동 안 시킴) → `mes.simulator` 가 켜져 있어도 "IN_PROGRESS+설비 RUNNING" 조건이 아니라 자동 생산 안 물림(데이터 통제). 라이브 데모하려면 설비현황에서 가동 누르면 IN_PROGRESS 건이 차오름.
+> - **✅ 포트폴리오 사이트 배포(2026-07-19~20, hwlee님)**: 계획대로 `hyunwoo.pro` 루트를 **개인 포트폴리오**로. 이전엔 erp 서브도메인으로 301 리다이렉트만 했음. **순수 정적 단일 페이지**(`hwlee-portfolio/index.html`) — ERP/MES 프론트와 달리 빌드 없이 `caddy:2-alpine` 에 복사. 미니멀 원페이지(히어로·핵심역량·개인프로젝트·기술스택·실무경력·연락처), 다크/라이트 테마 토글, 반응형, ERP와 같은 slate/sky 팔레트. `docker-compose.prod.yml` portfolio 서비스 + `caddy/Caddyfile` hyunwoo.pro→portfolio:80(www는 루트로 301). **✅ 검증**: 운영 hyunwoo.pro 200(포트폴리오)·서브도메인 erp/mes 무손상·erp API 200.
+>   - **디자인 방향**: meganmagic.com 참고 → 미니멀 하이브리드 + 프로젝트 중심. 콘텐츠는 hwlee님 이력서(딱플·위두쉽·우정항공·웰텍·엑스아이티 10년 9개월) 반영.
+>   - **⚠️ 정직성 조정(hwlee님 요청)**: 개인 프로젝트(ERP·MES·AI)를 "운영 중"으로 표현하니 상용 서비스처럼 보여 부담 → **"직접 설계·구현·배포한 개인 프로젝트 / 라이브 데모"** 로 정직하게. 실무 10년 경력을 진짜 자산으로 앞세움. "운영중"·"LIVE" → "라이브 데모"·"DEMO".
+>   - **✅ 저장소 공개**: `github.com/YO-Ov/erp` PRIVATE→**PUBLIC**. 공개 전 비밀값 전수 점검(PAT·AWS키·개인키·비번 전부 없음 확인). RDS 엔드포인트는 `${ERP_DB_HOST}`/`${MES_DB_HOST}` 변수화(커밋 `767889f`). 포트폴리오 프로젝트 카드가 저장소 폴더로 딥링크.
+>   - **▶ 다음 진도 = 포트폴리오 내용 보강**(hwlee님 "다음에"): ⓐ **기술 하이라이트**(문제해결 사례 — TS가 런타임버그를 컴파일에서 잡음·복식부기 불변식 422·ERP→MES 연동·권한적용 Text-to-SQL. PROGRESS 곳곳에 소재 풍부) ⓑ About/일하는 방식(자소서 "직접 확인 안 하면 안 믿는다" 검증습관, 야근 표현은 빼고) ⓒ 숫자 요약(경력·도메인·비용40%절감) ⓓ 연락·이력서 CTA(이력서 PDF는 전화·주소·사진 개인정보라 마스킹 버전 필요). ⓔ 프로젝트 CSS 프리뷰 → 실제 스크린샷 교체(임팩트↑). 소스: `hwlee-portfolio/index.html`(head) + 시안 body는 `scratchpad/portfolio-mockup.html`. 고치고 재배포.
+>   - **이력서 개선 조언(hwlee님 이력서용, 별도)**: ①개인 프로젝트 3개를 이력서 포트폴리오 칸·경력기술서에 추가(가장 큰 기회) ②상단 스킬 태그 최신화(Spring Boot·JPA·React Native·Next.js·CI/CD 앞으로) ③자소서 "야근/시간투입"→"문제해결/효율/자동화"(비용40%·CI/CD·배치자동화) ④성과 정량화 ⑤경력기술서 STAR 구조.
 > - ⬜ (선택) 마스터관리 CRUD 확장 · 구매/생산/재무 역할별 대시보드 · React 코드 워크스루(학습) · erp-agent 로컬 개발 세팅
 >
 > #### 🚀 ERP 프론트 정적 배포 구성 완료(2026-07-18) — 미푸시

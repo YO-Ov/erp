@@ -115,6 +115,10 @@
 >   - **반응형**(≤768px 브레이크포인트): 데스크톱=사이드바 고정, 모바일=**오프캔버스**(transform translateX + 백드롭, 햄버거 토글). 페이지 이동/메뉴 클릭 시 자동 닫힘(`useEffect [location.pathname]`).
 >   - **다크/라이트 테마**(`theme.ts` + `main.css`): `:root[data-theme=light]` 로 **CSS 변수만 오버라이드**(화면 코드 무수정). 선택은 localStorage 저장, 없으면 `prefers-color-scheme`. FOUC 방지로 `main.tsx` 첫 페인트 전 적용. 상단바 ☀️/🌙 토글.
 >   - **✅ 검증(headless Chrome + CDP 실측)**: 320/768/1280px **가로 넘침 0**(scrollWidth==innerWidth), 모바일=사이드바 오프스크린+햄버거 표시, 데스크톱=사이드바 고정. 테마 전환 body 배경 dark(15,23,42)↔light(241,245,249). 스크린샷 3종(데스크톱 다크/라이트·모바일 오픈) 육안 확인. `tsc -b` 0·build 그린.
+> - **✅ 운영 MES 데모 데이터 생성(2026-07-18, hwlee님 요청)**: 운영 mes_db 가 작업지시 0건이라(설비 8·작업자 8·불량사유 3 마스터만 있음) 비어 보였음 → **운영 MES API 로 직접 생성**(MES 는 인증 없음, curl). ⚠️ 운영 DB 외부포트 없어(내부 전용) SSH 없이 API 경유만 가능 — hwlee님 선택 "API 로 새로 생성". **ERP 는 그대로**(이미 고객100·수주782·전표3775 로 충분, Flyway 시드).
+>   - **생성 = 작업지시 11건**(상태 분포: COMPLETED 5·IN_PROGRESS 2·PAUSED 1·RECEIVED 3), 제품 4종(노트북·모니터·태블릿·올인원PC) + BOM 부품, 설비·작업자 배정, 실적(총 생산 514·불량 11), 품질검사 5건(FAIL 4·PASS 1). erpOrderNo `DEMO-YYYYMMDD-NNN`.
+>   - **방법**: 접수 `POST /work-orders` → `start`(설비·작업자) → `results`(실적) → `complete`/`pause`. 스크립트 `scratchpad/seed-mes.sh`. ⚠️ **python urllib 이 201 을 예외로 처리**해서 curl 기반 bash 로 전환(재사용 시 주의). ⚠️ 초기 테스트 1건 `WO-WO-DEMO-TEST-001`(workOrderNo 에 WO 중복)이 남음 — MES 에 삭제 API 없어 정리하려면 서버 SSH 로 DB 삭제 필요(데모엔 지장 없음).
+>   - **⚠️ 시뮬레이터 주의**: 설비는 전부 IDLE 유지(가동 안 시킴) → `mes.simulator` 가 켜져 있어도 "IN_PROGRESS+설비 RUNNING" 조건이 아니라 자동 생산 안 물림(데이터 통제). 라이브 데모하려면 설비현황에서 가동 누르면 IN_PROGRESS 건이 차오름.
 > - ⬜ (선택) 마스터관리 CRUD 확장 · 구매/생산/재무 역할별 대시보드 · React 코드 워크스루(학습) · erp-agent 로컬 개발 세팅
 >
 > #### 🚀 ERP 프론트 정적 배포 구성 완료(2026-07-18) — 미푸시
@@ -418,7 +422,7 @@
 - **변경 내용**: 로컬 Docker MySQL 대신 **회사 AWS RDS(MySQL 8.4)** 를 학습 DB로 사용 → 집/회사 어느 PC에서 켜도 같은 데이터를 본다. `aws` 스프링 프로파일 신설(커밋 `aa68614`).
   - 추가 파일: `hwlee-erp/src/main/resources/application-aws.yml`, `hwlee-mes/src/main/resources/application-aws.yml` (둘 다 비번은 `${ERP_DB_PASSWORD}` / `${MES_DB_PASSWORD}` 환경변수 참조, 평문 없음).
 - **접속 정보**:
-  - 호스트: `pro-ddakple.cltffqc0oqvb.ap-northeast-2.rds.amazonaws.com:3306`
+  - 호스트: RDS 엔드포인트 — `secret.properties` 의 `ERP_DB_HOST`/`MES_DB_HOST` 참조 (공개 저장소에 평문 금지)
   - ERP: 스키마 `erp_db` / 유저 `erp_app` / 비번 환경변수 `ERP_DB_PASSWORD`
   - MES: 스키마 `mes_db` / 유저 `mes_app` / 비번 환경변수 `MES_DB_PASSWORD`
   - 🔑 **비번 값 2줄은 개인 비밀번호 관리자에서 꺼내 채운다**(git 에 없음).

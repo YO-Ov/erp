@@ -6,8 +6,8 @@ spring:
     import: optional:file:./secret.properties
   datasource:
     # 회사 RDS(MySQL 8.4) - 학습 전용 스키마 mes_db / 전용 유저 mes_app
-    # 비밀번호는 환경변수 MES_DB_PASSWORD 로만 주입 (yml 에 평문 금지)
-    url: jdbc:mysql://pro-ddakple.cltffqc0oqvb.ap-northeast-2.rds.amazonaws.com:3306/mes_db?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: mes_app
+    # 호스트·비밀번호는 환경변수/secret.properties 로만 주입 (yml 에 평문·엔드포인트 금지)
+    url: jdbc:mysql://${MES_DB_HOST}:3306/mes_db?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ${MES_DB_USER:mes_app}
     password: ${MES_DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver

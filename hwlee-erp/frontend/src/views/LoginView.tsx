@@ -1,7 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import { canAccessPath } from '../auth/routeRoles'
 import { errorMessage } from '../api/client'
+import type { Role } from '../types/api'
 
 // 시연용 빠른 선택 계정 (기존 Thymeleaf 로그인 화면과 동일).
 // 계정을 고르면 이메일·공통 비밀번호(pass1234)가 자동 입력된다.
@@ -61,16 +63,28 @@ export default function LoginView() {
   // (예전 기본값이 /quotations 라 영업이 아닌 역할은 로그인하자마자 '권한 없음'을 봤다)
   const from = location.state?.from?.pathname || '/dashboard'
 
+  // 🐞 로그아웃 → 다른 역할로 로그인하면 '권한 없음'이 뜨던 문제.
+  //    로그아웃 시 ProtectedRoute 가 (아직 그 화면에 있는 채로) 세션이 끊긴 걸 보고
+  //    <Navigate to="/login" state={{ from: 현재경로 }}> 를 태운다. 그래서 재무 화면에서
+  //    로그아웃하면 from 에 '/journal-entries' 가 남고, 다음에 영업 계정으로 로그인해도
+  //    거기로 끌려가 AccessDenied 를 봤다.
+  //    → from 을 그대로 믿지 않고 **이 계정이 실제로 들어갈 수 있는 경로일 때만** 사용한다.
+  //      (렌더 순서에 기대지 않으므로 안정적이고, 북마크·딥링크로 남의 화면에 로그인한
+  //       경우까지 같이 해결된다.)
+  const destinationFor = (roles: readonly Role[]) =>
+    canAccessPath(from, roles) ? from : '/dashboard'
+
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // 이미 로그인돼 있으면 목록으로.
-  if (user) {
-    navigate(from, { replace: true })
-    return null
-  }
+  // 이미 로그인돼 있으면(뒤로가기 등으로 /login 에 온 경우) 갈 곳으로 보낸다.
+  // ⚠️ 렌더 도중 navigate 하면 React 경고가 나므로 effect 에서 처리한다.
+  useEffect(() => {
+    if (user) navigate(destinationFor(user.roles), { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
 
   // 빠른 선택: 계정을 고르면 이메일/비밀번호(공통 pass1234) 자동 입력.
   function onQuickPick(email: string) {
@@ -85,8 +99,9 @@ export default function LoginView() {
     setError(null)
     setLoading(true)
     try {
-      await login(username.trim(), password)
-      navigate(from, { replace: true })
+      // 컨텍스트의 user 는 아직 갱신 전일 수 있으므로 응답의 역할을 그대로 쓴다.
+      const res = await login(username.trim(), password)
+      navigate(destinationFor((res.roles || []) as Role[]), { replace: true })
     } catch (err) {
       // client.ts 인터셉터가 모든 실패를 Error 로 정규화하지만 catch 타입은 unknown 이다.
       setError(errorMessage(err))

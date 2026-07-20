@@ -1,7 +1,21 @@
 import { useEffect, useState } from 'react'
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import type { Role } from './types/api'
 import { useAuth } from './auth/AuthContext'
+import {
+  SD_ROLES,
+  MM_VIEW_ROLES,
+  MM_WRITE_ROLES,
+  PP_ROLES,
+  FI_ROLES,
+  STOCK_VIEW_ROLES,
+  STOCK_MOVEMENT_ROLES,
+  EMP_VIEW_ROLES,
+  HR_ROLES,
+  REPORT_ROLES,
+  CREDIT_ROLES,
+  BOM_ROLES,
+  ADMIN_ROLES,
+} from './auth/routeRoles'
 import { applyTheme, getInitialTheme, type Theme } from './theme'
 import ProtectedRoute from './auth/ProtectedRoute'
 import LoginView from './views/LoginView'
@@ -53,36 +67,9 @@ import BomListView from './views/BomListView'
 import AdminUserListView from './views/AdminUserListView'
 import AdminRoleListView from './views/AdminRoleListView'
 
-// SD 전 모듈(견적·수주·출하·청구)은 백엔드가 SALES/ADMIN 만 허용한다.
-const SD_ROLES: readonly Role[] = ['SALES', 'ADMIN']
-// 발주(MM)는 조회 역할이 넓고, 쓰기는 PURCHASING/ADMIN 만(백엔드와 동일하게 프론트도 분리).
-const MM_VIEW_ROLES: readonly Role[] = [
-  'SALES',
-  'PURCHASING',
-  'PRODUCTION',
-  'FINANCE',
-  'DIRECTOR',
-  'ADMIN',
-]
-const MM_WRITE_ROLES: readonly Role[] = ['PURCHASING', 'ADMIN']
-// 생산(PP)은 PRODUCTION/ADMIN 전용.
-const PP_ROLES: readonly Role[] = ['PRODUCTION', 'ADMIN']
-// 재무(FI) 전 모듈(전표·입출금·계정과목)은 FINANCE/ADMIN 전용 — 조회·쓰기 구분 없음.
-const FI_ROLES: readonly Role[] = ['FINANCE', 'ADMIN']
-// 현재고 조회는 영업까지 넓다(출하 위해 재고를 봐야 함). 이동이력은 구매/관리자만.
-const STOCK_VIEW_ROLES: readonly Role[] = ['SALES', 'PURCHASING', 'ADMIN']
-const STOCK_MOVEMENT_ROLES: readonly Role[] = ['PURCHASING', 'ADMIN']
-// 사원 조회는 넓다(백엔드도 관리부서 전반 허용). 급여계약·근태·급여대장은 HR/ADMIN 전용(민감정보).
-const EMP_VIEW_ROLES: readonly Role[] = ['SALES', 'PURCHASING', 'FINANCE', 'HR', 'ADMIN']
-const HR_ROLES: readonly Role[] = ['HR', 'ADMIN']
-// 전사 리포트(매출·재고·손익)는 재무·관리자 + 임원(DIRECTOR) 열람.
-const REPORT_ROLES: readonly Role[] = ['FINANCE', 'DIRECTOR', 'ADMIN']
-// 여신 상향 요청: 조회는 영업·재무·관리자, 생성은 영업·관리자(화면 내 분기).
-const CREDIT_ROLES: readonly Role[] = ['SALES', 'FINANCE', 'ADMIN']
-// BOM 조회는 생산·관리자.
-const BOM_ROLES: readonly Role[] = ['PRODUCTION', 'ADMIN']
-// 관리자(사용자·역할)는 ADMIN 전용.
-const ADMIN_ROLES: readonly Role[] = ['ADMIN']
+// 역할 상수는 auth/routeRoles.ts 로 옮겼다 — 로그인 직후 'from' 경로가 그 계정에
+// 허용되는지 판단하려면 라우트 JSX 바깥에서도 경로→역할을 알아야 하기 때문.
+// ⚠️ 아래 <Route> 를 추가/수정하면 routeRoles.ts 의 ROUTE_ROLES 도 같이 고칠 것.
 
 // 좌측 사이드바 — 부서별 섹션으로 묶은 네비.
 // ⚠️ 메뉴 노출은 '부서 소속' 기준으로 좁게 보여준다(이전 Thymeleaf 방식).

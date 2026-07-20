@@ -220,6 +220,8 @@
     padding: 8px 13px; border-radius: 9px;
   }
   .chip .k { color: var(--faint); }
+  .stack-note { margin: 20px 0 0; font-size: 13.5px; color: var(--muted); max-width: 62ch; line-height: 1.7; }
+  .stack-note strong { color: var(--text); font-weight: 600; }
 
   /* ── 경력·교육 ── */
   .tl { display: grid; gap: 4px; }
@@ -232,6 +234,30 @@
   .tl-what h4 { margin: 0 0 3px; font-size: 15.5px; }
   .tl-what p { margin: 0; font-size: 13.5px; color: var(--muted); }
   .ph { color: var(--faint); font-style: italic; }
+
+  /* 경력 상세 — 핵심 항목은 역할/규모/성과 구조로 펼친다 */
+  .tl-row.key { padding: 24px 0; }
+  .tl-head { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-bottom: 12px; }
+  .tl-head h4 { margin: 0; }
+  .tl-mark {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.03em;
+    color: var(--accent); background: var(--accent-soft);
+    border: 1px solid var(--accent); padding: 3px 9px; border-radius: 999px;
+  }
+  .tl-closed {
+    font-family: var(--mono); font-size: 11px; color: var(--faint);
+    border: 1px solid var(--border); padding: 3px 9px; border-radius: 999px;
+  }
+  .facts { display: grid; gap: 9px; margin: 0 0 14px; }
+  .fact { display: grid; grid-template-columns: 62px 1fr; gap: 12px; align-items: start; }
+  @media (max-width: 640px) { .fact { grid-template-columns: 1fr; gap: 2px; } }
+  .fact dt {
+    font-family: var(--mono); font-size: 11.5px; color: var(--faint);
+    padding-top: 2px; letter-spacing: 0.02em;
+  }
+  .fact dd { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.62; }
+  .fact dd strong { color: var(--text); font-weight: 600; }
+  .tl-what .stack { margin-bottom: 0; }
 
   /* ── 푸터 ── */
   footer { border-top: 1px solid var(--border); padding: 46px 0 60px; }
@@ -433,38 +459,160 @@
       <span class="chip"><span class="k">ops/</span> Caddy</span>
       <span class="chip"><span class="k">ops/</span> Cloudflare</span>
       <span class="chip"><span class="k">ops/</span> GitHub Actions</span>
+      <span class="chip"><span class="k">cloud/</span> AWS</span>
+      <span class="chip"><span class="k">cloud/</span> Oracle Cloud</span>
+      <span class="chip"><span class="k">cloud/</span> KT Cloud</span>
+      <span class="chip"><span class="k">legacy/</span> JSP · Servlet</span>
+      <span class="chip"><span class="k">legacy/</span> 전자정부 프레임워크</span>
+      <span class="chip"><span class="k">legacy/</span> Spring (XML)</span>
+      <span class="chip"><span class="k">legacy/</span> MyBatis · iBatis</span>
+      <span class="chip"><span class="k">legacy/</span> Oracle · MSSQL</span>
+      <span class="chip"><span class="k">legacy/</span> 프로시저 (PL/SQL)</span>
+      <span class="chip"><span class="k">legacy/</span> jQuery</span>
+      <span class="chip"><span class="k">infra/</span> Linux · Windows Server</span>
+      <span class="chip"><span class="k">infra/</span> Tomcat</span>
+      <span class="chip"><span class="k">infra/</span> 셸 스크립트 · 크론</span>
     </div>
+    <p class="stack-note">
+      최신 스택과 함께 <strong>레거시 환경</strong>도 실무에서 다뤄왔습니다.
+      운영 중인 시스템은 대부분 오래된 코드 위에 서 있고, 그걸 읽고 고치는 일이 실제 업무의 큰 부분이라고 생각합니다.
+    </p>
   </div>
 </section>
 
 <section id="about">
   <div class="wrap">
-    <div class="sec-head"><span class="sec-num">04</span><h2>실무 경력</h2><span class="sub">10년 9개월 · 백엔드/풀스택 · 현업 시스템 운영</span></div>
+    <div class="sec-head"><span class="sec-num">04</span><h2>실무 경력</h2><span class="sub">10년 9개월 · 현업이 매일 쓰는 업무 시스템을 만들고 지켜왔습니다 · 관련도 높은 순</span></div>
     <div class="tl">
-      <div class="tl-row">
-        <div class="tl-when">2025.04 – 현재</div>
-        <div class="tl-what"><h4>딱플 · 웹개발</h4><p>시설예약·대회신청 플랫폼 운영. 대회 정보 통합 검색 API(Spring Boot·배치·CI/CD)와 커뮤니티 앱(React Native) 개발. AWS 자원 정리로 서버 비용 40% 절감.</p></div>
+
+      <div class="tl-row key">
+        <div class="tl-when">2022.05 – 2023.07</div>
+        <div class="tl-what">
+          <div class="tl-head">
+            <h4>우정항공 시스템개발팀 · 대리</h4>
+            <span class="tl-mark">ERP 실무</span>
+            <span class="tl-closed">비공개 · 사내 시스템</span>
+          </div>
+          <dl class="facts">
+            <div class="fact">
+              <dt>역할</dt>
+              <dd>항공 화물 ERP의 <strong>대외 연계</strong>와 <strong>운영 안정화</strong>를 담당했습니다. 외부 프레임워크를 사내에 맞춰 커스터마이징한 시스템이라, 필요한 기능과 화면은 직접 개발·수정했습니다.</dd>
+            </div>
+            <div class="fact">
+              <dt>연계</dt>
+              <dd><strong>관세청 통관 연계</strong> — KTNET·KCNET을 통해 오가는 통관 정보를 사내 ERP와 연결했습니다. 항공사별 운항 스케줄·경유지·운임·유류할증도 함께 다뤘습니다.</dd>
+            </div>
+            <div class="fact">
+              <dt></dt>
+              <dd><strong>삼성SDS 첼로스퀘어 연동</strong> — 우정항공의 스케줄·가능 중량·운임을 플랫폼 규격에 맞춰 API로 제공했습니다. 첼로스퀘어 이용자가 목적지별 운송 조건을 조회하면 우정항공의 실제 스케줄과 비용이 노출되는 구조입니다.</dd>
+            </div>
+            <div class="fact">
+              <dt>성과</dt>
+              <dd>여러 쿼리를 따로 실행한 뒤 애플리케이션에서 취합·분류하던 기능을 임시 테이블 기반 단일 처리로 바꿔 <strong>1분 이상 → 10초대</strong>로 단축했습니다.</dd>
+            </div>
+            <div class="fact">
+              <dt></dt>
+              <dd>특정 기능 실행 시 서버가 내려가는 일이 잦았습니다. 상시 모니터링으로 부하 지점을 찾아 쿼리를 바로 잡는 방식으로 <strong>다운 원인의 95%를 해소</strong>했습니다.</dd>
+            </div>
+          </dl>
+          <div class="stack">
+            <span class="tag">ERP</span><span class="tag">EDI · 대외연계</span><span class="tag">쿼리 튜닝</span><span class="tag">Oracle</span><span class="tag">서버 운영</span>
+          </div>
+        </div>
       </div>
+
+      <div class="tl-row key">
+        <div class="tl-when">2017.01 – 2019.02</div>
+        <div class="tl-what">
+          <div class="tl-head">
+            <h4>엑스아이티 웹팀 · 주임</h4>
+            <span class="tl-mark">레거시 전환</span>
+            <span class="tl-closed">비공개 · 공공기관</span>
+          </div>
+          <dl class="facts">
+            <div class="fact">
+              <dt>역할</dt>
+              <dd>서울시청과 <strong>서울 25개 구청 중 23개 구청</strong>, 그 외 지방 시청까지 <strong>약 30개 기관</strong>의 주정차·버스전용차로 단속 시스템을 유지보수했습니다.</dd>
+            </div>
+            <div class="fact">
+              <dt>전환</dt>
+              <dd>행정안전부 보안 지적에 따른 노후 시스템 고도화로, <strong>7개 사이트를 ASP에서 전자정부 프레임워크로 전환</strong>했습니다. 단독으로 수행했습니다.</dd>
+            </div>
+            <div class="fact">
+              <dt>보안</dt>
+              <dd>KISA 지침 기반으로 SQL 인젝션·XSS 취약점을 개선하고, 인증서 단일 로그인에 <strong>휴대폰 본인인증</strong>을 추가했습니다.</dd>
+            </div>
+          </dl>
+          <div class="stack">
+            <span class="tag">전자정부 프레임워크</span><span class="tag">JSP</span><span class="tag">Oracle</span><span class="tag">jQuery</span><span class="tag">보안 조치</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tl-row key">
+        <div class="tl-when">2025.04 – 현재</div>
+        <div class="tl-what">
+          <div class="tl-head">
+            <h4>딱플 · 웹개발</h4>
+          </div>
+          <dl class="facts">
+            <div class="fact">
+              <dt>역할</dt>
+              <dd>시설예약·대회신청 플랫폼의 <strong>전체 유지보수와 신규 기능 개발</strong>을 맡고 있습니다. 커뮤니티 앱은 React Native로 개발했습니다.</dd>
+            </div>
+            <div class="fact">
+              <dt>비용</dt>
+              <dd>이전 개발사가 실사용량에 비해 과도하게 잡아둔 인프라(EC2 2대·RDS 1대)를 실측 기반으로 축소해 <strong>월 110만 원 → 60만 원대</strong>로 낮췄습니다.</dd>
+            </div>
+            <div class="fact">
+              <dt>개발</dt>
+              <dd>대회 운영사마다 제각기 다른 형식으로 자사 홈페이지에 올리는 대회 결과를, 크롤링·배치로 수집하고 하나의 형식으로 파싱해 통합 검색할 수 있게 만들었습니다. (Spring Boot · CI/CD)</dd>
+            </div>
+          </dl>
+          <div class="stack">
+            <span class="tag">Spring Boot</span><span class="tag">React Native</span><span class="tag">AWS</span><span class="tag">배치 · 크롤링</span><span class="tag">CI/CD</span>
+          </div>
+        </div>
+      </div>
+
       <div class="tl-row">
         <div class="tl-when">2023.08 – 2025.02</div>
-        <div class="tl-what"><h4>위두쉽 연구소 · 과장</h4><p>물류배송 예약 서비스(웹·키오스크) 운영, 지점 매출·사용량 통계 관리자 시스템, 고객사 그룹웨어 연동 예약 API 개발.</p></div>
+        <div class="tl-what">
+          <div class="tl-head">
+            <h4>위두쉽 연구소 · 과장</h4>
+            <span class="tl-closed">웰텍이 분사한 자회사 · 재합류</span>
+          </div>
+          <p>
+            물류배송 예약 서비스(웹·키오스크)를 운영하며 지점별 매출·사용량 통계 관리자 시스템과
+            고객사 그룹웨어 연동 예약 API를 개발했습니다.
+          </p>
+          <div class="stack">
+            <span class="tag">Java · Spring</span><span class="tag">MSSQL</span><span class="tag">통계 · 관리자</span><span class="tag">연동 API</span>
+          </div>
+        </div>
       </div>
-      <div class="tl-row">
-        <div class="tl-when">2022.05 – 2023.07</div>
-        <div class="tl-what"><h4>우정항공 시스템개발팀 · 대리</h4><p>ERP 커스터마이징·쿼리 최적화·서버 안정화. 삼성 SDS 첼로스퀘어(Cello Square) 연동 인터페이스 API 설계·개발.</p></div>
-      </div>
+
       <div class="tl-row">
         <div class="tl-when">2019.02 – 2022.05</div>
-        <div class="tl-what"><h4>웰텍 연구1부 · 대리</h4><p>키오스크 QR 사전예약 연동 프로세스로 현장 접수 시간 단축. 다국어 반응형 공식 웹사이트 구축(해외 문의 유입).</p></div>
+        <div class="tl-what">
+          <div class="tl-head">
+            <h4>웰텍 연구1부 · 대리</h4>
+          </div>
+          <p>
+            우편·물류 기업의 무인 택배함(PUDO) 서비스를 담당했습니다. 키오스크 QR 사전예약 연동 프로세스로 현장 접수 시간을 줄였고,
+            다국어 반응형 공식 웹사이트를 구축해 해외 문의 유입 경로를 만들었습니다. 두 사이트 모두 전체 개발을 맡았습니다.
+          </p>
+          <div class="stack">
+            <span class="tag">Java · Spring</span><span class="tag">MSSQL</span><span class="tag">키오스크 연동</span><span class="tag">다국어 · 반응형</span>
+          </div>
+        </div>
       </div>
-      <div class="tl-row">
-        <div class="tl-when">2017.01 – 2019.02</div>
-        <div class="tl-what"><h4>엑스아이티 웹팀 · 주임</h4><p>서울시청·구청 등 공공기관 주정차·버스전용차로 단속 시스템 유지보수. KISA 지침 기반 보안 취약점 개선·고도화.</p></div>
-      </div>
+
       <div class="tl-row">
         <div class="tl-when">2015.12 – 2016.12</div>
         <div class="tl-what"><h4>토모소프트 · 워터정보</h4><p>SI 파견 및 자체 솔루션 유지보수로 실무를 시작했습니다.</p></div>
       </div>
+
       <div class="tl-row">
         <div class="tl-when">학력</div>
         <div class="tl-what"><h4>영진사이버대학교 · 컴퓨터공학과</h4><p>2013년 졸업.</p></div>
@@ -482,7 +630,7 @@
       <a href="https://erp.hyunwoo.pro" target="_blank" rel="noopener">erp.hyunwoo.pro</a>
       <a href="https://mes.hyunwoo.pro" target="_blank" rel="noopener">mes.hyunwoo.pro</a>
     </div>
-    <div class="copy">© 2026 hyunwoo.pro · 시안(mockup) — 콘텐츠는 자유롭게 교체하세요</div>
+    <div class="copy">© 2026 이현우 · hyunwoo.pro</div>
   </div>
 </footer>
 

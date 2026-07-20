@@ -14,6 +14,20 @@
 	root * /srv
 	encode gzip zstd
 
+	# ── 캐시 정책 ────────────────────────────────────────────────
+	#   /assets/* 는 파일명에 내용 해시가 붙는다(index-DH60HPJJ.js) → 내용이 바뀌면
+	#   이름도 바뀌므로 오래 캐시해도 안전하다.
+	#   문제는 그 파일명을 가리키는 index.html 이다. 이름이 고정이라 캐시되면
+	#   새로 배포해도 브라우저가 옛 index.html → 옛 번들을 계속 쓴다.
+	#   🐞 실제로 겪음(2026-07-20): 로그인 버그를 고쳐 배포했는데 운영에서 그대로
+	#      재현 → 브라우저가 옛 번들을 캐시에서 쓰고 있었다(전송량 0).
+	#   no-cache = "캐시는 하되 쓸 때마다 서버에 확인" → 변경 없으면 304 로 가볍고,
+	#   배포 직후엔 곧바로 새 파일을 받는다.
+	#   ⚠️ SPA 폴백 때문에 /journal-entries 같은 경로도 index.html 을 받는다.
+	#      그래서 'index.html' 만 매칭하면 안 되고, assets 를 뺀 나머지 전부에 건다.
+	@no-cache not path /assets/*
+	header @no-cache Cache-Control "no-cache"
+
 	# 존재하는 파일이면 그대로, 없으면 index.html 로 폴백(클라이언트 라우팅).
 	try_files {path} /index.html
 	file_server

@@ -22,9 +22,12 @@
 # 1) 비밀번호 해시 생성 (평문 아님!)
 docker run --rm caddy:2 caddy hash-password --plaintext '원하는비번'
 
-# 2) .env 에 반영 — 해시에 $ 가 있으니 따옴표 없이 한 줄로 붙여넣는다
-#    STATS_USER=admin
-#    STATS_PASSWORD_HASH=$2a$14$....
+# 2) .env 에 반영 — ⚠️ 해시의 $ 를 전부 $$ 로 바꿔서 넣는다
+#    docker compose 가 .env 값의 $ 를 변수로 해석해 해시를 잘라먹기 때문.
+#    안 바꾸면 비번이 맞아도 계속 401 이 난다.
+#      STATS_USER=admin
+#      STATS_PASSWORD_HASH=$$2a$$14$$....
+#    변환:  echo '<해시>' | sed 's/\$/$$/g'
 
 # 3) 배포
 docker compose -f docker-compose.prod.yml up -d --build stats caddy

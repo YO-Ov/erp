@@ -14,6 +14,19 @@
 	# Cloudflare Origin 인증서를 직접 지정해 쓰므로 Caddy 의 자동 HTTPS(Let's Encrypt)를 끈다.
 	# (명시 tls 사이트는 어차피 자동발급 안 하지만, 80 포트 HTTP→HTTPS 리다이렉트도 불필요하므로 함께 비활성)
 	auto_https disable_redirects
+
+	# ── 실제 방문자 IP 복원 (방문 통계의 전제) ────────────────────
+	#   모든 트래픽이 Cloudflare 를 거치므로 Caddy 가 보는 접속 IP({remote_ip})는
+	#   전부 Cloudflare 서버 IP 다. 그대로 집계하면 방문자 수가 완전히 엉터리가 된다.
+	#   → Cloudflare 가 붙여주는 Cf-Connecting-Ip 헤더를 신뢰해 {client_ip} 를 채운다.
+	#
+	#   ⚠️ trusted_proxies 를 넓게 열면 아무나 헤더를 위조해 IP 를 속일 수 있다.
+	#      그래서 Cloudflare 공식 IP 대역으로만 한정한다.
+	#      대역은 바뀔 수 있음 → https://www.cloudflare.com/ips/ (갱신 시 여기 반영)
+	servers {
+		trusted_proxies static 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+		client_ip_headers Cf-Connecting-Ip
+	}
 }
 
 # ── ERP — https://erp.hyunwoo.pro (정식 주소) ────────────────────────
@@ -40,7 +53,39 @@ erp.hyunwoo.pro {
 hyunwoo.pro {
 	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
 	encode gzip zstd
-	reverse_proxy portfolio:80
+
+	# ── 방문 로그 (통계의 원본) ───────────────────────────────────
+	#   Caddy 는 액세스 로그가 기본 비활성이라 켜주지 않으면 아무것도 안 남는다.
+	#   stats 컨테이너가 이 파일을 읽어 /stats 리포트를 굽는다.
+	#   파일명이 바뀌면 hwlee-stats/run.sh 의 glob(hyunwoo.pro*.log)도 같이 고칠 것.
+	log {
+		output file /var/log/caddy/hyunwoo.pro.log {
+			roll_size 20mb
+			roll_keep 5
+		}
+		format json
+	}
+
+	# 통계 페이지 자체는 집계에서 뺀다 (내가 열어본 게 방문자로 잡히지 않도록).
+	# /stats/* 가 아니라 /stats* 인 이유: 슬래시 없는 /stats(→ 302 리다이렉트)까지 걸러야 한다.
+	log_skip /stats*
+
+	# ── 방문 통계 (비공개 — BasicAuth) ────────────────────────────
+	#   stats 컨테이너가 구운 정적 HTML 을 그대로 서빙한다.
+	#   계정은 .env 의 STATS_USER / STATS_PASSWORD_HASH 로 주입.
+	#   해시 생성:  docker run --rm caddy:2 caddy hash-password --plaintext '원하는비번'
+	redir /stats /stats/
+	handle_path /stats/* {
+		basic_auth {
+			{env.STATS_USER} {env.STATS_PASSWORD_HASH}
+		}
+		root * /srv/stats
+		file_server
+	}
+
+	handle {
+		reverse_proxy portfolio:80
+	}
 }
 
 # ── www → 루트로 301 (정규화) ────────────────────────────────────────

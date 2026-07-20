@@ -134,6 +134,25 @@ services:
     environment:
       TZ: Asia/Seoul
 
+  # ── 방문 통계 집계 (비공개) ────────────────────────────────────
+  #   Caddy 액세스 로그(JSON) → jq → Combined → GoAccess → 정적 HTML.
+  #   5분마다 리포트를 구워 stats-html 볼륨에 떨구면,
+  #   메인 Caddy 가 hyunwoo.pro/stats/ 에서 BasicAuth 뒤에 서빙한다.
+  #   외부 포트 없음. 로그는 읽기 전용으로만 붙인다.
+  stats:
+    build:
+      context: ./hwlee-stats
+      dockerfile: Dockerfile
+    image: hwlee-stats:latest
+    container_name: hwlee-stats
+    restart: unless-stopped
+    volumes:
+      - caddy-logs:/var/log/caddy:ro
+      - stats-html:/srv/stats
+    environment:
+      TZ: Asia/Seoul
+      STATS_INTERVAL: ${STATS_INTERVAL:-300}
+
   # ── ERP 프론트엔드 (React SPA 정적 서버) ──────────────────────
   #   React(Vite) 빌드 산출물(dist)만 서빙하는 초경량 정적 컨테이너.
   #   외부 포트를 열지 않는다 → 메인 Caddy 가 erp.hyunwoo.pro 의
@@ -209,11 +228,26 @@ services:
       - ./caddy/certs:/etc/caddy/certs:ro
       - caddy-data:/data
       - caddy-config:/config
+      # 방문 로그를 남기는 쪽(rw). stats 컨테이너가 같은 볼륨을 ro 로 읽는다.
+      - caddy-logs:/var/log/caddy
+      # stats 가 구운 리포트를 /stats/ 로 서빙하기 위해 읽기 전용으로 붙인다.
+      - stats-html:/srv/stats:ro
     environment:
       TZ: Asia/Seoul
+      # /stats BasicAuth 계정. 해시 생성:
+      #   docker run --rm caddy:2 caddy hash-password --plaintext '원하는비번'
+      STATS_USER: ${STATS_USER:-admin}
+      # ⚠️ 기본값이 반드시 '유효한 bcrypt 해시'여야 한다.
+      #    비어 있으면 basic_auth 가 "username and password are required" 로 죽고,
+      #    Caddy 자체가 기동 실패 → erp·mes·포트폴리오까지 전부 다운된다.
+      #    아래 기본값은 폐기한 랜덤 문자열의 해시라 아무도 로그인할 수 없다.
+      #    → .env 를 안 채우면 /stats 만 못 들어갈 뿐, 사이트는 정상 동작한다.
+      STATS_PASSWORD_HASH: ${STATS_PASSWORD_HASH:-$$2a$$14$$t58WTcnrkNGkl5pK0HUQlOmkUxA3wti7.mtUbLDeGfeLfGxxdW.Ke}
 
 volumes:
   hwlee-erp-mysql-data:
   hwlee-mes-mysql-data:
   caddy-data:
   caddy-config:
+  caddy-logs:   # Caddy 방문 로그 원본 (caddy rw → stats ro)
+  stats-html:   # GoAccess 가 구운 리포트  (stats rw → caddy ro)

@@ -61,4 +61,26 @@ public class SalesDashboardService {
         return new SdDashboardResponse(monthCount, monthAmount, shipCnt, shipAmt,
                 uninvCnt, uninvAmt, quotationToSend, pipeline, recent);
     }
+
+    /**
+     * 상태별 수주 건수(파이프라인) — 기간 필터 버전. 대시보드 '수주 진행 현황' 차트가 쓴다.
+     *
+     * @param from 수주일 시작(포함). null 이면 전체 기간.
+     * @param to   수주일 종료(포함). null 이면 전체 기간.
+     * @return 모든 상태를 0 으로 초기화한 뒤 채운, 상태명→건수 맵(상태 enum 정의 순서 유지).
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Long> orderStatus(LocalDate from, LocalDate to) {
+        Map<String, Long> pipeline = new LinkedHashMap<>();
+        for (SalesOrderStatus s : SalesOrderStatus.values()) {
+            pipeline.put(s.name(), 0L);
+        }
+        var rows = (from != null && to != null)
+                ? orderRepo.aggregateByStatusBetween(from, to)
+                : orderRepo.aggregateByStatus();
+        for (var row : rows) {
+            pipeline.put(row.getStatus().name(), row.getCount());
+        }
+        return pipeline;
+    }
 }

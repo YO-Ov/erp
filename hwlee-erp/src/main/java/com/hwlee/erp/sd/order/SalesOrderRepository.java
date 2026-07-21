@@ -21,6 +21,11 @@ public interface SalesOrderRepository
             + "from SalesOrder o group by o.status")
     List<SalesOrderStatusCount> aggregateByStatus();
 
+    /** 상태별 건수·금액 (파이프라인) — 수주일 기간 필터. */
+    @Query("select o.status as status, count(o) as count, coalesce(sum(o.totalAmount), 0) as amount "
+            + "from SalesOrder o where o.orderDate between :from and :to group by o.status")
+    List<SalesOrderStatusCount> aggregateByStatusBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
     /** 기간 내 수주 건수 (이번 달 수주). */
     long countByOrderDateBetween(LocalDate from, LocalDate to);
 

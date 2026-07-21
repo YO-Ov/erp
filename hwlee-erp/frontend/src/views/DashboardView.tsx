@@ -1,9 +1,9 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getInbox, getOutbox } from '../api/approvals'
 import { listNotifications, markNotificationRead, markAllNotificationsRead } from '../api/notifications'
-import { getSalesDashboard } from '../api/dashboard'
+import { getSalesDashboard, getOrderStatus } from '../api/dashboard'
 import {
   SALES_ORDER_STATUS,
   NOTIFICATION_TYPE,
@@ -12,7 +12,7 @@ import {
 } from '../domain/status'
 import { useAuth } from '../auth/AuthContext'
 import StatusBadge from '../components/StatusBadge'
-import type { SalesOrderStatus, SdDashboard } from '../types/api'
+import type { SalesOrderStatus } from '../types/api'
 
 function Card({
   label,
@@ -36,9 +36,93 @@ function Card({
   return to ? <Link to={to}>{body}</Link> : body
 }
 
-/** 수주 파이프라인 집계를 상태 타입을 유지한 채 순회한다(Object.entries 는 키를 string 으로 넓힌다). */
-function pipelineEntries(pipeline: SdDashboard['pipeline']): [SalesOrderStatus, number][] {
-  return Object.entries(pipeline || {}) as [SalesOrderStatus, number][]
+// '수주 진행 현황' 기간 프리셋. 커스텀 년월 범위는 (분석 성격이라) 리포트 화면 몫으로 남긴다.
+type Period = 'today' | 'week' | 'month' | 'all'
+const PERIOD_LABELS: Record<Period, string> = {
+  today: '오늘',
+  week: '이번주',
+  month: '이번달',
+  all: '전체',
+}
+
+const pad = (n: number) => String(n).padStart(2, '0')
+const fmtDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+
+/** 프리셋 → 수주일 범위(YYYY-MM-DD). '전체'는 빈 객체(파라미터 없이 전체 집계). */
+function periodRange(p: Period): { dateFrom?: string; dateTo?: string } {
+  if (p === 'all') return {}
+  const now = new Date()
+  if (p === 'today') return { dateFrom: fmtDate(now), dateTo: fmtDate(now) }
+  if (p === 'week') {
+    const monOffset = (now.getDay() + 6) % 7 // 월=0 이 되도록 보정
+    const mon = new Date(now)
+    mon.setDate(now.getDate() - monOffset)
+    const sun = new Date(mon)
+    sun.setDate(mon.getDate() + 6)
+    return { dateFrom: fmtDate(mon), dateTo: fmtDate(sun) }
+  }
+  // month
+  const first = new Date(now.getFullYear(), now.getMonth(), 1)
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  return { dateFrom: fmtDate(first), dateTo: fmtDate(last) }
+}
+
+/**
+ * 수주 진행 현황 — 상태별 건수 가로 막대 차트.
+ * 단일 계열(건수)이라 색은 식별이 아니라 강조용(모든 막대 accent 단색), 라벨·수치는 텍스트 토큰.
+ * 라이브러리 없이 CSS 막대로 그려 번들을 늘리지 않는다.
+ */
+function OrderStatusChart({
+  data,
+}: {
+  data: { status: SalesOrderStatus; label: string; count: number }[]
+}) {
+  const total = data.reduce((s, d) => s + d.count, 0)
+  const max = Math.max(1, ...data.map((d) => d.count))
+  if (total === 0) {
+    return <p className="muted">해당 기간의 수주가 없습니다.</p>
+  }
+  return (
+    <div style={{ display: 'grid', gap: 10 }}>
+      {data.map((d) => (
+        <div
+          key={d.status}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '96px 1fr 44px',
+            alignItems: 'center',
+            gap: 12,
+          }}
+          title={`${d.label}: ${d.count}건`}
+        >
+          <span className="muted" style={{ fontSize: 13 }}>
+            {d.label}
+          </span>
+          <div
+            style={{
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border)',
+              borderRadius: 5,
+              height: 16,
+            }}
+          >
+            <div
+              style={{
+                width: `${(d.count / max) * 100}%`,
+                minWidth: d.count > 0 ? 4 : 0,
+                height: '100%',
+                background: 'var(--accent)',
+                borderRadius: 4,
+              }}
+            />
+          </div>
+          <span className="mono" style={{ fontSize: 13, textAlign: 'right' }}>
+            {d.count}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function CardGrid({ children }: { children: ReactNode }) {
@@ -80,6 +164,19 @@ export default function DashboardView() {
     queryFn: getSalesDashboard,
     enabled: isSales,
   })
+
+  // 수주 진행 현황 차트 — 기간 프리셋으로 다시 집계(전체가 기본).
+  const [period, setPeriod] = useState<Period>('all')
+  const { data: orderStatus } = useQuery({
+    queryKey: ['sd-order-status', period],
+    queryFn: () => getOrderStatus(periodRange(period)),
+    enabled: isSales,
+  })
+  const statusData = (Object.keys(SALES_ORDER_STATUS) as SalesOrderStatus[]).map((s) => ({
+    status: s,
+    label: statusMeta(SALES_ORDER_STATUS, s).label,
+    count: orderStatus?.[s] ?? 0,
+  }))
 
   // id 를 주면 그 알림만, null 이면 전체 읽음 처리.
   const readMutation = useMutation<void, Error, number | null>({
@@ -218,23 +315,27 @@ export default function DashboardView() {
 
           <div className="section-title">수주 진행 현황</div>
           <div className="panel">
-            <table>
-              <thead>
-                <tr>
-                  <th>상태</th>
-                  <th className="num">건수</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* Object.entries 는 키를 string 으로 넓혀버려서 상태 타입을 되찾아준다. */}
-                {pipelineEntries(sd.pipeline).map(([status, count]) => (
-                  <tr key={status}>
-                    <td>{statusMeta(SALES_ORDER_STATUS, status).label}</td>
-                    <td className="num mono">{count}</td>
-                  </tr>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                marginBottom: 14,
+              }}
+            >
+              <select
+                className="sm"
+                value={period}
+                onChange={(e) => setPeriod(e.target.value as Period)}
+                aria-label="기간 선택"
+              >
+                {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
+                  <option key={p} value={p}>
+                    {PERIOD_LABELS[p]}
+                  </option>
                 ))}
-              </tbody>
-            </table>
+              </select>
+            </div>
+            <OrderStatusChart data={statusData} />
           </div>
 
           <div className="section-title">최근 수주</div>

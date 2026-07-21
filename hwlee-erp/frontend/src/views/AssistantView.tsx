@@ -8,7 +8,7 @@ import type { AssistantRequest, AssistantResponse } from '../types/api'
 const EXAMPLES = [
   '내가 상신한 결재 어떻게 됐어?',
   '이번 달 수주 합계 알려줘',
-  '고객 총 몇 곳이야?',
+  '고객사가 몇 곳이야?',
   '결재 반려된 것 있어?',
 ]
 
@@ -130,6 +130,18 @@ export default function AssistantView() {
             자연어로 조회·요청하세요. 쓰기 작업은 실행 전에 미리보기로 확인합니다.
           </p>
         </div>
+      </div>
+
+      <div
+        className="panel"
+        style={{
+          marginBottom: 12,
+          borderColor: 'var(--tone-warn)',
+          color: 'var(--text-muted)',
+          fontSize: 13,
+        }}
+      >
+        🚧 <b style={{ color: 'var(--tone-warn)' }}>개발 중인 기능</b>입니다 — 답변이 제한되거나 오류가 날 수 있어요.
       </div>
 
       <div

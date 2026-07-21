@@ -155,7 +155,23 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
 
         <div className="nav-section">공통</div>
         {link('/approvals', '전자결재')}
-        {link('/assistant', 'AI 챗봇')}
+        <NavLink to="/assistant" className="nav-link" onClick={onNavigate}>
+          AI 챗봇
+          <span
+            style={{
+              marginLeft: 6,
+              fontSize: 10,
+              fontWeight: 600,
+              padding: '1px 6px',
+              borderRadius: 999,
+              color: 'var(--tone-warn)',
+              border: '1px solid var(--tone-warn)',
+              verticalAlign: 'middle',
+            }}
+          >
+            개발중
+          </span>
+        </NavLink>
         {canAdmin && link('/admin/users', '관리자')}
       </nav>
     </aside>

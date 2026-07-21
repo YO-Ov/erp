@@ -3,12 +3,24 @@ import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getInbox, getOutbox } from '../api/approvals'
 import { listNotifications, markNotificationRead, markAllNotificationsRead } from '../api/notifications'
-import { getSalesDashboard, getOrderStatus, type OrderStatusCounts } from '../api/dashboard'
+import {
+  getSalesDashboard,
+  getOrderStatus,
+  getPurchasingDashboard,
+  getProductionDashboard,
+  getFinanceDashboard,
+  getHrDashboard,
+  type OrderStatusCounts,
+} from '../api/dashboard'
 import {
   SALES_ORDER_STATUS,
+  PURCHASE_ORDER_STATUS,
+  PRODUCTION_ORDER_STATUS,
+  PAYROLL_STATUS,
   NOTIFICATION_TYPE,
   formatMoney,
   statusMeta,
+  type StatusMap,
 } from '../domain/status'
 import { useAuth } from '../auth/AuthContext'
 import StatusBadge from '../components/StatusBadge'
@@ -152,6 +164,72 @@ function CardGrid({ children }: { children: ReactNode }) {
   )
 }
 
+/**
+ * 상태별 건수 가로 막대 — 구매·생산 파이프라인, 급여 상태, 부서별 인원 등에 공통으로 쓴다.
+ * 단일 계열(건수)이라 색은 강조용(모든 막대 accent). 라이브러리 없이 CSS 막대로 그린다.
+ */
+function StatusBarChart({
+  data,
+  emptyText = '데이터가 없습니다.',
+}: {
+  data: { key: string; label: string; count: number }[]
+  emptyText?: string
+}) {
+  const total = data.reduce((s, d) => s + d.count, 0)
+  const max = Math.max(1, ...data.map((d) => d.count))
+  if (total === 0) return <p className="muted">{emptyText}</p>
+  return (
+    <div style={{ display: 'grid', gap: 10 }}>
+      {data.map((d) => (
+        <div
+          key={d.key}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '110px 1fr 44px',
+            alignItems: 'center',
+            gap: 12,
+          }}
+          title={`${d.label}: ${d.count}`}
+        >
+          <span className="muted" style={{ fontSize: 13 }}>
+            {d.label}
+          </span>
+          <div
+            style={{
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border)',
+              borderRadius: 5,
+              height: 16,
+            }}
+          >
+            <div
+              style={{
+                width: `${(d.count / max) * 100}%`,
+                minWidth: d.count > 0 ? 4 : 0,
+                height: '100%',
+                background: 'var(--accent)',
+                borderRadius: 4,
+              }}
+            />
+          </div>
+          <span className="mono" style={{ fontSize: 13, textAlign: 'right' }}>
+            {d.count}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** 상태맵 정의 순서대로 pipeline(상태→건수)을 막대 데이터로 변환. */
+function pipelineToBars<K extends string>(pipeline: Record<K, number>, map: StatusMap<K>) {
+  return (Object.keys(map) as K[]).map((k) => ({
+    key: k,
+    label: statusMeta(map, k).label,
+    count: pipeline[k] ?? 0,
+  }))
+}
+
 // 역할과 무관하게 모두가 쓰는 홈 화면.
 //  - 공통: 결재/알림 요약 카드 4개 + 알림
 //  - 영업(SALES)이면 SD KPI 섹션이 더 붙는다.
@@ -159,6 +237,10 @@ export default function DashboardView() {
   const { user, hasRole } = useAuth()
   const queryClient = useQueryClient()
   const isSales = hasRole('SALES', 'ADMIN')
+  const isPurchasing = hasRole('PURCHASING', 'ADMIN')
+  const isProduction = hasRole('PRODUCTION', 'ADMIN')
+  const isFinance = hasRole('FINANCE', 'ADMIN')
+  const isHr = hasRole('HR', 'ADMIN')
 
   const { data: inbox } = useQuery({
     queryKey: ['approvals', 'inbox', { page: 0, size: 5 }],
@@ -184,6 +266,26 @@ export default function DashboardView() {
     queryKey: ['sd-order-status', period],
     queryFn: () => getOrderStatus(periodRange(period)),
     enabled: isSales,
+  })
+  const { data: mm } = useQuery({
+    queryKey: ['mm-dashboard'],
+    queryFn: getPurchasingDashboard,
+    enabled: isPurchasing,
+  })
+  const { data: pp } = useQuery({
+    queryKey: ['pp-dashboard'],
+    queryFn: getProductionDashboard,
+    enabled: isProduction,
+  })
+  const { data: fi } = useQuery({
+    queryKey: ['fi-dashboard'],
+    queryFn: getFinanceDashboard,
+    enabled: isFinance,
+  })
+  const { data: hr } = useQuery({
+    queryKey: ['hr-dashboard'],
+    queryFn: getHrDashboard,
+    enabled: isHr,
   })
 
   // id 를 주면 그 알림만, null 이면 전체 읽음 처리.
@@ -371,6 +473,247 @@ export default function DashboardView() {
                         <StatusBadge map={SALES_ORDER_STATUS} status={o.status} />
                       </td>
                       <td className="num mono">{formatMoney(o.totalAmount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+
+      {isPurchasing && mm && (
+        <>
+          <div className="section-title">구매 현황</div>
+          <CardGrid>
+            <Card
+              label="이번 달 발주"
+              value={formatMoney(mm.thisMonthOrderAmount)}
+              sub={`${mm.thisMonthOrderCount}건`}
+              to="/purchase-orders"
+            />
+            <Card
+              label="입고 대기"
+              value={mm.awaitingReceiptCount}
+              sub={formatMoney(mm.awaitingReceiptAmount)}
+              to="/goods-receipts"
+            />
+          </CardGrid>
+
+          <div className="section-title">발주 상태별 현황</div>
+          <div className="panel">
+            <StatusBarChart
+              data={pipelineToBars(mm.pipeline, PURCHASE_ORDER_STATUS)}
+              emptyText="발주가 없습니다."
+            />
+          </div>
+
+          <div className="section-title">최근 발주</div>
+          <div className="panel">
+            {(mm.recentOrders || []).length === 0 ? (
+              <p className="muted">최근 발주가 없습니다.</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>발주번호</th>
+                    <th>공급처</th>
+                    <th>발주일</th>
+                    <th>상태</th>
+                    <th className="num">금액</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mm.recentOrders.map((o) => (
+                    <tr key={o.number}>
+                      <td className="mono">{o.number}</td>
+                      <td>{o.vendorName}</td>
+                      <td>{o.orderDate}</td>
+                      <td>
+                        <StatusBadge map={PURCHASE_ORDER_STATUS} status={o.status} />
+                      </td>
+                      <td className="num mono">{formatMoney(o.totalAmount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+
+      {isProduction && pp && (
+        <>
+          <div className="section-title">생산 현황</div>
+          <CardGrid>
+            <Card
+              label="진행중"
+              value={pp.inProgressCount}
+              sub="착수됨(RELEASED)"
+              to="/production-orders"
+            />
+            <Card
+              label="완료 대기"
+              value={pp.awaitingCompletionCount}
+              sub="착수 예정(PLANNED)"
+              to="/production-orders"
+            />
+            <Card
+              label="이번 달 생산지시"
+              value={pp.thisMonthOrderCount}
+              sub="이번 달 등록"
+              to="/production-orders"
+            />
+          </CardGrid>
+
+          <div className="section-title">생산 상태별 현황</div>
+          <div className="panel">
+            <StatusBarChart
+              data={pipelineToBars(pp.pipeline, PRODUCTION_ORDER_STATUS)}
+              emptyText="생산지시가 없습니다."
+            />
+          </div>
+
+          <div className="section-title">최근 생산지시</div>
+          <div className="panel">
+            {(pp.recentOrders || []).length === 0 ? (
+              <p className="muted">최근 생산지시가 없습니다.</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>지시번호</th>
+                    <th>품목</th>
+                    <th>일자</th>
+                    <th>상태</th>
+                    <th className="num">수량</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pp.recentOrders.map((o) => (
+                    <tr key={o.number}>
+                      <td className="mono">{o.number}</td>
+                      <td>{o.productName}</td>
+                      <td>{o.orderDate}</td>
+                      <td>
+                        <StatusBadge map={PRODUCTION_ORDER_STATUS} status={o.status} />
+                      </td>
+                      <td className="num mono">{o.quantity}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+
+      {isFinance && fi && (
+        <>
+          <div className="section-title">재무 현황</div>
+          <CardGrid>
+            <Card
+              label="이번 달 매출"
+              value={formatMoney(fi.thisMonthSalesAmount)}
+              sub="발행 인보이스"
+              to="/invoices"
+            />
+            <Card
+              label="이번 달 입금"
+              value={formatMoney(fi.thisMonthReceiptAmount)}
+              sub="수금(POSTED)"
+              to="/payments"
+            />
+            <Card
+              label="미수금"
+              value={formatMoney(fi.accountsReceivable)}
+              sub="발행 인보이스 − 입금"
+              to="/payments"
+            />
+            <Card
+              label="승인 대기 전표"
+              value={fi.pendingJournalCount}
+              sub="작성중(DRAFT)"
+              to="/journal-entries"
+            />
+            <Card
+              label="여신 요청 대기"
+              value={fi.pendingCreditRequestCount}
+              sub="검토중(PENDING)"
+              to="/credit-requests"
+            />
+          </CardGrid>
+        </>
+      )}
+
+      {isHr && hr && (
+        <>
+          <div className="section-title">인사 현황</div>
+          <CardGrid>
+            <Card
+              label="재직 사원"
+              value={hr.activeEmployeeCount}
+              sub={`전체 ${hr.totalEmployeeCount}명`}
+              to="/employees"
+            />
+            <Card label="부서" value={hr.departmentCount} sub="부서 수" />
+            <Card
+              label="이번 달 급여대장"
+              value={
+                hr.thisMonthPayrollStatus
+                  ? statusMeta(PAYROLL_STATUS, hr.thisMonthPayrollStatus).label
+                  : '미생성'
+              }
+              sub={
+                hr.thisMonthPayrollStatus
+                  ? `${hr.thisMonthPeriod} · ${formatMoney(hr.thisMonthPayrollNet)}`
+                  : hr.thisMonthPeriod
+              }
+              to="/payroll-runs"
+            />
+          </CardGrid>
+
+          <div className="section-title">급여대장 상태별</div>
+          <div className="panel">
+            <StatusBarChart
+              data={pipelineToBars(hr.payrollStatusPipeline, PAYROLL_STATUS)}
+              emptyText="급여대장이 없습니다."
+            />
+          </div>
+
+          <div className="section-title">부서별 인원</div>
+          <div className="panel">
+            <StatusBarChart
+              data={Object.entries(hr.departmentHeadcount).map(([name, count]) => ({
+                key: name,
+                label: name,
+                count,
+              }))}
+              emptyText="부서 정보가 없습니다."
+            />
+          </div>
+
+          <div className="section-title">최근 입사자</div>
+          <div className="panel">
+            {(hr.recentHires || []).length === 0 ? (
+              <p className="muted">최근 입사자가 없습니다.</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>사번</th>
+                    <th>이름</th>
+                    <th>부서</th>
+                    <th>입사일</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {hr.recentHires.map((e) => (
+                    <tr key={e.code}>
+                      <td className="mono">{e.code}</td>
+                      <td>{e.name}</td>
+                      <td>{e.departmentName}</td>
+                      <td>{e.hireDate}</td>
                     </tr>
                   ))}
                 </tbody>

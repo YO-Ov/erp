@@ -27,4 +27,19 @@ public interface PaymentRepository
             + "and p.type = com.hwlee.erp.fi.payment.PaymentType.RECEIPT "
             + "and p.status = com.hwlee.erp.fi.payment.PaymentStatus.POSTED")
     BigDecimal sumPostedReceiptAmountByCustomer(@Param("customerId") Long customerId);
+
+    // ── 재무(FI) 대시보드 집계 ──
+
+    /** 기간 내 확정(POSTED)된 입금(RECEIPT) 금액 합 — 이번 달 입금(수금). */
+    @Query("select coalesce(sum(p.amount), 0) from Payment p "
+            + "where p.type = com.hwlee.erp.fi.payment.PaymentType.RECEIPT "
+            + "and p.status = com.hwlee.erp.fi.payment.PaymentStatus.POSTED "
+            + "and p.paymentDate between :from and :to")
+    BigDecimal sumPostedReceiptAmountBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /** 확정(POSTED)된 모든 입금(RECEIPT) 금액 합 — 미수금 = 발행 인보이스 합계 − 이 합계. */
+    @Query("select coalesce(sum(p.amount), 0) from Payment p "
+            + "where p.type = com.hwlee.erp.fi.payment.PaymentType.RECEIPT "
+            + "and p.status = com.hwlee.erp.fi.payment.PaymentStatus.POSTED")
+    BigDecimal sumAllPostedReceiptAmount();
 }

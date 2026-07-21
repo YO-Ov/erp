@@ -740,6 +740,79 @@ export interface SdDashboard {
   recentOrders: RecentOrder[]
 }
 
+// ── 구매(MM) 대시보드 ────────────────────────────────
+export interface MmRecentOrder {
+  number: string
+  vendorName: string
+  totalAmount: number
+  status: PurchaseOrderStatus
+  orderDate: string
+}
+
+export interface MmDashboard {
+  thisMonthOrderCount: number
+  thisMonthOrderAmount: number
+  /** 입고 대기(CONFIRMED). */
+  awaitingReceiptCount: number
+  awaitingReceiptAmount: number
+  pipeline: Record<PurchaseOrderStatus, number>
+  recentOrders: MmRecentOrder[]
+}
+
+// ── 생산(PP) 대시보드 ────────────────────────────────
+export interface PpRecentOrder {
+  number: string
+  productName: string
+  quantity: number
+  status: ProductionOrderStatus
+  orderDate: string
+}
+
+export interface PpDashboard {
+  /** 진행중(RELEASED). */
+  inProgressCount: number
+  /** 완료 대기(PLANNED). */
+  awaitingCompletionCount: number
+  thisMonthOrderCount: number
+  pipeline: Record<ProductionOrderStatus, number>
+  recentOrders: PpRecentOrder[]
+}
+
+// ── 재무(FI) 대시보드 ────────────────────────────────
+export interface FiDashboard {
+  thisMonthSalesAmount: number
+  thisMonthReceiptAmount: number
+  /** 미수금 = 발행 인보이스 합 − 입금 합(0 하한). */
+  accountsReceivable: number
+  pendingJournalCount: number
+  pendingCreditRequestCount: number
+  accountsReceivableDefinition: string
+}
+
+// ── 인사(HR) 대시보드 ────────────────────────────────
+export interface HrRecentHire {
+  code: string
+  name: string
+  departmentName: string
+  hireDate: string
+}
+
+export interface HrDashboard {
+  activeEmployeeCount: number
+  totalEmployeeCount: number
+  departmentCount: number
+  /** 'YYYY-MM'. */
+  thisMonthPeriod: string
+  /** 이번 달 급여대장 상태. 미생성이면 null. */
+  thisMonthPayrollStatus: PayrollStatus | null
+  thisMonthPayrollNet: number
+  /** 전체 급여대장 상태별 건수. */
+  payrollStatusPipeline: Record<PayrollStatus, number>
+  /** 부서명 → 인원(많은 순). */
+  departmentHeadcount: Record<string, number>
+  recentHires: HrRecentHire[]
+}
+
 // ── 재고: 현재고 (mm/stock) ──────────────────────────
 
 /** StockResponse — 조회 전용. 변경은 입고/출고/조정만 수행한다. */

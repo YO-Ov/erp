@@ -11,6 +11,9 @@ public interface PayrollRunRepository extends JpaRepository<PayrollRun, Long> {
 
     Optional<PayrollRun> findByPeriod(String period);
 
+    /** 상태별 급여대장 건수 — 인사 대시보드 파이프라인용. */
+    long countByStatus(PayrollStatus status);
+
     /** 명세 라인과 직원까지 fetch — 트랜잭션 밖 직렬화 시 LazyInitializationException 방지. */
     @Query("SELECT DISTINCT r FROM PayrollRun r "
             + "LEFT JOIN FETCH r.payslips p "

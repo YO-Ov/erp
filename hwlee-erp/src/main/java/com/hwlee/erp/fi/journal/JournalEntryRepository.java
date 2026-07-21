@@ -12,6 +12,9 @@ public interface JournalEntryRepository
 
     Optional<JournalEntry> findByNumber(String number);
 
+    /** 재무 대시보드: 상태별 전표 건수 — 승인 대기(DRAFT) 카운트에 사용. */
+    long countByStatus(JournalEntryStatus status);
+
     /** 출처별 조회 — 시연/디버깅 ("이 인보이스로 만든 전표를 보여줘"). */
     List<JournalEntry> findBySourceTypeAndSourceId(JournalSource sourceType, Long sourceId);
 

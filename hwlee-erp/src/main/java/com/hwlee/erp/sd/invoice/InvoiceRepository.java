@@ -38,4 +38,17 @@ public interface InvoiceRepository
             + "and i.invoiceDate between :from and :to "
             + "order by i.invoiceDate asc, i.id asc")
     List<Invoice> findIssuedBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    // ── 재무(FI) 대시보드 집계 ──
+
+    /** 기간 내 발행(ISSUED) 인보이스 총액(부가세 포함) 합 — 이번 달 매출. */
+    @Query("select coalesce(sum(i.totalAmount), 0) from Invoice i "
+            + "where i.status = com.hwlee.erp.sd.invoice.InvoiceStatus.ISSUED "
+            + "and i.invoiceDate between :from and :to")
+    BigDecimal sumIssuedTotalBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /** 발행(ISSUED)된 모든 인보이스 총액(부가세 포함) 합 — 미수금 = 이 합계 − 확정 입금 합계. */
+    @Query("select coalesce(sum(i.totalAmount), 0) from Invoice i "
+            + "where i.status = com.hwlee.erp.sd.invoice.InvoiceStatus.ISSUED")
+    BigDecimal sumAllIssuedInvoiceTotal();
 }

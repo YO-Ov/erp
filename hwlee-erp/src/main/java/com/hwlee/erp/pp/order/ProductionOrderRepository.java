@@ -1,5 +1,7 @@
 package com.hwlee.erp.pp.order;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -36,4 +38,17 @@ public interface ProductionOrderRepository
            )
         """)
     java.math.BigDecimal sumOpenProductionQtyByProduct(@Param("itemId") Long itemId);
+
+    // ── 생산 대시보드 집계 ──
+
+    /** 상태별 생산지시 건수 (파이프라인). */
+    @Query("select po.status as status, count(po) as count "
+            + "from ProductionOrder po group by po.status")
+    List<ProductionOrderStatusCount> aggregateByStatus();
+
+    /** 기간 내 생산지시 건수 (이번 달 생산). */
+    long countByOrderDateBetween(LocalDate from, LocalDate to);
+
+    /** 최근 생산지시 5건. */
+    List<ProductionOrder> findTop5ByOrderByOrderDateDescIdDesc();
 }

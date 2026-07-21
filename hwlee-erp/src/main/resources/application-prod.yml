@@ -41,3 +41,10 @@ mes:
 
 # JWT_SECRET 은 application.yml 의 ${JWT_SECRET:...} 로 주입됨.
 # → 운영에선 반드시 .env 의 JWT_SECRET 으로 실제 시크릿을 넣을 것.
+
+# 데이터 시뮬레이터 — 운영 서버에서만 켠다(로컬/aws 는 꺼둠).
+# 끄고 싶으면 .env 에 ERP_SIMULATOR_ENABLED=false 를 넣으면 application.yml 기본값이 이김… 이 아니라
+# 프로파일 오버라이드가 우선이므로, 아래 값을 env 참조로 두어 서버에서 토글 가능하게 한다.
+erp:
+  simulator:
+    enabled: ${ERP_SIMULATOR_ENABLED:true}

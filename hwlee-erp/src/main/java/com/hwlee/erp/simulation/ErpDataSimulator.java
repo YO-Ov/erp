@@ -94,6 +94,16 @@ public class ErpDataSimulator {
 
     private static final Logger log = LoggerFactory.getLogger(ErpDataSimulator.class);
 
+    // 결재 상신자는 "부서 담당(사원급)"으로 고른다. 담당이 올려야 결재선이 팀장 → 본부장 → 대표로
+    // 온전히 펼쳐진다(팀장이 상신하면 ApprovalLineResolver 가 자기 자신을 건너뛰어 본부장부터 시작).
+    /** 견적 상신자 후보 — 국내영업1팀 김영업 / 해외영업팀 윤상현. */
+    private static final List<String> SALES_REQUESTERS =
+            List.of("kim@hyunwoo.com", "sales.global@hyunwoo.com");
+    /** 발주 상신자 — 구매팀 담당 박상현. */
+    private static final String PURCHASE_REQUESTER = "purchase@hyunwoo.com";
+    /** 지급 상신자 — 재무팀 담당 이재무. */
+    private static final String PAYMENT_REQUESTER = "lee@hyunwoo.com";
+
     private final QuotationService quotationService;
     private final SalesOrderService salesOrderService;
     private final DeliveryService deliveryService;
@@ -325,48 +335,52 @@ public class ErpDataSimulator {
         };
     }
 
-    /** 발주 상신 — 구매 담당(purchase@) 명의. 결재자 = 구매팀장. */
+    /** 발주 상신 — 구매팀 담당(purchase@) 명의. 결재선: 구매팀장 → (금액에 따라) 경영지원본부장. */
     private int purchaseApproval(List<Warehouse> warehouses, Map<Long, List<VendorItem>> activeByVendor) {
         Long vendorId = pickVendorWithItems(activeByVendor);
         if (vendorId == null) {
             return 0;
         }
-        return runAs("purchase@hyunwoo.com", () -> {
+        return runAs(PURCHASE_REQUESTER, () -> {
             var lines = subset(activeByVendor.get(vendorId), 1, 2).stream()
                     .map(vi -> new PurchaseOrderLineRequest(vi.getItem().getId(), qty(), vi.getSupplyPrice()))
                     .toList();
             var po = purchaseOrderService.create(new PurchaseOrderCreateRequest(
                     vendorId, pick(warehouses).getId(), LocalDate.now(),
                     LocalDate.now().plusDays(7), "자동 상신(데이터 시뮬레이터)", lines));
-            purchaseOrderService.submitForApproval(po.id(), "purchase@hyunwoo.com");
+            purchaseOrderService.submitForApproval(po.id(), PURCHASE_REQUESTER);
             return 2; // 발주 + 결재요청
         });
     }
 
-    /** 견적 상신 — 영업팀장(sales.mgr) 명의. 결재자 = 영업본부장. */
+    /**
+     * 견적 상신 — 영업 담당(국내영업1팀 김영업 / 해외영업팀 윤상현) 명의.
+     * 결재선: 소속 팀장 → 영업본부장 → (고액이면) 대표.
+     */
     private int quotationApproval(List<Customer> customers, List<Item> finished) {
-        return runAs("sales.mgr@hyunwoo.com", () -> {
+        String requester = pick(SALES_REQUESTERS);
+        return runAs(requester, () -> {
             var lines = subset(finished, 1, 2).stream()
                     .map(it -> new QuotationLineRequest(it.getId(), qty(), price(it)))
                     .toList();
             var q = quotationService.create(new QuotationCreateRequest(
                     pick(customers).getId(), LocalDate.now(), LocalDate.now().plusDays(30), lines));
-            quotationService.submitForApproval(q.id(), "sales.mgr@hyunwoo.com");
+            quotationService.submitForApproval(q.id(), requester);
             return 2; // 견적 + 결재요청
         });
     }
 
-    /** 지급 상신 — 재무팀장(finance.mgr) 명의. 초안 생성 후 결재 상신. */
+    /** 지급 상신 — 재무팀 담당(이재무) 명의. 결재선: 재무팀장 → 경영지원본부장. */
     private int paymentApproval(List<Vendor> vendors) {
         if (vendors.isEmpty()) {
             return 0;
         }
-        return runAs("finance.mgr@hyunwoo.com", () -> {
+        return runAs(PAYMENT_REQUESTER, () -> {
             BigDecimal amount = BigDecimal.valueOf(rand(1, 30) * 100_000L); // 10만~300만
             var p = paymentService.createDraft(new PaymentCreateRequest(
                     PaymentType.DISBURSEMENT, null, pick(vendors).getId(),
                     amount, LocalDate.now(), "자동 지급 상신(데이터 시뮬레이터)"));
-            paymentService.submitForApproval(p.id(), "finance.mgr@hyunwoo.com");
+            paymentService.submitForApproval(p.id(), PAYMENT_REQUESTER);
             return 2; // 지급 + 결재요청
         });
     }

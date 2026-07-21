@@ -11,6 +11,7 @@ import com.hwlee.erp.sd.quotation.dto.QuotationBulkRequest;
 import com.hwlee.erp.sd.quotation.dto.QuotationBulkResponse;
 import com.hwlee.erp.sd.quotation.dto.QuotationCreateRequest;
 import com.hwlee.erp.sd.quotation.dto.QuotationResponse;
+import com.hwlee.erp.sd.quotation.dto.QuotationSummaryResponse;
 import com.hwlee.erp.sd.quotation.dto.QuotationUpdateRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -47,6 +48,18 @@ public class QuotationController {
     @GetMapping("/{id}")
     public QuotationResponse findById(@PathVariable Long id) {
         return service.findById(id);
+    }
+
+    /**
+     * 기간별 견적 집계 — "이번 달 견적 합계" 류 질의용. 건수·금액을 서버에서 정확히 합산해 내려준다.
+     * ('합계' 는 건수/금액 어느 쪽인지 중의적이라 둘 다 담는다. 기준일은 발행일.)
+     */
+    @GetMapping("/summary")
+    public QuotationSummaryResponse summary(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo
+    ) {
+        return service.summary(dateFrom, dateTo);
     }
 
     @GetMapping

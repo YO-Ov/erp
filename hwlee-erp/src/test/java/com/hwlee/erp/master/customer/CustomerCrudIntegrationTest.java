@@ -9,6 +9,7 @@ import com.hwlee.erp.master.customer.dto.CustomerResponse;
 import com.hwlee.erp.master.customer.dto.CustomerUpdateRequest;
 import jakarta.persistence.EntityNotFoundException;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -129,6 +130,27 @@ class CustomerCrudIntegrationTest {
         CustomerResponse found = service.findByCode(created.code());
 
         assertThat(found.id()).isEqualTo(created.id());
+    }
+
+    @Test
+    @DisplayName("등록일 기간으로 좁히면 그 기간에 등록된 고객만 나온다")
+    void 등록일_기간으로_고객을_좁힐_수_있다() {
+        CustomerResponse created = service.create(new CustomerCreateRequest(
+                "기간조회대상", uniqueBusinessNo(), null, PaymentTerms.NET30));
+        LocalDate today = LocalDate.now();
+
+        // 오늘을 포함하는 기간 → 방금 만든 고객이 보인다.
+        var inRange = service.search(
+                CustomerSpecifications.createdFrom(today).and(CustomerSpecifications.createdTo(today)),
+                PageRequest.of(0, 200));
+        assertThat(inRange.getContent()).extracting(CustomerResponse::id).contains(created.id());
+
+        // 과거 구간 → 같은 고객이 빠진다. (등록일 조건이 실제로 걸린다는 뜻)
+        var outOfRange = service.search(
+                CustomerSpecifications.createdFrom(today.minusDays(30))
+                        .and(CustomerSpecifications.createdTo(today.minusDays(10))),
+                PageRequest.of(0, 200));
+        assertThat(outOfRange.getContent()).extracting(CustomerResponse::id).doesNotContain(created.id());
     }
 
     private static int counter = 1;

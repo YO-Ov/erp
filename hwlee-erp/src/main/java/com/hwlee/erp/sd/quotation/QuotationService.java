@@ -14,8 +14,10 @@ import com.hwlee.erp.sd.quotation.dto.QuotationBulkResponse;
 import com.hwlee.erp.sd.quotation.dto.QuotationCreateRequest;
 import com.hwlee.erp.sd.quotation.dto.QuotationLineRequest;
 import com.hwlee.erp.sd.quotation.dto.QuotationResponse;
+import com.hwlee.erp.sd.quotation.dto.QuotationSummaryResponse;
 import com.hwlee.erp.sd.quotation.dto.QuotationUpdateRequest;
 import jakarta.persistence.EntityNotFoundException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +55,19 @@ public class QuotationService {
 
     public Page<QuotationResponse> search(Specification<Quotation> spec, Pageable pageable) {
         return repository.findAll(spec, pageable).map(mapper::toResponse);
+    }
+
+    /**
+     * 기간별 견적 집계 (발행일 기준) — 건수와 금액을 서버에서 정확히 합산한다.
+     *
+     * <p>{@link #search} 결과를 클라이언트에서 더하면 페이지에 담긴 만큼만 합산되어,
+     * 총건수가 페이지 크기를 넘는 순간 조용히 과소보고된다. 그래서 집계는 별도 경로로 둔다.
+     */
+    public QuotationSummaryResponse summary(LocalDate dateFrom, LocalDate dateTo) {
+        return new QuotationSummaryResponse(
+                dateFrom, dateTo,
+                repository.countByIssuedDateBetween(dateFrom, dateTo),
+                repository.sumAmountByIssuedDateBetween(dateFrom, dateTo));
     }
 
     @Transactional

@@ -1,5 +1,6 @@
 package com.hwlee.erp.approval;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -15,6 +16,15 @@ public interface ApprovalRepository extends JpaRepository<Approval, Long> {
 
     /** 상신함 — 내가 올린 결재 문서. */
     Page<Approval> findByCreatedByOrderByIdDesc(String createdBy, Pageable pageable);
+
+    /**
+     * 상신함(기간) — 내가 올린 결재 중 상신일({@code requestedAt})이 기간 내인 것.
+     *
+     * <p>아직 상신하지 않은 DRAFT 는 {@code requestedAt} 이 null 이라 자연히 빠진다.
+     * ("이번 달 상신한 결재" 라는 물음의 뜻에 맞다 — 작성만 해 둔 건 상신한 게 아니다.)
+     */
+    Page<Approval> findByCreatedByAndRequestedAtBetweenOrderByIdDesc(
+            String createdBy, LocalDateTime from, LocalDateTime to, Pageable pageable);
 
     /**
      * 결재함 — 내가 지금 처리할 차례인 문서(PENDING).

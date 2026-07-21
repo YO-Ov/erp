@@ -14,6 +14,7 @@ import com.hwlee.erp.sd.order.dto.CreditStatusResponse;
 import com.hwlee.erp.sd.order.dto.SalesOrderCreateRequest;
 import com.hwlee.erp.sd.order.dto.SalesOrderLineRequest;
 import com.hwlee.erp.sd.order.dto.SalesOrderResponse;
+import com.hwlee.erp.sd.order.dto.SalesOrderSummaryResponse;
 import com.hwlee.erp.sd.order.dto.SalesOrderUpdateRequest;
 import com.hwlee.erp.sd.quotation.Quotation;
 import com.hwlee.erp.sd.quotation.QuotationRepository;
@@ -21,6 +22,7 @@ import com.hwlee.erp.sd.quotation.QuotationStatus;
 import jakarta.persistence.EntityNotFoundException;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -84,6 +86,19 @@ public class SalesOrderService {
 
     public Page<SalesOrderResponse> search(Specification<SalesOrder> spec, Pageable pageable) {
         return repository.findAll(spec, pageable).map(mapper::toResponse);
+    }
+
+    /**
+     * 기간별 수주 집계 — 건수와 금액을 서버에서 정확히 합산한다.
+     *
+     * <p>{@link #search} 결과를 클라이언트에서 더하면 페이지에 담긴 만큼만 합산되어
+     * 총건수가 페이지 크기를 넘는 순간 조용히 과소보고된다. 그래서 집계는 별도 경로로 둔다.
+     */
+    public SalesOrderSummaryResponse summary(LocalDate dateFrom, LocalDate dateTo) {
+        return new SalesOrderSummaryResponse(
+                dateFrom, dateTo,
+                repository.countByOrderDateBetween(dateFrom, dateTo),
+                repository.sumAmountByOrderDateBetween(dateFrom, dateTo));
     }
 
     @Transactional

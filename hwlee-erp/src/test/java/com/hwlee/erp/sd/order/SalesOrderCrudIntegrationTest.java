@@ -113,6 +113,44 @@ class SalesOrderCrudIntegrationTest {
                 .hasMessageContaining("DRAFT");
     }
 
+    @Test
+    @DisplayName("기간별 집계는 기간 밖 수주를 빼고 건수·금액을 합산한다")
+    void 기간별_집계는_기간_내_수주만_합산한다() {
+        var customerId = createCustomer(new BigDecimal("100000000")).id();
+        var itemId = createItem(new BigDecimal("100000")).id();
+        // 다른 테스트(LocalDate.now() 사용)와 섞이지 않도록 과거의 한 달을 쓴다.
+        LocalDate 기간내 = LocalDate.of(2019, 3, 10);
+        LocalDate 기간밖 = LocalDate.of(2019, 4, 2);
+
+        createOrder(customerId, itemId, 기간내, new BigDecimal("3"));   // 30만
+        createOrder(customerId, itemId, 기간내, new BigDecimal("2"));   // 20만
+        createOrder(customerId, itemId, 기간밖, new BigDecimal("9"));   // 90만 — 섞이면 안 됨
+
+        var summary = salesOrderService.summary(
+                LocalDate.of(2019, 3, 1), LocalDate.of(2019, 3, 31));
+
+        assertThat(summary.orderCount()).isEqualTo(2);
+        assertThat(summary.totalAmount()).isEqualByComparingTo(new BigDecimal("500000"));
+    }
+
+    @Test
+    @DisplayName("수주가 없는 기간도 금액은 null 이 아니라 0")
+    void 수주가_없는_기간은_0으로_집계된다() {
+        // null 이 새어 나가면 이 값을 그대로 포맷하는 쪽(에이전트)이 터진다.
+        var summary = salesOrderService.summary(
+                LocalDate.of(2010, 1, 1), LocalDate.of(2010, 1, 31));
+
+        assertThat(summary.orderCount()).isZero();
+        assertThat(summary.totalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    private SalesOrderResponse createOrder(Long customerId, Long itemId, LocalDate orderDate, BigDecimal qty) {
+        return salesOrderService.create(new SalesOrderCreateRequest(
+                customerId, null, null, orderDate,
+                List.of(new SalesOrderLineRequest(itemId, qty, new BigDecimal("100000")))
+        ));
+    }
+
     private com.hwlee.erp.master.customer.dto.CustomerResponse createCustomer(BigDecimal creditLimit) {
         var customer = customerService.create(new CustomerCreateRequest(
                 "고객-" + System.nanoTime(),

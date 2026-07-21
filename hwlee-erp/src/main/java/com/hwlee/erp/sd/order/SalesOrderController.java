@@ -10,6 +10,7 @@ import static org.springframework.data.jpa.domain.Specification.where;
 import com.hwlee.erp.sd.order.dto.CreditStatusResponse;
 import com.hwlee.erp.sd.order.dto.SalesOrderCreateRequest;
 import com.hwlee.erp.sd.order.dto.SalesOrderResponse;
+import com.hwlee.erp.sd.order.dto.SalesOrderSummaryResponse;
 import com.hwlee.erp.sd.order.dto.SalesOrderUpdateRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -51,6 +52,20 @@ public class SalesOrderController {
     @GetMapping("/credit-status")
     public CreditStatusResponse creditStatus(@RequestParam Long customerId) {
         return service.creditStatus(customerId);
+    }
+
+    /**
+     * 기간별 수주 집계 — "이번 달 수주 합계" 류 질의용. 건수·금액을 서버에서 정확히 합산해 내려준다.
+     *
+     * <p>'합계' 는 건수/금액 어느 쪽인지 중의적이라 둘 다 담는다.
+     * ('이번 달' 고정 집계는 {@code /api/sd/dashboard} 에도 있고, 여기는 임의 기간용.)
+     */
+    @GetMapping("/summary")
+    public SalesOrderSummaryResponse summary(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo
+    ) {
+        return service.summary(dateFrom, dateTo);
     }
 
     @GetMapping

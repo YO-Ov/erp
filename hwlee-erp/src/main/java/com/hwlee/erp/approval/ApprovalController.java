@@ -3,9 +3,11 @@ package com.hwlee.erp.approval;
 import com.hwlee.erp.approval.dto.ApprovalActionRequest;
 import com.hwlee.erp.approval.dto.ApprovalResponse;
 import java.security.Principal;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,9 +37,15 @@ public class ApprovalController {
         return service.inbox(principal.getName(), pageable);
     }
 
+    /** 상신함. dateFrom·dateTo 를 주면 상신일 기준으로 그 기간만 (예: "이번 달 상신한 결재"). */
     @GetMapping("/outbox")
-    public Page<ApprovalResponse> outbox(Principal principal, Pageable pageable) {
-        return service.outbox(principal.getName(), pageable);
+    public Page<ApprovalResponse> outbox(
+            Principal principal,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+            Pageable pageable
+    ) {
+        return service.outbox(principal.getName(), dateFrom, dateTo, pageable);
     }
 
     @GetMapping("/{id}")

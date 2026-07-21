@@ -33,6 +33,54 @@ class AuthorizationTest {
 
     @Test
     @WithMockUser(roles = "SALES")
+    void sales_can_read_sales_order_summary() throws Exception {
+        // 리터럴 경로 /summary 가 /{id} 로 잘못 매칭되면 id 변환 실패로 400 이 난다 → 200 이어야 정상.
+        mockMvc.perform(get("/api/sales-orders/summary")
+                        .param("dateFrom", "2026-07-01")
+                        .param("dateTo", "2026-07-31"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "SALES")
+    void sales_can_read_quotation_summary() throws Exception {
+        // 리터럴 경로 /summary 가 /{id} 로 잘못 매칭되면 id 변환 실패로 400 이 난다 → 200 이어야 정상.
+        mockMvc.perform(get("/api/quotations/summary")
+                        .param("dateFrom", "2026-07-01")
+                        .param("dateTo", "2026-07-31"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(username = "someone@hyunwoo.com", roles = "SALES")
+    void outbox_accepts_date_range() throws Exception {
+        // 상신함 기간 파라미터가 바인딩되고 쿼리가 실행되는지 (파생 쿼리명 오타는 여기서 드러난다).
+        mockMvc.perform(get("/api/approvals/outbox")
+                        .param("dateFrom", "2026-07-01")
+                        .param("dateTo", "2026-07-31"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "SALES")
+    void customers_accept_created_date_range() throws Exception {
+        mockMvc.perform(get("/api/customers")
+                        .param("createdFrom", "2026-07-01")
+                        .param("createdTo", "2026-07-31"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "FINANCE")
+    void finance_cannot_read_sales_order_summary_returns_403() throws Exception {
+        mockMvc.perform(get("/api/sales-orders/summary")
+                        .param("dateFrom", "2026-07-01")
+                        .param("dateTo", "2026-07-31"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "SALES")
     void sales_cannot_access_finance_module_returns_403() throws Exception {
         mockMvc.perform(get("/api/journal-entries"))
                 .andExpect(status().isForbidden());

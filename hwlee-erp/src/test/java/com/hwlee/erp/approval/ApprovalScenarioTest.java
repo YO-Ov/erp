@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -100,6 +101,24 @@ class ApprovalScenarioTest {
                         () -> quotationService.submitForApproval(qid, REQUESTER))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("이미 진행 중");
+    }
+
+    @Test
+    @DisplayName("상신함 기간 조회: 상신일이 기간 밖이면 빠진다")
+    void 상신함은_상신일_기준으로_기간을_좁힌다() {
+        authenticate(REQUESTER);
+        Long qid = createQuotation(new BigDecimal("1000000"), new BigDecimal("5"));
+        String number = quotationService.submitForApproval(qid, REQUESTER).number();
+        LocalDate today = LocalDate.now();
+
+        // 오늘을 포함하는 기간 → 방금 상신한 건이 보인다.
+        var inRange = approvalService.outbox(REQUESTER, today, today, PageRequest.of(0, 100));
+        assertThat(inRange.getContent()).extracting(ApprovalResponse::number).contains(number);
+
+        // 과거 구간 → 같은 건이 빠진다. (기간이 실제로 걸린다는 뜻)
+        var outOfRange = approvalService.outbox(
+                REQUESTER, today.minusDays(30), today.minusDays(10), PageRequest.of(0, 100));
+        assertThat(outOfRange.getContent()).extracting(ApprovalResponse::number).doesNotContain(number);
     }
 
     // ── 헬퍼 ─────────────────────────────────────────────────────

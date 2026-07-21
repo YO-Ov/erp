@@ -1,6 +1,8 @@
 package com.hwlee.erp.master.customer;
 
 import static com.hwlee.erp.master.customer.CustomerSpecifications.businessNoEquals;
+import static com.hwlee.erp.master.customer.CustomerSpecifications.createdFrom;
+import static com.hwlee.erp.master.customer.CustomerSpecifications.createdTo;
 import static com.hwlee.erp.master.customer.CustomerSpecifications.nameContains;
 import static com.hwlee.erp.master.customer.CustomerSpecifications.statusEquals;
 import static org.springframework.data.jpa.domain.Specification.where;
@@ -11,9 +13,11 @@ import com.hwlee.erp.master.customer.dto.CustomerResponse;
 import com.hwlee.erp.master.customer.dto.CustomerUpdateRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -51,15 +55,19 @@ public class CustomerController {
         return service.findByCode(code);
     }
 
+    /** 고객 목록. createdFrom·createdTo 를 주면 등록일 기준으로 좁힌다 (예: "이번 달 신규 등록 고객"). */
     @GetMapping
     public Page<CustomerResponse> search(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String businessNo,
             @RequestParam(required = false) MasterStatus status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdTo,
             Pageable pageable
     ) {
         return service.search(
-                where(nameContains(name)).and(businessNoEquals(businessNo)).and(statusEquals(status)),
+                where(nameContains(name)).and(businessNoEquals(businessNo)).and(statusEquals(status))
+                        .and(createdFrom(createdFrom)).and(createdTo(createdTo)),
                 pageable
         );
     }

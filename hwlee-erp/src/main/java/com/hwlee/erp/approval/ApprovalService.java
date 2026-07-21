@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -154,6 +155,22 @@ public class ApprovalService {
     /** 상신함 — 내가 올린 결재. */
     public Page<ApprovalResponse> outbox(String username, Pageable pageable) {
         return repository.findByCreatedByOrderByIdDesc(username, pageable).map(a -> toResponse(a, username));
+    }
+
+    /**
+     * 상신함(기간) — 상신일 기준으로 좁힌다. 기간이 없으면 {@link #outbox(String, Pageable)} 과 같다.
+     *
+     * <p>기간은 '날짜' 로 받아 그 날 하루를 통째로 포함하도록 [00:00:00, 23:59:59.999999999] 로 넓힌다
+     * (상신일은 시각까지 있는 {@code LocalDateTime} 이라, 그냥 날짜로 비교하면 종료일 당일이 빠진다).
+     */
+    public Page<ApprovalResponse> outbox(String username, LocalDate dateFrom, LocalDate dateTo,
+                                         Pageable pageable) {
+        if (dateFrom == null || dateTo == null) {
+            return outbox(username, pageable);
+        }
+        return repository.findByCreatedByAndRequestedAtBetweenOrderByIdDesc(
+                        username, dateFrom.atStartOfDay(), dateTo.atTime(LocalTime.MAX), pageable)
+                .map(a -> toResponse(a, username));
     }
 
     /** 결재함 — 내가 처리할 차례인 결재. */

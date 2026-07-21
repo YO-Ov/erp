@@ -9,6 +9,8 @@
   --text-muted: #94a3b8;
   --accent: #38bdf8;
   --accent-strong: #0ea5e9;
+  /* primary 버튼 텍스트 — 밝은 강조색 배경이라 어두운 글자가 대비가 좋다. */
+  --accent-text: #04283a;
 
   /* 상태 tone */
   --tone-neutral: #64748b;
@@ -32,6 +34,8 @@
   --text-muted: #64748b;
   --accent: #0284c7;
   --accent-strong: #0369a1;
+  /* 라이트 모드는 강조색 배경이 진하므로 흰 글자라야 보인다. */
+  --accent-text: #ffffff;
 
   --tone-neutral: #64748b;
   --tone-active: #16a34a;
@@ -85,7 +89,7 @@ button:disabled {
 button.primary {
   background: var(--accent-strong);
   border-color: var(--accent-strong);
-  color: #04283a;
+  color: var(--accent-text);
   font-weight: 600;
 }
 button.primary:hover:not(:disabled) {
@@ -93,7 +97,7 @@ button.primary:hover:not(:disabled) {
 }
 button.danger {
   border-color: var(--tone-danger);
-  color: #fecaca;
+  color: var(--tone-danger);
 }
 button.sm {
   padding: 5px 10px;
@@ -158,6 +162,12 @@ select {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
+}
+/* date/select 등은 기본 컨텐츠 높이가 제각각이라, 폼 컨트롤 높이를 한 값으로 고정한다.
+   (checkbox·radio 는 네모 모양을 유지하도록 제외) */
+input:not([type='checkbox']):not([type='radio']),
+select {
+  height: 38px;
 }
 input:focus,
 select:focus {

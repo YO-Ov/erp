@@ -112,8 +112,19 @@ public class ErpDataSimulator {
     @Value("${erp.simulator.per-tick-max:5}")
     private int perTickMax;
 
+    /** 스케줄 진입점 — 설정된 cron 마다 한 배치를 생성한다. */
     @Scheduled(cron = "${erp.simulator.cron:0 0 8-20/2 * * *}")
     public void tick() {
+        generateBatch();
+    }
+
+    /**
+     * 한 배치(틱)의 데이터를 생성하고 실제 생성 건수를 돌려준다.
+     * 스케줄러와 관리자 수동 실행 엔드포인트가 공유한다.
+     *
+     * @return 이번 배치에서 실제로 생성된 레코드 수
+     */
+    public int generateBatch() {
         List<Customer> customers = customerRepository.findAll();
         List<Vendor> vendors = vendorRepository.findAll();
         List<Item> items = itemRepository.findAll();
@@ -129,7 +140,7 @@ public class ErpDataSimulator {
 
         if (customers.isEmpty() || warehouses.isEmpty() || finished.isEmpty()) {
             log.warn("[시뮬] 마스터 데이터 부족(고객·창고·완제품) — 이번 틱 생성 건너뜀");
-            return;
+            return 0;
         }
 
         int target = rand(perTickMin, perTickMax);
@@ -156,6 +167,7 @@ public class ErpDataSimulator {
             }
         }
         log.info("[시뮬] 이번 틱 데이터 {}건 생성 (목표 {})", created, target);
+        return created;
     }
 
     // ── SD: 견적 ────────────────────────────────────────────────

@@ -24,6 +24,7 @@ import type {
   InvoiceStatus,
   JournalEntryStatus,
   JournalSource,
+  MasterStatus,
   MovementReason,
   NormalSide,
   NotificationType,
@@ -440,6 +441,13 @@ export const POSITION: Record<Position, string> = {
 export const CONTRACT_STATUS: StatusMap<ContractStatus> = {
   ACTIVE: { label: '유효', tone: 'active' },
   INACTIVE: { label: '종료', tone: 'muted' },
+}
+
+// 고객·공급처 등 마스터 데이터 상태. 삭제는 하드딜리트가 아니라 INACTIVE 로 전환(과거 거래 보존).
+export const MASTER_STATUS: StatusMap<MasterStatus> = {
+  ACTIVE: { label: '활성', tone: 'active' },
+  INACTIVE: { label: '비활성', tone: 'muted' },
+  BLOCKED: { label: '거래중지', tone: 'danger' },
 }
 
 // 급여대장 상태.

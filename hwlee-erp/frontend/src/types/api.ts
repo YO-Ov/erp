@@ -86,6 +86,21 @@ export interface Customer extends Audited {
   status: MasterStatus
 }
 
+// 고객 등록 — 신규는 여신한도 0(현금거래)으로 시작하고, 한도 부여/상향은 재무의 여신 승인으로만.
+export interface CustomerCreateRequest {
+  name: string
+  businessNo: string
+  address: string | null
+  paymentTerms: PaymentTerms
+}
+
+// 고객 수정 — businessNo(외부 식별자)와 creditLimit(여신=재무 권한)은 바꿀 수 없다.
+export interface CustomerUpdateRequest {
+  name: string
+  address: string | null
+  paymentTerms: PaymentTerms
+}
+
 export type ItemType = 'FINISHED' | 'COMPONENT'
 export type ItemUnit = 'EA' | 'BOX' | 'KG'
 

@@ -22,6 +22,9 @@ import LoginView from './views/LoginView'
 import QuotationListView from './views/QuotationListView'
 import QuotationDetailView from './views/QuotationDetailView'
 import QuotationCreateView from './views/QuotationCreateView'
+import CustomerListView from './views/CustomerListView'
+import CustomerDetailView from './views/CustomerDetailView'
+import CustomerFormView from './views/CustomerFormView'
 import SalesOrderListView from './views/SalesOrderListView'
 import SalesOrderDetailView from './views/SalesOrderDetailView'
 import SalesOrderCreateView from './views/SalesOrderCreateView'
@@ -105,6 +108,7 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
         {inSD && (
           <>
             <div className="nav-section">영업 (SD)</div>
+            {link('/customers', '고객')}
             {link('/quotations', '견적')}
             {link('/sales-orders', '수주')}
             {link('/deliveries', '출하')}
@@ -243,6 +247,39 @@ export default function App() {
   const routes = (
       <Routes>
         <Route path="/login" element={<LoginView />} />
+
+        <Route
+          path="/customers"
+          element={
+            <ProtectedRoute roles={SD_ROLES}>
+              <CustomerListView />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customers/new"
+          element={
+            <ProtectedRoute roles={SD_ROLES}>
+              <CustomerFormView />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customers/:id/edit"
+          element={
+            <ProtectedRoute roles={SD_ROLES}>
+              <CustomerFormView />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customers/:id"
+          element={
+            <ProtectedRoute roles={SD_ROLES}>
+              <CustomerDetailView />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/quotations"

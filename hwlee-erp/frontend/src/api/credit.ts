@@ -26,6 +26,17 @@ export async function getCreditRequest(id: string | number): Promise<CreditLimit
   return data
 }
 
+// 특정 고객에 검토 대기(PENDING) 중인 여신 요청이 있으면 반환, 없으면 204 → null.
+// 고객 상세에서 "여신 검토 중" 배지로 중복 신청을 막는 데 쓴다.
+export async function getPendingCreditRequest(
+  customerId: number,
+): Promise<CreditLimitRequest | null> {
+  const res = await client.get<CreditLimitRequest>('/credit-limit-requests/pending', {
+    params: { customerId },
+  })
+  return res.status === 204 ? null : res.data
+}
+
 // 생성하면 서버가 전자결재를 상신한다 — 재무팀장이 결재함에서 승인/거부한다.
 export async function createCreditRequest(
   body: CreditLimitRequestCreateRequest,

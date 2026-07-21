@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { createCreditRequest } from '../api/credit'
 import { getCreditStatus } from '../api/salesOrders'
@@ -10,7 +10,9 @@ import { formatMoney } from '../domain/status'
 export default function CreditRequestCreateView() {
   const navigate = useNavigate()
 
-  const [customerId, setCustomerId] = useState('')
+  // 고객 상세의 '여신 상향 요청' 버튼에서 넘어오면 해당 고객을 미리 선택한다.
+  const [searchParams] = useSearchParams()
+  const [customerId, setCustomerId] = useState(searchParams.get('customerId') || '')
   const [requestedLimit, setRequestedLimit] = useState('')
   const [reason, setReason] = useState('')
 

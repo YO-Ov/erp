@@ -5,16 +5,36 @@ import { getInbox, getOutbox } from '../api/approvals'
 import { listNotifications, markNotificationRead, markAllNotificationsRead } from '../api/notifications'
 import { getSalesDashboard } from '../api/dashboard'
 import {
-  APPROVAL_STATUS,
   SALES_ORDER_STATUS,
   NOTIFICATION_TYPE,
-  approvalReason,
   formatMoney,
   statusMeta,
 } from '../domain/status'
 import { useAuth } from '../auth/AuthContext'
 import StatusBadge from '../components/StatusBadge'
-import type { SalesOrderStatus, SdDashboard } from '../types/api'
+import type { Role, SalesOrderStatus, SdDashboard } from '../types/api'
+
+// 대시보드 '바로가기' 타일 — 역할이 실제 접근 가능한 화면만 노출한다(roles 빈 배열이면 모두).
+// 경로·권한은 App.tsx 라우트/ProtectedRoute 와 일치시킨다.
+type QuickLink = { to: string; label: string; desc: string; roles: Role[] }
+const QUICK_LINKS: QuickLink[] = [
+  { to: '/quotations', label: '견적', desc: '견적 작성·발송', roles: ['SALES', 'ADMIN'] },
+  { to: '/sales-orders', label: '수주', desc: '수주 등록·확정', roles: ['SALES', 'ADMIN'] },
+  { to: '/deliveries', label: '출하', desc: '출하 처리', roles: ['SALES', 'ADMIN'] },
+  { to: '/invoices', label: '청구', desc: '세금계산서 발행', roles: ['SALES', 'ADMIN'] },
+  { to: '/customers', label: '고객', desc: '고객 마스터', roles: ['SALES', 'ADMIN'] },
+  { to: '/purchase-orders', label: '발주', desc: '구매 발주', roles: ['PURCHASING', 'ADMIN'] },
+  { to: '/goods-receipts', label: '입고', desc: '입고 전기', roles: ['PURCHASING', 'ADMIN'] },
+  { to: '/stocks', label: '재고', desc: '현재고 조회', roles: ['SALES', 'PURCHASING', 'ADMIN'] },
+  { to: '/production-orders', label: '생산', desc: '작업지시', roles: ['PRODUCTION', 'ADMIN'] },
+  { to: '/boms', label: 'BOM', desc: '자재명세 조회', roles: ['PRODUCTION', 'ADMIN'] },
+  { to: '/journal-entries', label: '전표', desc: '회계 전표', roles: ['FINANCE', 'ADMIN'] },
+  { to: '/payments', label: '입출금', desc: '수금·지급', roles: ['FINANCE', 'ADMIN'] },
+  { to: '/reports/sales', label: '리포트', desc: '매출·손익·재고', roles: ['FINANCE', 'DIRECTOR', 'ADMIN'] },
+  { to: '/employees', label: '사원', desc: '인사 정보', roles: ['SALES', 'PURCHASING', 'FINANCE', 'HR', 'ADMIN'] },
+  { to: '/payroll-runs', label: '급여', desc: '급여대장', roles: ['HR', 'ADMIN'] },
+  { to: '/approvals', label: '전자결재', desc: '결재함·상신함', roles: [] },
+]
 
 function Card({
   label,
@@ -58,7 +78,7 @@ function CardGrid({ children }: { children: ReactNode }) {
 }
 
 // 역할과 무관하게 모두가 쓰는 홈 화면.
-//  - 공통: 결재 대기 / 내 상신 현황 / 알림
+//  - 공통: 결재/알림 요약 카드 4개 + 역할별 바로가기 + 알림
 //  - 영업(SALES)이면 SD KPI 섹션이 더 붙는다.
 export default function DashboardView() {
   const { user, hasRole } = useAuth()
@@ -132,91 +152,19 @@ export default function DashboardView() {
         <Card label="미확인 알림" value={unread} sub="최근 5건 기준" />
       </CardGrid>
 
-      <div className="section-title">내 결재 대기</div>
-      <div className="panel">
-        {inboxRows.length === 0 ? (
-          <p className="muted">처리할 결재가 없습니다.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>결재번호</th>
-                <th>문서</th>
-                <th>제목</th>
-                <th className="num">금액</th>
-                <th>상신자</th>
-                <th>상태</th>
-              </tr>
-            </thead>
-            <tbody>
-              {inboxRows.map((a) => (
-                <tr key={a.id}>
-                  <td>
-                    <Link to={`/approvals/${a.id}`} className="mono">
-                      {a.number}
-                    </Link>
-                  </td>
-                  <td className="muted">{a.docTypeLabel}</td>
-                  <td>
-                    {a.title}
-                    {a.myTurn && (
-                      <span className="mono" style={{ marginLeft: 8, color: 'var(--accent)' }}>
-                        ● 내 차례
-                      </span>
-                    )}
-                  </td>
-                  <td className="num mono">{formatMoney(a.amount)}</td>
-                  <td className="muted">{a.requester}</td>
-                  <td>
-                    <StatusBadge map={APPROVAL_STATUS} status={a.status} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="section-title">내 상신 현황</div>
-      <div className="panel">
-        {outboxRows.length === 0 ? (
-          <p className="muted">내가 올린 결재가 없습니다.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>결재번호</th>
-                <th>문서</th>
-                <th>제목</th>
-                <th>상신일</th>
-                <th>상태</th>
-                <th>반려/반송 사유</th>
-              </tr>
-            </thead>
-            <tbody>
-              {outboxRows.map((a) => {
-                const reason = approvalReason(a)
-                return (
-                  <tr key={a.id}>
-                    <td>
-                      <Link to={`/approvals/${a.id}`} className="mono">
-                        {a.number}
-                      </Link>
-                    </td>
-                    <td className="muted">{a.docTypeLabel}</td>
-                    <td>{a.title}</td>
-                    <td className="muted">{(a.requestedAt || '').slice(0, 10)}</td>
-                    <td>
-                      <StatusBadge map={APPROVAL_STATUS} status={a.status} />
-                    </td>
-                    <td className={reason ? 'error' : 'muted'}>{reason || '-'}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <div className="section-title">바로가기</div>
+      <CardGrid>
+        {QUICK_LINKS.filter((l) => l.roles.length === 0 || hasRole(...l.roles)).map((l) => (
+          <Link key={l.to} to={l.to}>
+            <div className="panel" style={{ height: '100%' }}>
+              <div style={{ fontWeight: 700 }}>{l.label}</div>
+              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                {l.desc}
+              </div>
+            </div>
+          </Link>
+        ))}
+      </CardGrid>
 
       <div className="section-title">알림</div>
       <div className="panel">

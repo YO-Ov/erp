@@ -47,6 +47,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -54,6 +55,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 /**
@@ -150,7 +155,7 @@ public class ErpDataSimulator {
 
         while (created < target && attempts < maxAttempts) {
             attempts++;
-            int pick = rand(0, 6);
+            int pick = rand(0, 7);
             try {
                 created += switch (pick) {
                     case 0 -> newQuotation(customers, finished);
@@ -159,7 +164,8 @@ public class ErpDataSimulator {
                     case 3 -> goodsReceiptDirect(warehouses, activeByVendor);
                     case 4 -> newProductionOrder(finished, warehouses);
                     case 5 -> newPayment(customers, vendors);
-                    default -> attendance(employees);
+                    case 6 -> attendance(employees);
+                    default -> approvalFlow(customers, finished, vendors, warehouses, activeByVendor);
                 };
             } catch (Exception e) {
                 // 한 활동의 실패가 이번 틱 전체를 막지 않도록 격리.
@@ -302,6 +308,84 @@ public class ErpDataSimulator {
             }
         }
         return count;
+    }
+
+    // ── 전자결재: 문서 생성 + 결재 상신 ─────────────────────────
+    // 결재 문서의 소유자(createdBy)가 곧 상신자(ApprovalResponse.requester)이자 상신함 소유 기준이므로,
+    // 반드시 "유효한 상신자 계정"으로 SecurityContext 를 세팅한 채 상신해야 결재선·상신함이 일관된다.
+    // (스케줄러/관리자 스레드에는 해당 사용자의 인증이 없기 때문.)
+
+    /** 한 배치에서 결재 문서 하나를 만들어 상신한다(발주/견적/지급 중 무작위). */
+    private int approvalFlow(List<Customer> customers, List<Item> finished, List<Vendor> vendors,
+                             List<Warehouse> warehouses, Map<Long, List<VendorItem>> activeByVendor) {
+        return switch (rand(0, 2)) {
+            case 0 -> purchaseApproval(warehouses, activeByVendor);
+            case 1 -> quotationApproval(customers, finished);
+            default -> paymentApproval(vendors);
+        };
+    }
+
+    /** 발주 상신 — 구매 담당(purchase@) 명의. 결재자 = 구매팀장. */
+    private int purchaseApproval(List<Warehouse> warehouses, Map<Long, List<VendorItem>> activeByVendor) {
+        Long vendorId = pickVendorWithItems(activeByVendor);
+        if (vendorId == null) {
+            return 0;
+        }
+        return runAs("purchase@hyunwoo.com", () -> {
+            var lines = subset(activeByVendor.get(vendorId), 1, 2).stream()
+                    .map(vi -> new PurchaseOrderLineRequest(vi.getItem().getId(), qty(), vi.getSupplyPrice()))
+                    .toList();
+            var po = purchaseOrderService.create(new PurchaseOrderCreateRequest(
+                    vendorId, pick(warehouses).getId(), LocalDate.now(),
+                    LocalDate.now().plusDays(7), "자동 상신(데이터 시뮬레이터)", lines));
+            purchaseOrderService.submitForApproval(po.id(), "purchase@hyunwoo.com");
+            return 2; // 발주 + 결재요청
+        });
+    }
+
+    /** 견적 상신 — 영업팀장(sales.mgr) 명의. 결재자 = 영업본부장. */
+    private int quotationApproval(List<Customer> customers, List<Item> finished) {
+        return runAs("sales.mgr@hyunwoo.com", () -> {
+            var lines = subset(finished, 1, 2).stream()
+                    .map(it -> new QuotationLineRequest(it.getId(), qty(), price(it)))
+                    .toList();
+            var q = quotationService.create(new QuotationCreateRequest(
+                    pick(customers).getId(), LocalDate.now(), LocalDate.now().plusDays(30), lines));
+            quotationService.submitForApproval(q.id(), "sales.mgr@hyunwoo.com");
+            return 2; // 견적 + 결재요청
+        });
+    }
+
+    /** 지급 상신 — 재무팀장(finance.mgr) 명의. 초안 생성 후 결재 상신. */
+    private int paymentApproval(List<Vendor> vendors) {
+        if (vendors.isEmpty()) {
+            return 0;
+        }
+        return runAs("finance.mgr@hyunwoo.com", () -> {
+            BigDecimal amount = BigDecimal.valueOf(rand(1, 30) * 100_000L); // 10만~300만
+            var p = paymentService.createDraft(new PaymentCreateRequest(
+                    PaymentType.DISBURSEMENT, null, pick(vendors).getId(),
+                    amount, LocalDate.now(), "자동 지급 상신(데이터 시뮬레이터)"));
+            paymentService.submitForApproval(p.id(), "finance.mgr@hyunwoo.com");
+            return 2; // 지급 + 결재요청
+        });
+    }
+
+    /**
+     * 주어진 username 으로 SecurityContext 를 세팅한 채 action 을 실행하고, 끝나면 원래 컨텍스트로 복원한다.
+     * 결재 문서의 createdBy(=상신자)가 유효한 사용자로 남도록 하기 위함.
+     */
+    private <T> T runAs(String username, Supplier<T> action) {
+        SecurityContext original = SecurityContextHolder.getContext();
+        try {
+            SecurityContext ctx = SecurityContextHolder.createEmptyContext();
+            ctx.setAuthentication(new UsernamePasswordAuthenticationToken(
+                    username, "N/A", List.of(new SimpleGrantedAuthority("ROLE_USER"))));
+            SecurityContextHolder.setContext(ctx);
+            return action.get();
+        } finally {
+            SecurityContextHolder.setContext(original);
+        }
     }
 
     // ── 헬퍼 ────────────────────────────────────────────────────

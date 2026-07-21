@@ -112,8 +112,8 @@ function OrderStatusPipeline({ counts }: { counts: OrderStatusCounts | undefined
           <Fragment key={s}>
             <div
               style={{
-                flex: '0 0 auto',
-                minWidth: 92,
+                flex: '1 1 0',
+                minWidth: 88,
                 textAlign: 'center',
                 padding: '12px 10px',
                 background: 'var(--bg-elevated)',

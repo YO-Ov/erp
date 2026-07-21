@@ -1,9 +1,9 @@
-import { useState, type ReactNode } from 'react'
+import { Fragment, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getInbox, getOutbox } from '../api/approvals'
 import { listNotifications, markNotificationRead, markAllNotificationsRead } from '../api/notifications'
-import { getSalesDashboard, getOrderStatus } from '../api/dashboard'
+import { getSalesDashboard, getOrderStatus, type OrderStatusCounts } from '../api/dashboard'
 import {
   SALES_ORDER_STATUS,
   NOTIFICATION_TYPE,
@@ -67,61 +67,74 @@ function periodRange(p: Period): { dateFrom?: string; dateTo?: string } {
   return { dateFrom: fmtDate(first), dateTo: fmtDate(last) }
 }
 
+// 진행 단계(흐름 순서)와 종료 단계 분리 — 종료/취소는 카드가 아니라 아래 요약으로 뺀다.
+const PIPELINE_STAGES: SalesOrderStatus[] = [
+  'DRAFT',
+  'CONFIRMED',
+  'SHIPPING',
+  'SHIPPED',
+  'INVOICING',
+  'INVOICED',
+]
+
 /**
- * 수주 진행 현황 — 상태별 건수 가로 막대 차트.
- * 단일 계열(건수)이라 색은 식별이 아니라 강조용(모든 막대 accent 단색), 라벨·수치는 텍스트 토큰.
- * 라이브러리 없이 CSS 막대로 그려 번들을 늘리지 않는다.
+ * 수주 진행 현황 — 진행 단계 카드를 흐름(→)으로 배치한 파이프라인 스텝퍼.
+ * 종료·취소는 막대에서 빼고 아래 muted 요약으로. 건수>0 단계는 accent 로 강조해 "어디에 일이 몰렸는지" 보이게.
+ * 좁은 화면에선 한 줄 유지한 채 가로 스크롤(표처럼 접지 않음).
  */
-function OrderStatusChart({
-  data,
-}: {
-  data: { status: SalesOrderStatus; label: string; count: number }[]
-}) {
-  const total = data.reduce((s, d) => s + d.count, 0)
-  const max = Math.max(1, ...data.map((d) => d.count))
-  if (total === 0) {
-    return <p className="muted">해당 기간의 수주가 없습니다.</p>
-  }
+function OrderStatusPipeline({ counts }: { counts: OrderStatusCounts | undefined }) {
+  const c = (s: SalesOrderStatus) => counts?.[s] ?? 0
+  const activeTotal = PIPELINE_STAGES.reduce((sum, s) => sum + c(s), 0)
   return (
-    <div style={{ display: 'grid', gap: 10 }}>
-      {data.map((d) => (
-        <div
-          key={d.status}
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '96px 1fr 44px',
-            alignItems: 'center',
-            gap: 12,
-          }}
-          title={`${d.label}: ${d.count}건`}
-        >
-          <span className="muted" style={{ fontSize: 13 }}>
-            {d.label}
-          </span>
-          <div
-            style={{
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--border)',
-              borderRadius: 5,
-              height: 16,
-            }}
-          >
+    <>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          overflowX: 'auto',
+          paddingBottom: 4,
+        }}
+      >
+        {PIPELINE_STAGES.map((s, i) => (
+          <Fragment key={s}>
             <div
               style={{
-                width: `${(d.count / max) * 100}%`,
-                minWidth: d.count > 0 ? 4 : 0,
-                height: '100%',
-                background: 'var(--accent)',
-                borderRadius: 4,
+                flex: '0 0 auto',
+                minWidth: 92,
+                textAlign: 'center',
+                padding: '12px 10px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border)',
+                borderRadius: 10,
               }}
-            />
-          </div>
-          <span className="mono" style={{ fontSize: 13, textAlign: 'right' }}>
-            {d.count}
-          </span>
-        </div>
-      ))}
-    </div>
+            >
+              <div className="muted" style={{ fontSize: 12 }}>
+                {statusMeta(SALES_ORDER_STATUS, s).label}
+              </div>
+              <div
+                style={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  marginTop: 4,
+                  color: c(s) > 0 ? 'var(--accent)' : 'var(--text-muted)',
+                }}
+              >
+                {c(s)}
+              </div>
+            </div>
+            {i < PIPELINE_STAGES.length - 1 && (
+              <span className="muted" style={{ flex: '0 0 auto', fontSize: 16 }}>
+                →
+              </span>
+            )}
+          </Fragment>
+        ))}
+      </div>
+      <div className="muted" style={{ marginTop: 12, fontSize: 13 }}>
+        진행 중 {activeTotal}건 · 종료 {c('CLOSED')} · 취소 {c('CANCELLED')}
+      </div>
+    </>
   )
 }
 
@@ -165,18 +178,13 @@ export default function DashboardView() {
     enabled: isSales,
   })
 
-  // 수주 진행 현황 차트 — 기간 프리셋으로 다시 집계(전체가 기본).
-  const [period, setPeriod] = useState<Period>('all')
+  // 수주 진행 현황 — 기간 프리셋으로 다시 집계(이번달이 기본).
+  const [period, setPeriod] = useState<Period>('month')
   const { data: orderStatus } = useQuery({
     queryKey: ['sd-order-status', period],
     queryFn: () => getOrderStatus(periodRange(period)),
     enabled: isSales,
   })
-  const statusData = (Object.keys(SALES_ORDER_STATUS) as SalesOrderStatus[]).map((s) => ({
-    status: s,
-    label: statusMeta(SALES_ORDER_STATUS, s).label,
-    count: orderStatus?.[s] ?? 0,
-  }))
 
   // id 를 주면 그 알림만, null 이면 전체 읽음 처리.
   const readMutation = useMutation<void, Error, number | null>({
@@ -335,7 +343,7 @@ export default function DashboardView() {
                 ))}
               </select>
             </div>
-            <OrderStatusChart data={statusData} />
+            <OrderStatusPipeline counts={orderStatus} />
           </div>
 
           <div className="section-title">최근 수주</div>

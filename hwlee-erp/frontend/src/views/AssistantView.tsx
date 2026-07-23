@@ -100,7 +100,9 @@ export default function AssistantView() {
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     // Enter 전송, Shift+Enter 줄바꿈.
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // isComposing: 한글 IME 조합 중 Enter는 '글자 확정'용이므로 전송하지 않는다.
+    // (막지 않으면 전송 후 compositionend 가 뒤늦게 발생해 마지막 글자가 입력창에 남음)
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       onSubmit(e)
     }

@@ -19,6 +19,22 @@
 
 ## 현재 위치
 
+> ### 🆕 최신 작업 (2026-07-23) — 고객 마스터 확장: 담당자(연락처) 1:N
+> "고객 정보가 너무 빈약하다"는 관찰에서 출발. 실무 거래처 마스터를 두껍게 만드는 핵심축(분류·1:N)을 짚고, **가장 효과 큰 담당자(연락처) 1:N 부터** 추가.
+> - **백엔드**: 신규 `CustomerContact` 엔티티(`customer_contact` 테이블, 마이그레이션 `V73`) — name·position(부서·직책)·phone·email·is_primary(대표 1명). `Customer` 애그리거트 자식(`@OneToMany`, orphanRemoval, `@OrderBy("primary DESC")`)으로 두고 add/update/removeContact 도메인 메서드로만 변경. **대표 담당자 1명 불변식은 도메인이 강제**(primary 지정 시 기존 대표 자동 해제). DTO 2개(`CustomerContactRequest`/`Response`) + Mapper 확장 + Service CRUD.
+> - **REST = 서브리소스**(`/api/customers/{id}/contacts`, GET/POST/PUT/DELETE). **`CustomerResponse`에 끼워넣지 않음** — 목록 조회 N+1 회피. 조회는 넓은 역할, 쓰기는 SALES/ADMIN(고객과 동일).
+> - **프론트**: `types/api.ts`에 `CustomerContact`(+Request), `api/customers.ts`에 담당자 4함수, 신규 `CustomerContactsPanel.tsx`(목록 표 + 인라인 추가/수정/삭제, 대표=초록 배지) → `CustomerDetailView` 하단에 임베드. 편집버튼은 SALES/ADMIN만(canEditContacts).
+> - **✅ 검증**: `./gradlew compileJava` 그린(기존 deprecation 경고만) / 프론트 `npm run build` 그린(tsc+vite, 227모듈).
+> - **✅ 시드 데이터 `V74__seed_customer_contacts.sql`**: 고객사 18곳에 담당자 **30명**(대표 1명씩 + 대형 공공/전자사는 2~3명). customer_id 를 **코드 조인**으로 넣어 환경별 id 차이와 무관하게 동일 결과. **RDS(aws) 적용·검증 완료**(2026-07-23, 30건/대표 18/고객 18, flyway_schema_history v74 success). 서울대·한전 샘플 1:N + 대표 표시 정상.
+> - **▶ 운영 배포**: `V73`(테이블)+`V74`(데이터)가 **main 푸시 → GitHub Actions 배포** 시 운영 DB(prod 컨테이너)에 Flyway 자동 적용. 운영은 RDS와 별개 DB라 밖에서 직접 못 넣고 배포로만 반영(직접 INSERT 시 Flyway 이력 어긋나 중복 위험 → 안 함). **auth/me 기능(이전 세션 미커밋분)도 같은 커밋에 포함**(types/api.ts 공유).
+>
+> ### 📋 고객 마스터 확장 — 남은 할일 (백로그, 우선순위 순)
+> 실무 대비 아직 빠진 축. 필드 나열이 아니라 **분류축 + 1:N 구조**가 핵심.
+> 1. **[ ] 거래처 유형·분류** — `type`(고객/공급처/양쪽), 담당 영업사원(FK→employee), 업태·종목. 분류축이 생기면 목록·검색이 실무화됨.
+> 2. **[ ] 배송지(Ship-to) 1:N** — 본사 주소 ≠ 납품 주소. `customer_ship_to`(주소·기본배송지 여부). **수주(SalesOrder) 도메인과 붙일 때** 넣는 게 자연스러움(수주 라인에서 배송지 선택).
+> 3. **[ ] (선택) 청구지(Bill-to)/대금지급처** — 받는 곳 ≠ 돈 내는 곳. 배송지 다음 단계로 필요 시.
+> - **❌ 넣지 않기로 한 것**: 회사 재무제표·재무상태 — 과함(외부 신용평가 연동 영역). 영업 마스터는 기존 `creditLimit` 하나로 충분.
+>
 > ### 🧭 별도 트랙 — 프론트엔드 전환 & 포트폴리오 사이트 (ERP 커리큘럼과 무관, 2026-07-15 신설)
 > ERP 커리큘럼(Phase 0~16)과 **독립된 별도 트랙**. 상세 계획·결정·다음 진도는 → **`doc/프론트엔드전환-포트폴리오사이트-계획.md`**.
 > - **목표**: ⓐ `hyunwoo.pro`에 프로필+포트폴리오 사이트(ERP·MES·AI 3개 소개) ⓑ **Vue·React 직접 학습** = ERP를 SPA로 점진 전환.

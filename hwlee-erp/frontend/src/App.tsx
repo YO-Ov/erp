@@ -243,8 +243,26 @@ function Footer() {
   )
 }
 
+// 부팅 검증 중 보여줄 스플래시 — 죽은 토큰으로 대시보드가 깜빡이는 걸 막는다.
+function BootSplash() {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'var(--text-muted)',
+        fontSize: 14,
+      }}
+    >
+      불러오는 중…
+    </div>
+  )
+}
+
 export default function App() {
-  const { user } = useAuth()
+  const { user, bootstrapping } = useAuth()
   const [theme, setTheme] = useState<Theme>(getInitialTheme)
   const [navOpen, setNavOpen] = useState(false)
   const location = useLocation()
@@ -737,6 +755,10 @@ export default function App() {
         <Route path="*" element={<HomeRedirect />} />
       </Routes>
   )
+
+  // 부팅 시 저장 토큰을 서버(/auth/me)에 검증하는 동안은 스플래시만 보여준다.
+  // 이 게이트 덕분에 만료/무효 토큰으로 대시보드가 잠깐 렌더됐다 튕기는 깜빡임이 사라진다.
+  if (bootstrapping) return <BootSplash />
 
   // 미인증(로그인 화면)은 사이드바 셸 없이 렌더한다.
   if (!user) return routes

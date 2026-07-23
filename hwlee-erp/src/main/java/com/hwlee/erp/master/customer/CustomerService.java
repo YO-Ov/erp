@@ -1,10 +1,13 @@
 package com.hwlee.erp.master.customer;
 
 import com.hwlee.erp.common.code.CodeGenerator;
+import com.hwlee.erp.master.customer.dto.CustomerContactRequest;
+import com.hwlee.erp.master.customer.dto.CustomerContactResponse;
 import com.hwlee.erp.master.customer.dto.CustomerCreateRequest;
 import com.hwlee.erp.master.customer.dto.CustomerResponse;
 import com.hwlee.erp.master.customer.dto.CustomerUpdateRequest;
 import jakarta.persistence.EntityNotFoundException;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -67,6 +70,36 @@ public class CustomerService {
     public void delete(Long id) {
         Customer customer = getOrThrow(id);
         repository.delete(customer); // @SQLDelete 에 의해 Soft Delete 로 동작
+    }
+
+    // ── 담당자(연락처) ─────────────────────────────────────
+    // 변경은 항상 Customer 애그리거트를 통해서만(대표 1명 불변식은 도메인이 보장).
+
+    /** 고객의 담당자 목록(대표 담당자 우선). */
+    public List<CustomerContactResponse> getContacts(Long customerId) {
+        return mapper.toContactResponses(getOrThrow(customerId).getContacts());
+    }
+
+    @Transactional
+    public CustomerContactResponse addContact(Long customerId, CustomerContactRequest req) {
+        Customer customer = getOrThrow(customerId);
+        CustomerContact contact = customer.addContact(
+                req.name(), req.position(), req.phone(), req.email(), req.primary());
+        repository.flush(); // 신규 담당자 id 를 응답에 담기 위해 즉시 반영
+        return mapper.toContactResponse(contact);
+    }
+
+    @Transactional
+    public CustomerContactResponse updateContact(Long customerId, Long contactId, CustomerContactRequest req) {
+        Customer customer = getOrThrow(customerId);
+        CustomerContact contact = customer.updateContact(
+                contactId, req.name(), req.position(), req.phone(), req.email(), req.primary());
+        return mapper.toContactResponse(contact);
+    }
+
+    @Transactional
+    public void deleteContact(Long customerId, Long contactId) {
+        getOrThrow(customerId).removeContact(contactId);
     }
 
     private Customer getOrThrow(Long id) {

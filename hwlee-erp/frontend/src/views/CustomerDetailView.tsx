@@ -4,6 +4,7 @@ import { deleteCustomer, getCustomer } from '../api/customers'
 import { getPendingCreditRequest } from '../api/credit'
 import { MASTER_STATUS, formatMoney } from '../domain/status'
 import StatusBadge from '../components/StatusBadge'
+import CustomerContactsPanel from './CustomerContactsPanel'
 import { useAuth } from '../auth/AuthContext'
 
 // 고객 상세 — 기본정보 + 여신한도(표시만). 여신한도 변경은 재무 권한이라
@@ -15,6 +16,8 @@ export default function CustomerDetailView() {
   const queryClient = useQueryClient()
   const { hasRole } = useAuth()
   const canDelete = hasRole('ADMIN')
+  // 담당자 편집 권한 = 고객 편집과 동일(SALES/ADMIN). 최종 강제는 백엔드.
+  const canEditContacts = hasRole('SALES') || hasRole('ADMIN')
 
   const { data: c, isLoading, isError, error } = useQuery({
     queryKey: ['customer', id],
@@ -120,6 +123,8 @@ export default function CustomerDetailView() {
           필요하면 <strong>여신 상향 요청</strong>을 올려 재무 승인을 받습니다.
         </p>
       </div>
+
+      <CustomerContactsPanel customerId={c.id} canEdit={canEditContacts} />
 
       {deleteMutation.isError && (
         <p className="error" style={{ marginTop: 12 }}>

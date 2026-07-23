@@ -3,14 +3,21 @@ package com.hwlee.erp.master.customer;
 import com.hwlee.erp.audit.AuditEntityListener;
 import com.hwlee.erp.audit.Auditable;
 import com.hwlee.erp.common.entity.BaseEntityWithCode;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -50,6 +57,14 @@ public class Customer extends BaseEntityWithCode implements Auditable {
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_terms", nullable = false, length = 30)
     private PaymentTerms paymentTerms;
+
+    /**
+     * 담당자(연락처) — 애그리거트 자식. 대표 담당자를 먼저 보이도록 정렬한다.
+     * 추가/수정/삭제는 아래 도메인 메서드로만(외부에서 컬렉션 직접 변경 불가).
+     */
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("primary DESC, id ASC")
+    private List<CustomerContact> contacts = new ArrayList<>();
 
     /**
      * 생성자 — code 는 외부에서 발급받아 주입한다.
@@ -92,6 +107,49 @@ public class Customer extends BaseEntityWithCode implements Auditable {
             throw new IllegalArgumentException("creditLimit 은 0 이상이어야 한다.");
         }
         this.creditLimit = newCreditLimit;
+    }
+
+    // ── 담당자(연락처) ─────────────────────────────────────
+    // 대표 담당자(primary)는 고객당 최대 1명. 이 불변식을 여기서 강제한다.
+
+    /** 담당자 추가. primary=true 면 기존 대표를 해제하고 이 담당자를 대표로 세운다. */
+    public CustomerContact addContact(String name, String position, String phone, String email, boolean primary) {
+        if (primary) {
+            contacts.forEach(c -> c.assignPrimary(false));
+        }
+        CustomerContact contact = new CustomerContact(this, name, position, phone, email, primary);
+        contacts.add(contact);
+        return contact;
+    }
+
+    /** 담당자 수정. primary 지정 시 다른 담당자의 대표 표시를 해제한다. */
+    public CustomerContact updateContact(Long contactId, String name, String position, String phone,
+                                         String email, boolean primary) {
+        CustomerContact contact = findContact(contactId);
+        contact.update(name, position, phone, email);
+        if (primary) {
+            contacts.forEach(c -> c.assignPrimary(false));
+            contact.assignPrimary(true);
+        } else {
+            contact.assignPrimary(false);
+        }
+        return contact;
+    }
+
+    /** 담당자 삭제 — orphanRemoval 로 실제 행이 제거된다(연락처는 이력 보존 대상 아님). */
+    public void removeContact(Long contactId) {
+        contacts.remove(findContact(contactId));
+    }
+
+    public List<CustomerContact> getContacts() {
+        return Collections.unmodifiableList(contacts);
+    }
+
+    private CustomerContact findContact(Long contactId) {
+        return contacts.stream()
+                .filter(c -> contactId != null && contactId.equals(c.getId()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("담당자를 찾을 수 없습니다: id=" + contactId));
     }
 
     /** 감사 로그에 남길 스냅샷 — 어떤 필드를 추적할지 명시적으로 고른다. */

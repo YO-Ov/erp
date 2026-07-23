@@ -63,6 +63,12 @@ export interface LoginResponse {
   roles: string[]
 }
 
+/** MeResponse — GET /api/auth/me. 부팅 시 저장 토큰 유효성 검증용. */
+export interface MeResponse {
+  username: string
+  roles: string[]
+}
+
 /** 백엔드 Role enum 과 대응. 화면 권한 가드에 쓴다. */
 export type Role =
   | 'SALES'
@@ -99,6 +105,25 @@ export interface CustomerUpdateRequest {
   name: string
   address: string | null
   paymentTerms: PaymentTerms
+}
+
+// 고객 담당자(연락처) — 한 고객에 여러 명. primary=대표 담당자(고객당 1명, 서버가 보장).
+export interface CustomerContact {
+  id: number
+  name: string
+  position: string | null
+  phone: string | null
+  email: string | null
+  primary: boolean
+}
+
+// 담당자 등록/수정 공용 요청.
+export interface CustomerContactRequest {
+  name: string
+  position: string | null
+  phone: string | null
+  email: string | null
+  primary: boolean
 }
 
 export type ItemType = 'FINISHED' | 'COMPONENT'

@@ -294,12 +294,10 @@ export default function DashboardView() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   })
 
-  const inboxRows = inbox?.content || []
   const outboxRows = outbox?.content || []
   const notiRows = notis?.content || []
 
   // 결재함 전체 건수는 서버 페이징의 totalElements 가 정확하다(현재 페이지 길이가 아니라).
-  const myTurnCount = inboxRows.filter((a) => a.myTurn).length
   const pendingSent = outboxRows.filter((a) => a.status === 'PENDING').length
   const rejectedSent = outboxRows.filter((a) => a.status === 'REJECTED').length
   const unread = notiRows.filter((n) => !n.read).length
@@ -316,25 +314,10 @@ export default function DashboardView() {
       </div>
 
       <CardGrid>
-        <Card
-          label="결재 대기"
-          value={inbox?.totalElements ?? '—'}
-          sub={myTurnCount > 0 ? `지금 내 차례 ${myTurnCount}건` : '내 차례 없음'}
-          to="/approvals"
-        />
-        <Card
-          label="진행중 상신"
-          value={pendingSent}
-          sub="내가 올려 결재중"
-          to="/approvals?box=outbox"
-        />
-        <Card
-          label="반려됨"
-          value={rejectedSent}
-          sub="최근 상신 기준"
-          to="/approvals?box=outbox"
-        />
-        <Card label="미확인 알림" value={unread} sub="최근 5건 기준" />
+        <Card label="결재 대기" value={inbox?.totalElements ?? '—'} to="/approvals" />
+        <Card label="진행중 상신" value={pendingSent} to="/approvals?box=outbox" />
+        <Card label="반려됨" value={rejectedSent} to="/approvals?box=outbox" />
+        <Card label="미확인 알림" value={unread} />
       </CardGrid>
 
       <div className="section-title">알림</div>

@@ -1,6 +1,8 @@
 import client from './client'
 import type {
   Customer,
+  CustomerContact,
+  CustomerContactRequest,
   CustomerCreateRequest,
   CustomerUpdateRequest,
   MasterStatus,
@@ -44,4 +46,41 @@ export async function updateCustomer(
 
 export async function deleteCustomer(id: string | number): Promise<void> {
   await client.delete(`/customers/${id}`)
+}
+
+// ── 담당자(연락처) 서브리소스 (/api/customers/{id}/contacts) ──
+// 조회는 넓은 역할, 추가·수정·삭제는 SALES/ADMIN(백엔드가 강제).
+
+export async function getCustomerContacts(
+  customerId: string | number,
+): Promise<CustomerContact[]> {
+  const { data } = await client.get<CustomerContact[]>(`/customers/${customerId}/contacts`)
+  return data
+}
+
+export async function addCustomerContact(
+  customerId: string | number,
+  body: CustomerContactRequest,
+): Promise<CustomerContact> {
+  const { data } = await client.post<CustomerContact>(`/customers/${customerId}/contacts`, body)
+  return data
+}
+
+export async function updateCustomerContact(
+  customerId: string | number,
+  contactId: number,
+  body: CustomerContactRequest,
+): Promise<CustomerContact> {
+  const { data } = await client.put<CustomerContact>(
+    `/customers/${customerId}/contacts/${contactId}`,
+    body,
+  )
+  return data
+}
+
+export async function deleteCustomerContact(
+  customerId: string | number,
+  contactId: number,
+): Promise<void> {
+  await client.delete(`/customers/${customerId}/contacts/${contactId}`)
 }

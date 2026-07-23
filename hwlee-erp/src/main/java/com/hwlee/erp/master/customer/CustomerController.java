@@ -8,12 +8,15 @@ import static com.hwlee.erp.master.customer.CustomerSpecifications.statusEquals;
 import static org.springframework.data.jpa.domain.Specification.where;
 
 import com.hwlee.erp.common.entity.MasterStatus;
+import com.hwlee.erp.master.customer.dto.CustomerContactRequest;
+import com.hwlee.erp.master.customer.dto.CustomerContactResponse;
 import com.hwlee.erp.master.customer.dto.CustomerCreateRequest;
 import com.hwlee.erp.master.customer.dto.CustomerResponse;
 import com.hwlee.erp.master.customer.dto.CustomerUpdateRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.time.LocalDate;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -82,6 +85,39 @@ public class CustomerController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ── 담당자(연락처) 서브리소스 ─────────────────────────
+    // 조회는 고객 조회 역할, 변경은 고객과 동일하게 SALES/ADMIN.
+
+    @GetMapping("/{id}/contacts")
+    public List<CustomerContactResponse> contacts(@PathVariable Long id) {
+        return service.getContacts(id);
+    }
+
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('SALES','ADMIN')")
+    @PostMapping("/{id}/contacts")
+    public ResponseEntity<CustomerContactResponse> addContact(
+            @PathVariable Long id, @Valid @RequestBody CustomerContactRequest req) {
+        CustomerContactResponse created = service.addContact(id, req);
+        return ResponseEntity
+                .created(URI.create("/api/customers/" + id + "/contacts/" + created.id()))
+                .body(created);
+    }
+
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('SALES','ADMIN')")
+    @PutMapping("/{id}/contacts/{contactId}")
+    public CustomerContactResponse updateContact(
+            @PathVariable Long id, @PathVariable Long contactId,
+            @Valid @RequestBody CustomerContactRequest req) {
+        return service.updateContact(id, contactId, req);
+    }
+
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('SALES','ADMIN')")
+    @DeleteMapping("/{id}/contacts/{contactId}")
+    public ResponseEntity<Void> deleteContact(@PathVariable Long id, @PathVariable Long contactId) {
+        service.deleteContact(id, contactId);
         return ResponseEntity.noContent().build();
     }
 }
